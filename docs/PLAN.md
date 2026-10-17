@@ -109,7 +109,31 @@ brokerPortal/
 
 Started Oct 17, 2026, built unattended. Each step is committed separately once lint, typecheck and tests pass. Nothing is pushed. Migrations are additive only (new tables, new enums, new view, nullable or defaulted new columns).
 
-<!-- PHASE-G-SUMMARY -->
+### Summary (written when phase G finished, Oct 17, 2026)
+
+**Done:** all seven steps, G1 to G7, each committed locally (nothing pushed). Every migration is additive. `pnpm lint`, `pnpm typecheck`, `pnpm test` (383 unit and integration tests) and `pnpm test:e2e` (12 journeys, including the two new training ones) all pass.
+
+- Brokers: training opens once their status is Active. Chapters unlock in order, Part 0 first. Lessons are text, embedded video (YouTube, Loom or Vimeo, finished with "Mark as watched") or uploaded MP4 (finished at 90% watched, played through 5-minute links). Each quiz draws a random set of questions from the chapter's pool. Answers stay hidden until the broker submits. Results show explanations. After a fail, the broker re-reads the lessons behind the missed questions, then the retake opens.
+- Admins: chapter list with average scores, chapter settings (pass mark, questions per attempt, retake rule), publish and unpublish (drafts are never visible to brokers), a lesson editor with callout buttons and live preview, video by embed link or MP4 upload (multipart, up to 1 GB), reordering, a question editor with per-question correct rates, training columns on the broker list (3b), a training panel on the broker profile (3c) and quiz stats on the overview (3a).
+- Content: Volume One (Part 0 and Modules 01 to 06) has 24 lessons and 73 questions in the manual's wording, plus the empty "GoHighLevel CRM walkthrough" video slot in Module 01. Volume Two Parts II to X are "coming soon" cards. Production gets Volume One as **drafts** on the next deploy (the release step adds them once). An admin reviews and publishes each chapter.
+
+**Before publishing in production:** check the chapters flagged with a warning icon in the admin. These are the DBPR fee and bond figures in Module 02, and the disputed $500,000 co-broke example in Module 03 (kept out of the questions; the lesson uses the standard 10% gross, 50/50 split).
+
+**Skipped, and why:**
+- 3e's "Draft questions from lessons (AI)" and "Upload SOP" buttons: they need an AI API key and the later ingest phase.
+- "Book a 1-on-1" on 3a and 3c: no booking feature exists yet.
+- Clicking through a real MP4 upload in the browser locally: the shared local SeaweedFS bucket has no CORS rule for the test origin, and changing it could break your own dev setup. Integration tests cover the server side. Production runs in direct upload mode and its bucket CORS (including the exposed ETag header) was checked on Oct 17, so large uploads should work there. Nothing extra is needed to enable them. In proxy mode the API refuses video uploads and asks for an embed link.
+- Video captions: not built yet (see the decision below).
+
+**Decisions to confirm** (each is written out in full under Decisions in docs/SPEC.md as "G-assumed"):
+separate `broker_training_metrics` view · chapter statuses draft / live / coming soon · per-chapter pass mark (80%), questions per attempt (8) and retake rule · unlocking · lesson completion · answers hidden until submit · lesson videos · lesson text format (Markdown with callouts) · admin-only notes · content edits keep history · "needs a hand" list · no video captions yet · broker training screens · admin training screens · content seeded once per chapter code · lesson length follows the manual · verify-before-publishing flags as admin notes.
+
+**Try the training flow locally:**
+1. `docker compose up -d`, then `pnpm db:migrate` and `pnpm db:seed`. Outside production the seed adds the training chapters as live. It never changes chapters that already exist.
+2. `pnpm dev`, then open http://localhost:3000.
+3. As a broker: sign in as `kevin.osei@example.com` with your `SEED_SAMPLE_PASSWORD` (Kevin is the active sample broker). Open Training, read Part 0, and take the quiz. Get some answers wrong to see the re-read and retake path. Pass to unlock Module 01.
+4. As an admin: sign in with your `SEED_OWNER_*` account and open Training (the "Chapters & quizzes" nav item). Try a chapter: edit a lesson, add a YouTube or Loom link, add a question, publish or unpublish. Then check Kevin's row on Brokers and his profile.
+5. Or run `pnpm test:e2e -- journey-7` to watch both journeys run against their own database.
 
 - [x] G1. Schema: chapters, lessons, lesson_videos, lesson_progress, questions, question_options, quiz_attempts, attempt_answers; `broker_training_metrics` view
 - [x] G2. Shared logic + unit tests: unlock rules, lesson completion, scoring and pass mark, drawing N questions, retake after re-reading, best / first-attempt scores, embed URL validation, lesson Markdown with callouts
@@ -119,4 +143,4 @@ Started Oct 17, 2026, built unattended. Each step is committed separately once l
   - Skipped: mockup 3e's "Draft questions from lessons (AI)" and "Upload SOP" buttons (need an AI API key and the later ingest phase), and 3a/3c's "Book a 1-on-1" (no booking feature exists). Browser MP4 upload was not clicked through locally: the shared local SeaweedFS bucket has no CORS rule for the test origin, and changing it could break Aj's own dev setup. The server side is covered by integration tests and production CORS was verified.
 - [x] G6. Content: Volume One (Part 0, Modules 01-06) as 24 lessons and 73 questions; Volume Two as coming-soon chapters; drafts in production, live in development
   - Kept the manual's wording, so most lessons read in 1 to 2 minutes (shown as at least 2). Existing chapters are never overwritten by the seed.
-- [ ] G7. Playwright: broker learns, fails, re-reads, passes, next chapter unlocks; admin creates a lesson with an embed video, adds questions, publishes, sees stats
+- [x] G7. Playwright: broker learns, fails, re-reads, passes, next chapter unlocks; admin creates a lesson with an embed video, adds questions, publishes, sees stats (`apps/web/e2e/journey-7-training.spec.ts`)
