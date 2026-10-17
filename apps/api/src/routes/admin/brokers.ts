@@ -1,6 +1,7 @@
 /**
  * File: apps/api/src/routes/admin/brokers.ts
- * Purpose: Admin routes for managing brokers (3b, 3c): the filtered list, inviting a new broker, the full profile with
+ * Purpose: Admin routes for managing brokers (3b, 3c): the filtered list (with training progress from the
+ * broker_training_metrics view), inviting a new broker, the full profile with
  * files and persona, editing level/status/dates, the persona, resending an invite, sending a reset link and reminders.
  * Setting a broker to inactive deletes their sessions at once (SPEC D9). Every change writes audit_log.
  *
@@ -8,7 +9,7 @@
  * - registerAdminBrokerRoutes(app): mounts the /v1/admin/brokers routes.
  * - pickChanges(before, body): returns only the fields whose value actually changes.
  */
-import { brokerMetrics, brokers, createBroker, sessions, users } from "@bp/db";
+import { brokerMetrics, brokers, brokerTrainingMetrics, createBroker, sessions, users } from "@bp/db";
 import {
   brokerListQuerySchema,
   brokerListResponseSchema,
@@ -65,7 +66,17 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     },
     async (request) => {
       const rows = await listBrokerMetrics(app.deps.db, request.query);
-      return { counts: await countBrokersByStatus(app.deps.db), brokers: rows.map(toBrokerListRow) };
+      const training = await app.deps.db.select().from(brokerTrainingMetrics);
+      return {
+        counts: await countBrokersByStatus(app.deps.db),
+        brokers: rows.map((row) => {
+          const metrics = training.find((item) => item.brokerId === row.brokerId);
+          return {
+            ...toBrokerListRow(row),
+            training: metrics ? { chaptersPassed: metrics.chaptersPassed, chaptersTotal: metrics.chaptersTotal, avgBestScore: metrics.avgBestScore } : undefined,
+          };
+        }),
+      };
     },
   );
 

@@ -1,7 +1,7 @@
 /**
  * File: packages/shared/test/storage.int.test.ts
  * Purpose: Integration tests for the S3 storage adapter against a real SeaweedFS container: presigned PUT and GET,
- * server-side upload, HEAD for existing and missing objects, bucket CORS, and the config and header helpers.
+ * multipart uploads for large videos, server-side upload, HEAD for existing and missing objects, bucket CORS, and the config and header helpers.
  *
  * Functions:
  * - none
@@ -94,6 +94,25 @@ describe("S3 storage", () => {
     await storage.putObject({ key: "t/b.png", body: new Uint8Array([1, 2, 3]), contentType: "image/png" });
     expect(await storage.headObject("t/b.png")).toEqual({ sizeBytes: 3, contentType: "image/png" });
     expect(await storage.headObject("t/missing.pdf")).toBeNull();
+  });
+
+  it("uploads a large file in parts through presigned part URLs, and can abort an upload", async () => {
+    const partOne = new Uint8Array(5 * 1024 * 1024).fill(1);
+    const partTwo = new TextEncoder().encode("the end");
+    const uploadId = await storage.createMultipartUpload({ key: "t/video.mp4", contentType: "video/mp4" });
+    const etags = [];
+    for (const [index, body] of [partOne, partTwo].entries()) {
+      const url = await storage.presignUploadPart({ key: "t/video.mp4", uploadId, partNumber: index + 1, expiresInSeconds: 60 });
+      const response = await fetch(url, { method: "PUT", body });
+      expect(response.ok).toBe(true);
+      etags.push({ partNumber: index + 1, etag: response.headers.get("etag")! });
+    }
+    await storage.completeMultipartUpload({ key: "t/video.mp4", uploadId, parts: etags.reverse() });
+    expect(await storage.headObject("t/video.mp4")).toEqual({ sizeBytes: partOne.byteLength + partTwo.byteLength, contentType: "video/mp4" });
+
+    const abandoned = await storage.createMultipartUpload({ key: "t/abandoned.mp4", contentType: "video/mp4" });
+    await storage.abortMultipartUpload({ key: "t/abandoned.mp4", uploadId: abandoned });
+    expect(await storage.headObject("t/abandoned.mp4")).toBeNull();
   });
 
   it("sets bucket CORS for the web origin", async () => {

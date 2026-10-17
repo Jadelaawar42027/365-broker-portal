@@ -9,6 +9,7 @@
 export const PRODUCT_NAME = "365 Yachts Broker Portal";
 
 export * from "./api";
+export * from "./api-training";
 export * from "./chapters";
 export * from "./constants";
 export * from "./files";

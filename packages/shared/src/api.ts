@@ -252,6 +252,9 @@ export const brokerListRowSchema = z.object({
   stepsTotal: z.number().int(),
   stepsWaitingReview: z.number().int(),
   lastActivityAt: nullableTimestamp,
+  training: z
+    .object({ chaptersPassed: z.number().int(), chaptersTotal: z.number().int(), avgBestScore: z.number().int().nullable() })
+    .optional(),
 });
 export type BrokerListRow = z.infer<typeof brokerListRowSchema>;
 

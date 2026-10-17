@@ -22,6 +22,7 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerInviteRoutes } from "./routes/invites";
 import { registerMeRoutes } from "./routes/me";
 import { registerPasswordResetRoutes } from "./routes/password-reset";
+import { registerTrainingRoutes } from "./routes/training";
 import { createMailer, type Mailer } from "./services/mailer";
 
 export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now"> & {
@@ -58,6 +59,7 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
   registerPasswordResetRoutes(app);
   registerMeRoutes(app);
   registerBrokerStepRoutes(app);
+  registerTrainingRoutes(app);
   await registerFileRoutes(app);
   await registerAdminRoutes(app);
 

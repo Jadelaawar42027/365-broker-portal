@@ -12,6 +12,7 @@ import { registerAdminAccountRoutes } from "./admins";
 import { registerAdminBrokerRoutes } from "./brokers";
 import { registerAdminOverviewRoutes } from "./overview";
 import { registerAdminReviewRoutes } from "./reviews";
+import { registerAdminTrainingRoutes } from "./training";
 import { registerAdminUploadRoutes } from "./uploads";
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
@@ -22,5 +23,6 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     registerAdminReviewRoutes(scope);
     registerAdminUploadRoutes(scope);
     registerAdminAccountRoutes(scope);
+    registerAdminTrainingRoutes(scope);
   });
 }

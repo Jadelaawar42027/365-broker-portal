@@ -39,6 +39,10 @@ function memoryStorage(): FileStorage {
     putObject: async ({ key, body }) => void stored.set(key, body),
     headObject: async (key) => (stored.has(key) ? { sizeBytes: stored.get(key)!.byteLength, contentType: null } : null),
     setCors: async () => {},
+    createMultipartUpload: async () => "unused",
+    presignUploadPart: async () => "unused",
+    completeMultipartUpload: async () => {},
+    abortMultipartUpload: async () => {},
   };
 }
 

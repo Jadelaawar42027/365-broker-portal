@@ -5,7 +5,7 @@
  * and persona notes never appear in any broker-facing response.
  *
  * Functions:
- * - adminRoutes(brokerId, brokerStepId): every admin route with sample ids, so none can be missed.
+ * - adminRoutes(brokerId, brokerStepId, chapterId): every admin route with sample ids and valid bodies, so none can be missed.
  */
 import { files } from "@bp/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,7 +17,8 @@ let brokerA: Awaited<ReturnType<TestContext["createBroker"]>>;
 let brokerB: Awaited<ReturnType<TestContext["createBroker"]>>;
 const SECRET_PERSONA = "Prefers veterans. SECRET-PERSONA-MARKER";
 
-function adminRoutes(brokerId: string, brokerStepId: string): [string, string, unknown?][] {
+function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerStepId): [string, string, unknown?][] {
+  const id = brokerStepId;
   return [
     ["GET", "/v1/admin/overview"],
     ["GET", "/v1/admin/reviews"],
@@ -37,6 +38,28 @@ function adminRoutes(brokerId: string, brokerStepId: string): [string, string, u
     ["POST", `/v1/admin/broker-steps/${brokerStepId}/send-back`, { note: "no" }],
     ["POST", `/v1/admin/broker-steps/${brokerStepId}/mark-done`, {}],
     ["POST", "/v1/admin/admins", { name: "Evil Admin", email: "evil@example.com" }],
+    ["GET", "/v1/admin/training/chapters"],
+    ["POST", "/v1/admin/training/chapters", { code: "Z9", title: "Nope chapter" }],
+    ["GET", `/v1/admin/training/chapters/${id}`],
+    ["PATCH", `/v1/admin/training/chapters/${id}`, { title: "Nope chapter" }],
+    ["DELETE", `/v1/admin/training/chapters/${id}`],
+    ["POST", `/v1/admin/training/chapters/${id}/publish`],
+    ["POST", `/v1/admin/training/chapters/${id}/unpublish`],
+    ["POST", `/v1/admin/training/chapters/${id}/lessons`, { title: "Nope lesson" }],
+    ["PUT", `/v1/admin/training/chapters/${id}/lesson-order`, { lessonIds: ["00000000-0000-4000-8000-000000000000"] }],
+    ["POST", `/v1/admin/training/chapters/${id}/questions`, { prompt: "Nope question?", options: [{ label: "A", isCorrect: true }, { label: "B", isCorrect: false }] }],
+    ["PATCH", `/v1/admin/training/lessons/${id}`, { title: "Nope lesson" }],
+    ["DELETE", `/v1/admin/training/lessons/${id}`],
+    ["PUT", `/v1/admin/training/lessons/${id}/video/embed`, { url: "https://youtu.be/dQw4w9WgXcQ" }],
+    ["DELETE", `/v1/admin/training/lessons/${id}/video`],
+    ["POST", `/v1/admin/training/lessons/${id}/video/uploads`, { fileName: "a.mp4", contentType: "video/mp4", sizeBytes: 10 }],
+    ["POST", `/v1/admin/training/lessons/${id}/video/uploads/complete`, { uploadId: "x", storageKey: "x", fileName: "a.mp4", parts: [{ partNumber: 1, etag: "x" }] }],
+    ["POST", `/v1/admin/training/lessons/${id}/video/uploads/abort`, { uploadId: "x", storageKey: "x" }],
+    ["PATCH", `/v1/admin/training/questions/${id}`, { prompt: "Nope question?" }],
+    ["DELETE", `/v1/admin/training/questions/${id}`],
+    ["GET", `/v1/admin/training/brokers/${brokerId}`],
+    ["POST", `/v1/admin/training/brokers/${brokerId}/chapters/${chapterId}/allow-retake`],
+    ["GET", "/v1/admin/training/overview"],
   ];
 }
 
@@ -61,7 +84,7 @@ describe("admin routes", () => {
       .filter(([path]) => path.startsWith("/v1/admin"))
       .flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`))
       .sort();
-    const tested = adminRoutes("{id}", "{id}")
+    const tested = adminRoutes("{id}", "{id}", "{chapterId}")
       .map(([method, path]) => `${method} ${path.replace("/w9/", "/{key}/")}`)
       .sort();
     expect(tested).toEqual(documented);

@@ -1,6 +1,7 @@
 /**
  * File: apps/api/test/uploads.int.test.ts
- * Purpose: Integration tests for the proxy upload mode (SPEC D11) and for admins uploading on a broker's behalf:
+ * Purpose: Integration tests for the proxy upload mode (SPEC D11), lesson video uploads being refused in that mode, and
+ * for admins uploading on a broker's behalf:
  * upload tokens are tied to the user, size and type, cannot be tampered with or reused by someone else, and admin
  * uploads are stored, attributed to the admin and mark the step approved.
  *
@@ -84,6 +85,19 @@ describe("proxy upload mode", () => {
   it("hides the WhatsApp contact when no number is configured", async () => {
     const me = (await ctx.call("GET", "/v1/me", { cookie: broker.cookie })).json();
     expect(me.support).toEqual({ name: "Shelly", whatsappNumber: null });
+  });
+});
+
+describe("lesson video uploads in proxy mode", () => {
+  it("are refused with a clear message, because large videos must go straight to the bucket", async () => {
+    const chapter = await ctx.call("POST", "/v1/admin/training/chapters", { cookie: owner, body: { code: "V1", title: "Video chapter" } });
+    const lesson = await ctx.call("POST", `/v1/admin/training/chapters/${chapter.json().id}/lessons`, { cookie: owner, body: { title: "Video lesson" } });
+    const response = await ctx.call("POST", `/v1/admin/training/lessons/${lesson.json().id}/video/uploads`, {
+      cookie: owner,
+      body: { fileName: "a.mp4", contentType: "video/mp4", sizeBytes: 1000 },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: "video_upload_unavailable", message: expect.stringMatching(/YouTube, Loom or Vimeo/) });
   });
 });
 

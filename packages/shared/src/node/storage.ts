@@ -13,8 +13,16 @@
  * - putObject(input): uploads bytes straight from the server.
  * - headObject(key): returns size and content type of a stored object, or null if it does not exist.
  * - setCors(origins): allows browsers on the given origins to PUT and GET objects (needed for direct uploads).
+ * - createMultipartUpload(input): starts a multipart upload (large lesson videos) and returns its upload id.
+ * - presignUploadPart(input): presigned PUT URL for one part of a multipart upload.
+ * - completeMultipartUpload(input): joins the uploaded parts (with their ETags) into the final object.
+ * - abortMultipartUpload(input): cancels a multipart upload and discards its parts.
  */
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
   HeadObjectCommand,
   NotFound,
   PutBucketCorsCommand,
@@ -42,6 +50,10 @@ export interface FileStorage {
   putObject(input: { key: string; body: Uint8Array; contentType: string }): Promise<void>;
   headObject(key: string): Promise<StoredObjectInfo | null>;
   setCors(origins: string[]): Promise<void>;
+  createMultipartUpload(input: { key: string; contentType: string }): Promise<string>;
+  presignUploadPart(input: { key: string; uploadId: string; partNumber: number; expiresInSeconds: number }): Promise<string>;
+  completeMultipartUpload(input: { key: string; uploadId: string; parts: { partNumber: number; etag: string }[] }): Promise<void>;
+  abortMultipartUpload(input: { key: string; uploadId: string }): Promise<void>;
 }
 
 export function readStorageConfig(env: NodeJS.ProcessEnv): StorageConfig | null {
@@ -101,6 +113,31 @@ export function createS3Storage(config: StorageConfig): FileStorage {
         if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404) return null;
         throw error;
       }
+    },
+    async createMultipartUpload({ key, contentType }) {
+      const result = await client.send(new CreateMultipartUploadCommand({ Bucket, Key: key, ContentType: contentType }));
+      if (!result.UploadId) throw new Error("Storage did not return an upload id.");
+      return result.UploadId;
+    },
+    async presignUploadPart({ key, uploadId, partNumber, expiresInSeconds }) {
+      return getSignedUrl(client, new UploadPartCommand({ Bucket, Key: key, UploadId: uploadId, PartNumber: partNumber }), {
+        expiresIn: expiresInSeconds,
+      });
+    },
+    async completeMultipartUpload({ key, uploadId, parts }) {
+      await client.send(
+        new CompleteMultipartUploadCommand({
+          Bucket,
+          Key: key,
+          UploadId: uploadId,
+          MultipartUpload: {
+            Parts: [...parts].sort((a, b) => a.partNumber - b.partNumber).map((part) => ({ PartNumber: part.partNumber, ETag: part.etag })),
+          },
+        }),
+      );
+    },
+    async abortMultipartUpload({ key, uploadId }) {
+      await client.send(new AbortMultipartUploadCommand({ Bucket, Key: key, UploadId: uploadId }));
     },
     async setCors(origins) {
       await client.send(
