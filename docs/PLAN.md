@@ -104,3 +104,17 @@ brokerPortal/
 - Phase C: Next.js rewrites cap proxied request bodies (10 MB by default). The proxy upload mode (D11) needs that limit raised, or uploads must go straight to the API.
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
+
+## Phase G: Training
+
+Started Oct 17, 2026, built unattended. Each step is committed separately once lint, typecheck and tests pass. Nothing is pushed. Migrations are additive only (new tables, new enums, new view, nullable or defaulted new columns).
+
+<!-- PHASE-G-SUMMARY -->
+
+- [x] G1. Schema: chapters, lessons, lesson_videos, lesson_progress, questions, question_options, quiz_attempts, attempt_answers; `broker_training_metrics` view
+- [ ] G2. Shared logic + unit tests: unlock rules, lesson completion, scoring and pass mark, drawing N questions, retake after re-reading, best / first-attempt scores, embed URL validation, lesson Markdown with callouts
+- [ ] G3. API + integration tests: broker training home, chapter, lesson, progress and video heartbeat, quiz start / answer / submit / result; admin chapter, lesson, video (multipart upload up to 1 GB, or embed), question CRUD, publish, stats, per-broker progress; permission tests
+- [ ] G4. Broker screens 2a-2d (training home, lesson reader with video, quiz, result); visual-check at 390 and 1280
+- [ ] G5. Admin screen 3e (chapters, lesson editor with callouts and video, question editor, publish, stats); unlock nav item; training columns on 3b, training panel on 3c, training panel on 3a; visual-check at 1280
+- [ ] G6. Content: Volume One (Part 0, Modules 01-06) as lessons and questions; Volume Two as coming-soon chapters; drafts in production, live in development
+- [ ] G7. Playwright: broker learns, fails, re-reads, passes, next chapter unlocks; admin creates a lesson with an embed video, adds questions, publishes, sees stats

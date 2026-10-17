@@ -15,6 +15,20 @@
       "when": 1792244395442,
       "tag": "0001_broker_metrics_view",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792254016756,
+      "tag": "0002_training",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792254036210,
+      "tag": "0003_broker_training_metrics_view",
+      "breakpoints": true
     }
   ]
 }
