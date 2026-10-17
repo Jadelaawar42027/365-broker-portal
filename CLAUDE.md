@@ -32,6 +32,7 @@ Keep these working at all times and update this list if they change.
 - `pnpm test:e2e` - Playwright end-to-end tests (needs `docker compose up -d`; resets and uses its own `broker_portal_e2e` database and ports 3100/4100)
 - `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
 - `pnpm build` - production build of web + api
+- `pnpm start` / `node scripts/start.mjs` - production start for one Railway service (picks api or web from `RAILWAY_SERVICE_NAME` or `BP_SERVICE`)
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`; sample brokers are never seeded when `NODE_ENV=production`)
 - `pnpm db:metrics-user` - create or reset the read-only `broker_metrics` login from `METRICS_READER_USER` / `METRICS_READER_PASSWORD`
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`

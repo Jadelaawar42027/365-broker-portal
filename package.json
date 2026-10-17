@@ -19,7 +19,8 @@
     "import:brokers": "pnpm --filter @bp/db import:brokers",
     "db:metrics-user": "pnpm --filter @bp/db db:metrics-user",
     "admin:invite": "pnpm --filter @bp/api admin:invite",
-    "storage:cors": "pnpm --filter @bp/api storage:cors"
+    "storage:cors": "pnpm --filter @bp/api storage:cors",
+    "start": "node scripts/start.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

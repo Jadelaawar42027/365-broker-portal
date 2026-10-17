@@ -25,10 +25,12 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | Source → Watch Paths | `/apps/api/**`<br>`/packages/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
 | Build → Builder | Railpack (default). It reads Node 24 from `.nvmrc` / `engines` and pnpm from `packageManager`. |
 | Build → Custom Build Command | `pnpm --filter @bp/api build` |
-| Deploy → Custom Start Command | `pnpm --filter @bp/api start` |
+| Deploy → Custom Start Command | `node scripts/start.mjs` |
 | Deploy → Pre-Deploy Command | `pnpm --filter @bp/api release` |
 | Deploy → Healthcheck Path | `/health` |
 | Networking → Public Networking | Not needed. The web service talks to the api over the private network. Add a domain later only for the AI bot. |
+
+**Start command.** Both services use the same `node scripts/start.mjs`. It starts the api or the web app based on the service's name (`RAILWAY_SERVICE_NAME`, which Railway sets): keep the services named `api` and `web`, or set a variable `BP_SERVICE=api` / `BP_SERVICE=web`. It runs Node directly rather than through pnpm, so Railway's stop signal on redeploy reaches the server and it shuts down cleanly. It is also the root `pnpm start` script, which Railpack needs to find before it will build a monorepo.
 
 `release` runs the database migrations, then the idempotent seed: it adds any missing onboarding steps and creates the owner from `SEED_OWNER_*` if that email doesn't exist yet. Sample brokers are never created in production. If `release` fails, Railway keeps the previous deploy running.
 
@@ -70,7 +72,7 @@ Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in pro
 | Source → Watch Paths | `/apps/web/**`<br>`/packages/shared/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
 | Build → Builder | Railpack (default) |
 | Build → Custom Build Command | `pnpm --filter @bp/web build` |
-| Deploy → Custom Start Command | `pnpm --filter @bp/web start` |
+| Deploy → Custom Start Command | `node scripts/start.mjs` |
 | Deploy → Pre-Deploy Command | *(leave empty)* |
 | Deploy → Healthcheck Path | `/login` |
 | Networking → Public Networking | **Generate Domain** (or add `team.365yachts.org` as a custom domain). Put this URL in the api's `WEB_ORIGIN`. |
@@ -127,6 +129,9 @@ Step 2 has a "Download contract & NDA" button only once a template file exists.
 
 | Symptom | Fix |
 | --- | --- |
+| Build log: `No start command detected` (Railpack) | You're on an older commit without the root `start` script, or the Custom Start Command is empty. Pull the latest code and set **Deploy → Custom Start Command** to `node scripts/start.mjs` on both services. |
+| Build log: `WARN could not detect pnpm lockfile version` | Harmless. pnpm 12 lockfiles start with `---`, which Railpack 0.41 doesn't read; it still installs pnpm 12 from `packageManager` in package.json. |
+| Deploy log: `Can't tell which app to start` | The service isn't named `api` or `web`. Rename it, or add the variable `BP_SERVICE=api` (or `web`). |
 | api deploy fails in pre-deploy | Open the deploy logs. Usually `DATABASE_URL` is missing or the owner password is shorter than 8 characters. |
 | api crashes at start with "Invalid API environment" | The message lists every bad variable, e.g. `WEB_ORIGIN: must use https in production`. |
 | Web pages show "Could not load…" or sign-in loops | `API_INTERNAL_URL` is wrong, or the web build happened before it was set. Fix it and redeploy web. Check `API_HOST=::` on the api. |
