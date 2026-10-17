@@ -5,7 +5,7 @@
  *
  * Functions:
  * - apiBaseUrl(): the API address for server-side calls.
- * - serverGet(path): GETs JSON with the visitor's cookies; redirects to /login on 401 and to / (which routes by role) on 403; returns { status, data }.
+ * - serverGet(path, options): GETs JSON with the visitor's cookies; redirects to /login on 401 and on 403 to options.forbiddenRedirect (default / , which routes by role); returns { status, data }.
  * - requireMe(): returns the signed-in user from /v1/me (once per request), or redirects to /login.
  * - publicGet(path): GETs JSON without cookies (invite and reset links); returns { status, data, message }.
  * - optionalMe(): returns the signed-in user, or null when nobody is signed in (never redirects).
@@ -19,14 +19,14 @@ function apiBaseUrl(): string {
   return (process.env.API_INTERNAL_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 }
 
-export async function serverGet<T>(path: string): Promise<{ status: number; data: T | null }> {
+export async function serverGet<T>(path: string, options: { forbiddenRedirect?: string } = {}): Promise<{ status: number; data: T | null }> {
   const cookieHeader = (await cookies()).toString();
   const response = await fetch(`${apiBaseUrl()}${path}`, {
     headers: cookieHeader ? { cookie: cookieHeader } : {},
     cache: "no-store",
   });
   if (response.status === 401) redirect("/login");
-  if (response.status === 403) redirect("/");
+  if (response.status === 403) redirect(options.forbiddenRedirect ?? "/");
   if (!response.ok) return { status: response.status, data: null };
   return { status: response.status, data: (await response.json()) as T };
 }

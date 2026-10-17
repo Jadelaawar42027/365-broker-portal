@@ -1,7 +1,8 @@
 /**
  * File: apps/web/eslint.config.mjs
  * Purpose: ESLint config for the Next.js app: the workspace base config plus the Next.js, React Hooks
- * and accessibility (jsx-a11y) rules, with browser globals for client code.
+ * and accessibility (jsx-a11y) rules, with browser globals for client code. Uploaded training videos have no caption
+ * files yet (SPEC Phase G decisions), so the caption rule is off for that one player.
  *
  * Functions:
  * - none
@@ -25,5 +26,9 @@ export default defineConfig([
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.flatConfigs.recommended.rules,
     },
+  },
+  {
+    files: ["src/components/training/lesson-video.tsx"],
+    rules: { "jsx-a11y/media-has-caption": "off" },
   },
 ]);

@@ -4,7 +4,7 @@
  * highlighted, and the avatar menu with "Sign out".
  *
  * Functions:
- * - BrokerNav(): the three navigation links, marking the active one with aria-current.
+ * - BrokerNav({ trainingOpen }): the three navigation links, marking the active one; Training shows a lock until it opens.
  * - UserMenu({ name }): the avatar and name button that opens a small menu with "Sign out".
  * - signOut(): ends the session through Better Auth and returns to /login.
  */
@@ -23,11 +23,12 @@ const LINKS = [
   { href: "/app/help", label: "Help", locked: false },
 ];
 
-export function BrokerNav() {
+export function BrokerNav({ trainingOpen = false }: { trainingOpen?: boolean }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Main" className="flex flex-wrap gap-1">
-      {LINKS.map((link) => {
+      {LINKS.map((entry) => {
+        const link = { ...entry, locked: entry.locked && !trainingOpen };
         const active = link.href === "/app" ? pathname === "/app" : pathname.startsWith(link.href);
         return (
           <Link

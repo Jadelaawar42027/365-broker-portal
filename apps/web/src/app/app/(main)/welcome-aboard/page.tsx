@@ -1,19 +1,21 @@
 /**
  * File: apps/web/src/app/app/(main)/welcome-aboard/page.tsx
  * Purpose: Screen 1d, "You're officially a 365 broker": shown once when every step is approved, with the broker's
- * level, commission tier and onboarding date, a disabled "Training coming soon" button (SPEC D6) and the first-90-days
- * plan from the manual. Brokers who aren't active yet are sent back to their checklist.
+ * level, commission tier and onboarding date, a "Start training" button once chapters are published (a disabled
+ * "Training coming soon" before that, SPEC D6) and the first-90-days plan from the manual. Brokers who aren't active yet are sent back to their checklist.
  *
  * Functions:
  * - WelcomeAboardPage(): renders the screen and records that it was seen.
  */
+import type { TrainingHomeResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MarkWelcomeSeen } from "@/components/broker/mark-welcome-seen";
-import { CheckIcon, LockIcon } from "@/components/ui/icons";
+import { LinkButton } from "@/components/ui/button";
+import { ArrowRightIcon, CheckIcon, LockIcon } from "@/components/ui/icons";
 import { FIRST_90_DAYS } from "@/lib/content";
 import { formatDate } from "@/lib/format";
-import { requireMe } from "@/lib/server-api";
+import { requireMe, serverGet } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Welcome aboard · 365 Yachts" };
 
@@ -21,6 +23,8 @@ export default async function WelcomeAboardPage() {
   const me = await requireMe();
   const broker = me.broker;
   if (!broker || broker.status !== "active") redirect("/app");
+  const { data: training } = await serverGet<TrainingHomeResponse>("/v1/me/training");
+  const trainingReady = Boolean(training?.open && training.volumeOne.length);
   const level = broker.level === "senior" ? "Senior broker" : "Junior broker";
   const facts = [
     `Level: ${level}`,
@@ -37,7 +41,9 @@ export default async function WelcomeAboardPage() {
         </span>
         <h1 className="mt-7 text-[40px] leading-[1.1] font-extrabold tracking-tight sm:text-[48px]">You&apos;re officially a 365 broker.</h1>
         <p className="mx-auto mt-5 max-w-[36rem] text-xl leading-relaxed text-[#dfe6f1]">
-          All your onboarding steps are approved. Training opens soon — we&apos;ll email you when Part 0 is ready.
+          {trainingReady
+            ? "All your onboarding steps are approved. Training is open — start with Part 0."
+            : "All your onboarding steps are approved. Training opens soon — we\u2019ll email you when Part 0 is ready."}
         </p>
         <ul className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center" aria-label="Your details">
           {facts.map((fact) => (
@@ -46,14 +52,21 @@ export default async function WelcomeAboardPage() {
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          disabled
-          className="mt-9 inline-flex min-h-12 cursor-not-allowed items-center gap-2.5 rounded-xl border-2 border-white/40 bg-white/10 px-6 text-lg font-bold text-[#e6ecf5]"
-        >
-          <LockIcon />
-          Training coming soon
-        </button>
+        {trainingReady ? (
+          <LinkButton href="/app/training" variant="white" size="lg" className="mt-9">
+            Start training
+            <ArrowRightIcon />
+          </LinkButton>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="mt-9 inline-flex min-h-12 cursor-not-allowed items-center gap-2.5 rounded-xl border-2 border-white/40 bg-white/10 px-6 text-lg font-bold text-[#e6ecf5]"
+          >
+            <LockIcon />
+            Training coming soon
+          </button>
+        )}
       </section>
 
       <section aria-labelledby="ninety-days" className="mt-12">

@@ -21,7 +21,7 @@ export default async function BrokerMainLayout({ children }: { children: ReactNo
           <Link href="/app" className="self-start rounded-lg" aria-label="365 Yachts, my onboarding">
             <BrandLockup />
           </Link>
-          <BrokerNav />
+          <BrokerNav trainingOpen={me.broker?.status === "active"} />
           <UserMenu name={me.user.name} />
         </div>
       </header>
