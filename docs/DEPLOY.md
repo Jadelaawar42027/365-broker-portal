@@ -2,7 +2,9 @@
 
 The portal runs as four Railway services in one project: **web** (Next.js), **api** (Fastify), **Postgres** and a **Storage Bucket**. There are deliberately no `railway.json` / `railway.toml` files (Railway has deprecated them for new services) and no `.railway/railway.ts`. Everything below is typed into the Railway dashboard.
 
-In the variable references below, `Postgres`, `api` and `bucket` are the **service names** in your Railway project. If you named a service differently, use its name instead (for example `${{Bucket.ENDPOINT}}`).
+In the variable references below, `Postgres` and `api` are service names and `uploads` is the bucket's name in the Railway project. If you named something differently, use its name instead (for example `${{Bucket.ENDPOINT}}`).
+
+**Current production (Oct 17, 2026):** project `365-broker-portal`, services `api` and `web`, bucket `uploads`, web at https://web-production-43f32.up.railway.app. Everything below is already set there; this guide is for checking it or rebuilding it.
 
 ## Before you start
 
@@ -22,7 +24,7 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | Setting (Railway → api → Settings) | Value |
 | --- | --- |
 | Source → Root Directory | *(leave empty)* |
-| Source → Watch Paths | `/apps/api/**`<br>`/packages/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
+| Source → Watch Paths | `/apps/api/**`<br>`/packages/**`<br>`/scripts/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
 | Build → Builder | Railpack (default). It reads Node 24 from `.nvmrc` / `engines` and pnpm from `packageManager`. |
 | Build → Custom Build Command | `pnpm --filter @bp/api build` |
 | Deploy → Custom Start Command | `node scripts/start.mjs` |
@@ -44,11 +46,11 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | reference to the Postgres service |
 | `WEB_ORIGIN` | `https://<web domain>` | the web service's public domain from step 3, e.g. `https://web-production-1234.up.railway.app` or `https://team.365yachts.org` (no trailing slash) |
 | `BETTER_AUTH_SECRET` | *(32+ random characters)* | `openssl rand -base64 32` |
-| `S3_ENDPOINT` | `${{bucket.ENDPOINT}}` | reference to the bucket |
-| `S3_REGION` | `${{bucket.REGION}}` | reference to the bucket |
-| `S3_BUCKET` | `${{bucket.BUCKET}}` | reference to the bucket (use `BUCKET`, not `RAILWAY_BUCKET_NAME`) |
-| `S3_ACCESS_KEY_ID` | `${{bucket.ACCESS_KEY_ID}}` | reference to the bucket |
-| `S3_SECRET_ACCESS_KEY` | `${{bucket.SECRET_ACCESS_KEY}}` | reference to the bucket |
+| `S3_ENDPOINT` | `${{uploads.ENDPOINT}}` | reference to the bucket |
+| `S3_REGION` | `${{uploads.REGION}}` | reference to the bucket |
+| `S3_BUCKET` | `${{uploads.BUCKET}}` | reference to the bucket (use `BUCKET`, not `RAILWAY_BUCKET_NAME`) |
+| `S3_ACCESS_KEY_ID` | `${{uploads.ACCESS_KEY_ID}}` | reference to the bucket |
+| `S3_SECRET_ACCESS_KEY` | `${{uploads.SECRET_ACCESS_KEY}}` | reference to the bucket |
 | `S3_FORCE_PATH_STYLE` | `false` | type it. Use `true` only if the bucket's **Credentials** tab says path-style URLs |
 | `STORAGE_UPLOAD_MODE` | `direct` (or `proxy`, see step 5) | type it |
 | `RESEND_API_KEY` | `re_…` | Resend dashboard. Leave unset to only log emails |
@@ -69,19 +71,20 @@ Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in pro
 | Setting (Railway → web → Settings) | Value |
 | --- | --- |
 | Source → Root Directory | *(leave empty)* |
-| Source → Watch Paths | `/apps/web/**`<br>`/packages/shared/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
+| Source → Watch Paths | `/apps/web/**`<br>`/packages/shared/**`<br>`/scripts/**`<br>`/package.json`<br>`/pnpm-lock.yaml`<br>`/pnpm-workspace.yaml`<br>`/turbo.json`<br>`/tsconfig.base.json` |
 | Build → Builder | Railpack (default) |
 | Build → Custom Build Command | `pnpm --filter @bp/web build` |
 | Deploy → Custom Start Command | `node scripts/start.mjs` |
 | Deploy → Pre-Deploy Command | *(leave empty)* |
 | Deploy → Healthcheck Path | `/login` |
-| Networking → Public Networking | **Generate Domain** (or add `team.365yachts.org` as a custom domain). Put this URL in the api's `WEB_ORIGIN`. |
+| Networking → Public Networking | **Generate Domain** on port `8080` (or add `team.365yachts.org` as a custom domain). Put this URL in the api's `WEB_ORIGIN`. |
 
 ### Variables (Railway → web → Variables)
 
 | Variable | Value | Where it comes from |
 | --- | --- | --- |
 | `NODE_ENV` | `production` | type it |
+| `PORT` | `8080` | type it (matches the domain's target port) |
 | `API_INTERNAL_URL` | `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:${{api.PORT}}` | references to the api service (private network, plain http) |
 | `SUPPORT_CONTACT_NAME` | `${{api.SUPPORT_CONTACT_NAME}}` | reference, so both services show the same contact |
 | `SUPPORT_WHATSAPP_NUMBER` | `${{api.SUPPORT_WHATSAPP_NUMBER}}` | reference |
@@ -96,7 +99,13 @@ Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in pro
 
 ## 5. File uploads: direct or proxy
 
-With `STORAGE_UPLOAD_MODE=direct`, phones upload straight to the bucket with presigned URLs, which needs the bucket to accept the web domain (CORS). Railway's docs don't say whether buckets support CORS, so check once from your laptop with the bucket's credentials (copy them from the bucket's **Credentials** tab):
+With `STORAGE_UPLOAD_MODE=direct`, phones upload straight to the bucket with presigned URLs, which needs the bucket to accept the web domain (CORS). Railway buckets do support this (checked on Oct 17, 2026: the web domain is allowed, other sites get 403). Run it once per bucket, and again if the web domain changes. The easiest way uses the api's own variables:
+
+```bash
+railway run --service api -- pnpm storage:cors
+```
+
+Or pass the bucket's credentials yourself (from the bucket's **Credentials** tab):
 
 ```bash
 WEB_ORIGIN=https://<web domain> \
