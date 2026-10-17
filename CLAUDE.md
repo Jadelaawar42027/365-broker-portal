@@ -32,7 +32,8 @@ Keep these working at all times and update this list if they change.
 - `pnpm test:e2e` - Playwright end-to-end tests
 - `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
 - `pnpm build` - production build of web + api
-- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio`
+- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`; sample brokers are never seeded when `NODE_ENV=production`)
+- `pnpm db:metrics-user` - create or reset the read-only `broker_metrics` login from `METRICS_READER_USER` / `METRICS_READER_PASSWORD`
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`
 
 ## Rule 1: Comments - file headers only, never inline

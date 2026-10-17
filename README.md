@@ -51,8 +51,9 @@ pnpm dev
 | `pnpm build` | Production build of web and API |
 | `pnpm db:generate` | Creates a migration after a schema change |
 | `pnpm db:migrate` | Applies migrations |
-| `pnpm db:seed` | Seeds onboarding steps, owner and sample brokers |
+| `pnpm db:seed` | Seeds onboarding steps, owner and sample brokers (prints Marisol's invite link) |
 | `pnpm db:studio` | Opens Drizzle Studio to browse the database |
+| `pnpm db:metrics-user` | Creates the read-only login other tools use to read `broker_metrics` |
 | `pnpm import:brokers -- --dry-run` | Previews importing existing brokers from `data/import/` |
 
 ## Local services

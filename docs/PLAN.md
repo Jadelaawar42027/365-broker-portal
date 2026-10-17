@@ -5,7 +5,7 @@ Approved by Aj on Oct 17, 2026. `docs/SPEC.md` (including its "Decisions" sectio
 ## Status
 
 - [x] A. Monorepo scaffold (Oct 17, 2026)
-- [ ] B. Database and shared logic
+- [x] B. Database and shared logic (Oct 17, 2026)
 - [ ] C. API
 - [ ] D. Broker screens
 - [ ] E. Admin screens
@@ -78,9 +78,14 @@ brokerPortal/
 
 - Phase A: Vitest runs per package through Turborepo instead of a root `vitest.workspace.ts` (the workspace file is deprecated in current Vitest). The ESLint config and its local rules live in a new `packages/eslint-config` package so the rules have their own tests.
 - Phase A: SeaweedFS replaces MinIO locally and in tests (SPEC D21). Phase C integration tests start `chrislusf/seaweedfs` as a Testcontainers GenericContainer.
+- Phase B: schema details beyond the spec are recorded in SPEC D8 and D17 (no broker_id on account_tokens; short_title, summary, intro, max_size_bytes, attempts; explicit step kinds; date columns).
+- Phase B: `pnpm db:metrics-user` and the `@bp/db/testing` helper (Testcontainers Postgres with migrations) were added; the API's integration tests reuse it.
 - Phase A: TypeScript is pinned to 6.0.x and ESLint to 9.x: typescript-eslint does not support TypeScript 7 yet, and the Next.js React/a11y lint plugins do not support ESLint 10 yet.
 
 ## Notes for later phases
+
+- Phase C: the seed creates approved upload steps without file rows (no storage client yet). Once storage exists, the seed uploads small placeholder files for the sample brokers so "View file" works locally.
+- Phase C: the contract & NDA step has no template file yet (`template_file_key` is empty). Aj needs to provide the blank contract and NDA; the W-9 step links to the IRS form.
 
 - Phase C: Next.js rewrites cap proxied request bodies (10 MB by default). The proxy upload mode (D11) needs that limit raised, or uploads must go straight to the API.
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.

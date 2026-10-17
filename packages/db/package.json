@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -14,18 +15,23 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
-    "import:brokers": "tsx scripts/import-brokers.ts"
+    "import:brokers": "tsx scripts/import-brokers.ts",
+    "db:metrics-user": "tsx scripts/metrics-user.ts"
   },
   "dependencies": {
     "@bp/shared": "workspace:*",
+    "better-auth": "^1.7.10",
     "drizzle-orm": "^0.45.4",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@bp/eslint-config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.1",
     "@types/node": "^24.19.2",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.0",
+    "testcontainers": "^12.2.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vitest": "^5.0.5"

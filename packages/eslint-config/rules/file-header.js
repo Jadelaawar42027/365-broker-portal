@@ -7,7 +7,7 @@
  * - findRepoRoot(startPath): walks up from a file to the folder holding pnpm-workspace.yaml; returns it or null.
  * - getHeaderComment(sourceCode): returns the block comment that opens the file, or null.
  * - readListedFunctions(headerText): returns the names listed under "Functions:" in a header.
- * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const, method of a top-level object literal and class method.
+ * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const, method of a top-level object literal and class method (constructors included).
  * - resolveRootDir(context): returns the repo root from the rule options or by searching upward.
  * - requireFileHeader.create(context): reports a missing header, a wrong "File:" path, or a missing Purpose/Functions section.
  * - noCommentsOutsideHeader.create(context): reports every comment other than the file header.
@@ -93,11 +93,7 @@ function collectDeclaredFunctions(program) {
       }
     } else if (node.type === "ClassDeclaration") {
       for (const member of node.body.body) {
-        if (
-          member.type === "MethodDefinition" &&
-          member.kind !== "constructor" &&
-          member.key.type === "Identifier"
-        ) {
+        if (member.type === "MethodDefinition" && member.key.type === "Identifier") {
           declared.push({ name: member.key.name, node: member });
         }
       }

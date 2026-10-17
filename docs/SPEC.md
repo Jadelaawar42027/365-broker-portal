@@ -173,7 +173,7 @@ Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from
 ### Accounts and auth
 
 - **D7. Admin accounts.** Owner-only `POST /v1/admin/admins` invites an admin by email, plus a `pnpm admin:invite` script. No Settings screen this weekend.
-- **D8. Account tokens.** Invites and password resets share one token mechanism: an `account_tokens` table (id, user_id, broker_id nullable, purpose `invite` | `password_reset`, token_hash, expires_at, used_at) replaces `invites`. Invites expire after 7 days, reset links after 24 hours; tokens are single-use and stored only as hashes.
+- **D8. Account tokens.** Invites and password resets share one token mechanism: an `account_tokens` table (id, user_id, purpose `invite` | `password_reset`, token_hash, expires_at, used_at, created_by, created_at) replaces `invites`. It has no broker_id: users and brokers are one-to-one, and admin invites (D7) have no broker row. Invites expire after 7 days, reset links after 24 hours; tokens are single-use and stored only as hashes.
   - `POST /v1/admin/brokers/:id/resend-invite` issues a fresh invite and invalidates the old one.
   - `POST /v1/admin/brokers/:id/reset-password` emails a reset link; `/login` has a "Forgot password?" link that does the same for the user's own email (always answers the same way so it does not reveal which emails exist).
   - `/reset/[token]` sets a new password; completing it deletes the user's other sessions.
@@ -202,7 +202,11 @@ Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from
 
 ### Data and metrics
 
-- **D17. Schema additions.** `onboarding_steps.config` (jsonb: choices, checkboxes, max size, review checklist); `brokers.welcome_seen_at` (the onboarding-complete screen shows once); Better Auth's user table is `users`, with `role` and `phone` as additional fields.
+- **D17. Schema additions.** `onboarding_steps.config` (jsonb: choices, checklist items, confirm label, text length limits, template link, review checklist, minutes); `brokers.welcome_seen_at` (the onboarding-complete screen shows once); Better Auth's user table is `users`, with `role` and `phone` as additional fields. Added in phase B:
+  - `onboarding_steps`: `short_title` (3a/3c/3d labels such as "W-9"), `summary` (the 1b next-step card text), `intro` (the 1c subtitle), `max_size_bytes`.
+  - `onboarding_steps.kind` is one of `upload`, `text`, `choice`, `confirm`, `checklist`, `admin` (the spec's "form (long text)", "form (choice)", "confirm", "confirm (3 checkboxes)" and "admin marks done").
+  - `broker_steps.attempts` (number of submissions, shown as "Attempt" on 3d).
+  - `joined_at`, `onboarded_at` and `left_at` are `date` columns; "today" in metrics is Florida time.
 - **D18. metrics_reader.** The migration creates `metrics_reader` as a NOLOGIN role with SELECT on `broker_metrics` only. `pnpm db:metrics-user` creates a login user in that role from `METRICS_READER_PASSWORD`.
 - **D19.** 3a's "Avg. days to onboard" subtitle says "Last 10 brokers" (the mockup's "Last 6" is placeholder).
 

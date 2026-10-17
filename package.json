@@ -16,7 +16,8 @@
     "db:migrate": "pnpm --filter @bp/db db:migrate",
     "db:seed": "pnpm --filter @bp/db db:seed",
     "db:studio": "pnpm --filter @bp/db db:studio",
-    "import:brokers": "pnpm --filter @bp/db import:brokers"
+    "import:brokers": "pnpm --filter @bp/db import:brokers",
+    "db:metrics-user": "pnpm --filter @bp/db db:metrics-user"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

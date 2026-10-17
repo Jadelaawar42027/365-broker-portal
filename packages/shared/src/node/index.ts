@@ -7,3 +7,4 @@
  * - none
  */
 export { findRootEnvFile, loadRootEnvFile } from "./env-file";
+export { createAccountToken, hashToken } from "./tokens";

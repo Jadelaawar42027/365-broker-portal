@@ -98,7 +98,7 @@ ruleTester.run("no-comments-outside-header", noCommentsOutsideHeader, {
 ruleTester.run("header-lists-functions", headerListsFunctions, {
   valid: [
     {
-      code: `${header("x.ts", [" * - add(a, b): sums.", " * - Box.open(): opens.", " * - plugin.create(ctx): builds."])}
+      code: `${header("x.ts", [" * - add(a, b): sums.", " * - Box.constructor(): builds a box.", " * - Box.open(): opens.", " * - plugin.create(ctx): builds."])}
 export function add(a: number, b: number) { return a + b; }
 class Box { constructor() {} open() { return true; } }
 export const plugin = { create(ctx: unknown) { return ctx; } };
@@ -113,6 +113,11 @@ export { Box };`,
   invalid: [
     {
       code: `${header("x.ts")}\nexport const double = (n: number) => n * 2;`,
+      filename,
+      errors: [{ messageId: "unlisted" }],
+    },
+    {
+      code: `${header("x.ts", [" * - Box.open(): opens."])}\nexport class Box { constructor() {} open() { return 1; } }`,
       filename,
       errors: [{ messageId: "unlisted" }],
     },
