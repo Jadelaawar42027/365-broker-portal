@@ -6,7 +6,7 @@ Approved by Aj on Oct 17, 2026. `docs/SPEC.md` (including its "Decisions" sectio
 
 - [x] A. Monorepo scaffold (Oct 17, 2026)
 - [x] B. Database and shared logic (Oct 17, 2026)
-- [ ] C. API
+- [x] C. API (Oct 17, 2026)
 - [ ] D. Broker screens
 - [ ] E. Admin screens
 - [ ] F. Import, end-to-end tests, deploy docs
@@ -80,6 +80,8 @@ brokerPortal/
 - Phase A: SeaweedFS replaces MinIO locally and in tests (SPEC D21). Phase C integration tests start `chrislusf/seaweedfs` as a Testcontainers GenericContainer.
 - Phase B: schema details beyond the spec are recorded in SPEC D8 and D17 (no broker_id on account_tokens; short_title, summary, intro, max_size_bytes, attempts; explicit step kinds; date columns).
 - Phase B: `pnpm db:metrics-user` and the `@bp/db/testing` helper (Testcontainers Postgres with migrations) were added; the API's integration tests reuse it.
+- Phase C: extra routes, storage key nonce, email rules, CSRF origin check and the shared API contract are recorded as SPEC D22-D26. Added `pnpm admin:invite` and `pnpm storage:cors`.
+- Phase C: the S3 adapter lives in `@bp/shared/node` (not `apps/api`) because the seed and the phase F importer also upload files.
 - Phase A: TypeScript is pinned to 6.0.x and ESLint to 9.x: typescript-eslint does not support TypeScript 7 yet, and the Next.js React/a11y lint plugins do not support ESLint 10 yet.
 
 ## Notes for later phases

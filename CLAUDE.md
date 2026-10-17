@@ -35,6 +35,8 @@ Keep these working at all times and update this list if they change.
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`; sample brokers are never seeded when `NODE_ENV=production`)
 - `pnpm db:metrics-user` - create or reset the read-only `broker_metrics` login from `METRICS_READER_USER` / `METRICS_READER_PASSWORD`
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`
+- `pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` - create an admin and print their invite link (owner task, SPEC D7)
+- `pnpm storage:cors` - allow the web origin to upload straight to the bucket (run once per bucket; SPEC D11)
 
 ## Rule 1: Comments - file headers only, never inline
 

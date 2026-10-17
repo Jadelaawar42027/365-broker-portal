@@ -10,6 +10,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    hookTimeout: 180_000,
+    testTimeout: 60_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],

@@ -28,6 +28,7 @@ cp .env.example .env          # local settings; the defaults work with docker co
 docker compose up -d          # starts Postgres and file storage, creates the bucket
 pnpm db:migrate               # creates the tables
 pnpm db:seed                  # adds the onboarding steps, the owner account and sample brokers
+pnpm storage:cors             # lets the browser upload straight to local file storage
 pnpm --filter @bp/web exec playwright install chromium   # once, for end-to-end tests
 ```
 
@@ -39,6 +40,10 @@ pnpm dev
 
 - Web app: http://localhost:3000
 - API health: http://localhost:4000/health
+- API docs (OpenAPI / Swagger UI): http://localhost:4000/docs
+- Emails are printed in the API's console unless `RESEND_API_KEY` is set.
+
+Sample logins after `pnpm db:seed`: the owner from `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD`, and the brokers `daniel.reyes@example.com` (mid-onboarding) and `kevin.osei@example.com` (active) with `SEED_SAMPLE_PASSWORD`. The seed prints an invite link for Marisol Vega.
 
 ## Everyday commands
 
@@ -55,6 +60,8 @@ pnpm dev
 | `pnpm db:studio` | Opens Drizzle Studio to browse the database |
 | `pnpm db:metrics-user` | Creates the read-only login other tools use to read `broker_metrics` |
 | `pnpm import:brokers -- --dry-run` | Previews importing existing brokers from `data/import/` |
+| `pnpm admin:invite -- --name "…" --email …` | Creates an admin account and prints the invite link |
+| `pnpm storage:cors` | Allows the web app to upload straight to the bucket (once per bucket) |
 
 ## Local services
 

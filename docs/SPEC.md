@@ -214,3 +214,11 @@ Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from
 
 - **D20.** Node 24 (`engines.node >=24`, `.nvmrc`), not Node 22.
 - **D21. Local S3 is SeaweedFS, not MinIO.** MinIO stopped publishing pullable Docker images (quay.io/minio returns 401, Docker Hub `minio/minio` is gone). Local development and integration tests use `chrislusf/seaweedfs` (S3 API on port 8333, credentials in `docker/seaweedfs/s3.json`). Production is unchanged (Railway Storage Bucket); the API only speaks plain S3. Decided by Aj, Oct 17, 2026.
+
+### Added during phase C (API)
+
+- **D22. Storage keys** are `brokers/{brokerId}/{stepKey}/{version}-{nonce}-{safeFileName}`. The short random nonce keeps keys unique when one submission holds several files with the same name (D12). Submitted files are re-checked in storage (exists, type, size, belongs to this broker and step, not recorded before) before a `files` row is written.
+- **D23. Routes beyond the spec's list**, all needed by the screens or decisions: `GET /v1/invites/:token` (1a shows the name), `POST /v1/password-reset/request`, `GET`/`POST /v1/password-reset/:token` (D8), `POST /v1/me/welcome-seen` (1d once), `GET /v1/me/steps/:key/template-url`, `GET /v1/admin/broker-steps/:id` (3d detail and queue position), `POST /v1/admin/brokers/:id/resend-invite`, `.../reset-password`, `.../remind` (D16), `POST /v1/admin/admins` (D7), `PUT /v1/uploads/:token` (proxy uploads, D11). The full list is in the OpenAPI document at `/docs`.
+- **D24. Emails** go to the broker when a step is approved or sent back, on invite, reset and reminder, and to the broker and every admin when onboarding completes. A failed email is logged and never fails the request.
+- **D25. CSRF guard.** Besides SameSite cookies, state-changing `/v1` requests that carry an `Origin` header must come from `WEB_ORIGIN`.
+- **D26. Request/response contract** lives in `packages/shared/src/api.ts` as Zod schemas. The API validates and serialises with them (so fields not listed, like persona notes on broker routes, can never be sent) and the web app imports the same types.

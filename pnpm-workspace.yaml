@@ -2,7 +2,10 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.11.9'
   - '@turbo/darwin-arm64@2.11.9'

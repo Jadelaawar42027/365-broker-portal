@@ -15,20 +15,23 @@
  * - seedDaniel(tx, context): creates Daniel Reyes, mid-onboarding with one step sent back and one waiting for review.
  * - seedKevin(tx, context): creates Kevin Osei, an active broker with every step approved and a persona.
  * - seedMarisol(tx, context): creates Marisol Vega, invited but not signed up yet, with a fresh invite token.
+ * - attachSampleFile(tx, context, input): uploads a placeholder file to storage (when storage is configured) and records it as version 1 of the step.
  */
-import { addDays, INVITE_TTL_DAYS, todayInTimeZone, type StepStatus } from "@bp/shared";
-import { createAccountToken } from "@bp/shared/node";
+import { addDays, buildStorageKey, INVITE_TTL_DAYS, todayInTimeZone, type StepStatus } from "@bp/shared";
+import { createAccountToken, type FileStorage } from "@bp/shared/node";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { createBroker } from "../brokers";
 import type { Database, Transaction } from "../client";
-import { accountTokens, accounts, brokerSteps, onboardingSteps, users } from "../schema";
+import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } from "../schema";
 import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
+import { samplePdf, samplePng } from "./sample-files";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
 
 export type SeedOptions = {
   owner?: { name: string; email: string; password: string } | null;
   sampleBrokers?: { password: string } | null;
+  storage?: FileStorage | null;
   refreshSteps?: boolean;
   now?: Date;
   webOrigin?: string;
@@ -49,6 +52,7 @@ type SampleContext = {
   password: string;
   webOrigin: string;
   stepIds: Map<string, string>;
+  storage: FileStorage | null;
   summary: SeedSummary;
 };
 
@@ -90,6 +94,7 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
         password: options.sampleBrokers.password,
         webOrigin: (options.webOrigin ?? "http://localhost:3000").replace(/\/+$/, ""),
         stepIds: await loadStepIds(tx),
+        storage: options.storage ?? null,
         summary,
       };
       await seedDaniel(tx, context);
@@ -147,6 +152,33 @@ async function ensureOwner(tx: Transaction, owner: NonNullable<SeedOptions["owne
 async function loadStepIds(tx: Transaction): Promise<Map<string, string>> {
   const rows = await tx.select({ id: onboardingSteps.id, key: onboardingSteps.key }).from(onboardingSteps);
   return new Map(rows.map((row) => [row.key, row.id]));
+}
+
+async function attachSampleFile(
+  tx: Transaction,
+  context: SampleContext,
+  input: { brokerId: string; userId: string; stepKey: string; title: string; uploadedAt: Date; image?: boolean },
+) {
+  if (!context.storage) return;
+  const fileName = input.image ? "headshot.png" : `${input.stepKey}.pdf`;
+  const contentType = input.image ? "image/png" : "application/pdf";
+  const body = input.image ? samplePng() : samplePdf(input.title);
+  const storageKey = buildStorageKey({ brokerId: input.brokerId, stepKey: input.stepKey, version: 1, nonce: "seed", fileName });
+  await context.storage.putObject({ key: storageKey, body, contentType });
+  const [step] = await tx
+    .select({ id: brokerSteps.id })
+    .from(brokerSteps)
+    .where(and(eq(brokerSteps.brokerId, input.brokerId), eq(brokerSteps.stepId, context.stepIds.get(input.stepKey)!)));
+  await tx.insert(files).values({
+    brokerStepId: step!.id,
+    storageKey,
+    fileName,
+    mimeType: contentType,
+    sizeBytes: body.byteLength,
+    version: 1,
+    uploadedBy: input.userId,
+    createdAt: input.uploadedAt,
+  });
 }
 
 async function setStepState(tx: Transaction, brokerId: string, stepId: string, state: StepState) {
@@ -219,6 +251,12 @@ async function seedDaniel(tx: Transaction, context: SampleContext) {
     submittedAt: at(addDays(today, -2), 17),
     formData: { choice: "transfer" },
   });
+  const uploads = [
+    { stepKey: "photo_id", title: "Photo ID", uploadedAt: at(addDays(today, -4), 14) },
+    { stepKey: "contract_nda", title: "Employment Contract & NDA", uploadedAt: at(addDays(today, -3), 16) },
+    { stepKey: "headshot", title: "Headshot", uploadedAt: at(addDays(today, -2), 15), image: true },
+  ];
+  for (const upload of uploads) await attachSampleFile(tx, context, { brokerId, userId, ...upload });
   context.summary.sampleBrokers.push({ email, outcome: "created" });
 }
 
@@ -260,6 +298,16 @@ async function seedKevin(tx: Transaction, context: SampleContext) {
       reviewedBy: seed.needsApproval ? context.ownerId : null,
       formData: formDataByKey[seed.key] ?? null,
     });
+    if (seed.kind === "upload") {
+      await attachSampleFile(tx, context, {
+        brokerId,
+        userId,
+        stepKey: seed.key,
+        title: seed.shortTitle,
+        uploadedAt: at(day, 14),
+        image: seed.key === "headshot",
+      });
+    }
   }
   context.summary.sampleBrokers.push({ email, outcome: "created" });
 }

@@ -1,7 +1,7 @@
 /**
  * File: packages/db/scripts/seed.ts
  * Purpose: `pnpm db:seed` entry point. Seeds the onboarding steps, the owner from SEED_OWNER_* and, outside
- * production, three sample brokers. Flags: --refresh-steps overwrites step copy, --no-samples skips sample brokers.
+ * production, three sample brokers (with placeholder files when S3_* is set). Flags: --refresh-steps overwrites step copy, --no-samples skips sample brokers.
  *
  * Functions:
  * - readOwner(env): returns the owner account settings from the environment, or null (with a warning) if any are missing; throws on an invalid email or short password.
@@ -9,7 +9,7 @@
  * - main(argv): loads the environment, runs the seed and closes the connection.
  */
 import { emailSchema, passwordSchema } from "@bp/shared";
-import { loadRootEnvFile } from "@bp/shared/node";
+import { createS3Storage, loadRootEnvFile, readStorageConfig } from "@bp/shared/node";
 import { createDb } from "../src/client";
 import { readDatabaseUrl } from "../src/database-url";
 import { seedDatabase, type SeedSummary } from "../src/seed";
@@ -50,7 +50,10 @@ async function main(argv: string[]): Promise<void> {
   const samplePassword = withSamples ? process.env.SEED_SAMPLE_PASSWORD || DEFAULT_SAMPLE_PASSWORD : null;
   const { db, close } = createDb(readDatabaseUrl(), { max: 1 });
   try {
+    const storageConfig = readStorageConfig(process.env);
+    if (withSamples && !storageConfig) console.warn("S3_* not set - sample brokers get no placeholder files.");
     const summary = await seedDatabase(db, {
+      storage: withSamples && storageConfig ? createS3Storage(storageConfig) : null,
       owner: readOwner(process.env),
       sampleBrokers: samplePassword ? { password: passwordSchema.parse(samplePassword) } : null,
       refreshSteps: argv.includes("--refresh-steps"),

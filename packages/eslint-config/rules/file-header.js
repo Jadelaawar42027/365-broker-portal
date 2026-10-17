@@ -8,10 +8,12 @@
  * - getHeaderComment(sourceCode): returns the block comment that opens the file, or null.
  * - readListedFunctions(headerText): returns the names listed under "Functions:" in a header.
  * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const, method of a top-level object literal and class method (constructors included).
+ * - collectAllFunctionNames(program): returns the names of every named function, method and function-valued variable anywhere in the file.
+ * - isFunctionNode(node): true for function declarations, function expressions and arrow functions.
  * - resolveRootDir(context): returns the repo root from the rule options or by searching upward.
  * - requireFileHeader.create(context): reports a missing header, a wrong "File:" path, or a missing Purpose/Functions section.
  * - noCommentsOutsideHeader.create(context): reports every comment other than the file header.
- * - headerListsFunctions.create(context): reports functions missing from the header and header entries with no matching function.
+ * - headerListsFunctions.create(context): reports top-level functions missing from the header and header entries that name no function in the file.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -100,6 +102,44 @@ function collectDeclaredFunctions(program) {
     }
   }
   return declared;
+}
+
+function isFunctionNode(node) {
+  return (
+    !!node &&
+    (node.type === "FunctionDeclaration" ||
+      node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression")
+  );
+}
+
+function collectAllFunctionNames(program) {
+  const names = new Set();
+  const visit = (node) => {
+    if (!node || typeof node.type !== "string") return;
+    if ((node.type === "FunctionDeclaration" || node.type === "FunctionExpression") && node.id) {
+      names.add(node.id.name);
+    }
+    if (node.type === "VariableDeclarator" && node.id.type === "Identifier" && isFunctionNode(node.init)) {
+      names.add(node.id.name);
+    }
+    if (
+      (node.type === "Property" || node.type === "MethodDefinition" || node.type === "PropertyDefinition") &&
+      node.key &&
+      node.key.type === "Identifier" &&
+      (node.type === "MethodDefinition" || node.method || isFunctionNode(node.value))
+    ) {
+      names.add(node.key.name);
+    }
+    for (const key of Object.keys(node)) {
+      if (key === "parent") continue;
+      const value = node[key];
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value.type === "string") visit(value);
+    }
+  };
+  visit(program);
+  return names;
 }
 
 function resolveRootDir(context) {
@@ -200,7 +240,7 @@ export const headerListsFunctions = {
         if (!header || !header.value.includes("Functions:")) return;
         const listed = readListedFunctions(header.value);
         const declared = collectDeclaredFunctions(program);
-        const declaredNames = new Set(declared.map((d) => d.name));
+        const declaredNames = collectAllFunctionNames(program);
         const listedNames = new Set(listed);
         for (const { name, node } of declared) {
           if (!listedNames.has(name)) {

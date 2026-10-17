@@ -109,6 +109,11 @@ export { Box };`,
       code: `${header("x.ts")}\nexport const value = 1;`,
       filename,
     },
+    {
+      code: `${header("x.ts", [" * - make(): builds.", " * - make.run(): nested method.", " * - helper(n): inner helper."])}
+export function make() { const helper = (n: number) => n; return { run() { return helper(1); } }; }`,
+      filename,
+    },
   ],
   invalid: [
     {

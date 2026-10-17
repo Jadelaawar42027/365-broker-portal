@@ -17,7 +17,9 @@
     "db:seed": "pnpm --filter @bp/db db:seed",
     "db:studio": "pnpm --filter @bp/db db:studio",
     "import:brokers": "pnpm --filter @bp/db import:brokers",
-    "db:metrics-user": "pnpm --filter @bp/db db:metrics-user"
+    "db:metrics-user": "pnpm --filter @bp/db db:metrics-user",
+    "admin:invite": "pnpm --filter @bp/api admin:invite",
+    "storage:cors": "pnpm --filter @bp/api storage:cors"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

@@ -50,7 +50,7 @@ export const baseConfig = defineConfig([
       "bp/require-file-header": "error",
       "bp/no-comments-outside-header": "error",
       "bp/header-lists-functions": "error",
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true }],
     },
   },
 ]);
