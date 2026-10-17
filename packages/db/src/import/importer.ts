@@ -10,7 +10,7 @@
  * - matchStepKey(baseName, stepKeys): the upload step a file name belongs to ("w9" or "w9-page2" → "w9"), or null.
  * - loadImportFolder(dir, uploadStepKeys): reads brokers.csv, personas/{email}.md and files/{email}/{stepKey}.{ext}; returns the parsed input and any errors.
  * - runImport(db, storage, input, options): applies the import (or rehearses it with dryRun) and returns the summary.
- * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them.
+ * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them; blank commission split cells leave the current splits alone.
  * - approveForImport(tx, context, brokerStepId, before): marks one step approved as imported and records it in audit_log.
  * - audit(tx, entry): inserts an audit_log row with no actor (the importer).
  * - DryRunRollback.constructor(summary): the error used to roll back a dry run while keeping its summary.
@@ -151,6 +151,8 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     onboardedAt: row.onboardedAt,
     leftAt: row.leftAt,
     commissionTier: row.commissionTier,
+    ...(row.inHouseSplit === null ? {} : { inHouseSplit: row.inHouseSplit }),
+    ...(row.selfGeneratedSplit === null ? {} : { selfGeneratedSplit: row.selfGeneratedSplit }),
   };
 
   let brokerId: string;

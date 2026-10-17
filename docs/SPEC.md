@@ -56,7 +56,8 @@ Seed one owner account from env vars (`SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD`)
 | 8 | license_bond | Florida license | Upload your license & surety bond copy | upload | yes |
 | 9 | email_signature | Your tools | Activate your 365 email and install the brand signature | confirm | no |
 | 10 | platform_logins | Your tools | Log in to BoatWizard, YachtCloser and GoHighLevel | confirm (3 checkboxes) | no |
-| 11 | commission_tier | Your tools | Book your 1-on-1 to confirm your commission tier | admin marks done | yes |
+
+Step 11 (`commission_tier`, "Book your 1-on-1 to confirm your commission tier") was retired in October 2026: commission splits are now set when the broker is invited (D27). Its row is kept with `active = false`, so brokers who already had it keep their history, but no checklist, count or metric includes it.
 
 Each step has: instructions (markdown), optional template file to download, optional video URL, accepted file types, max size 10 MB.
 
@@ -75,7 +76,7 @@ Each step has: instructions (markdown), optional template file to download, opti
 ## Data model (Drizzle, Postgres)
 
 - `users`: id, name, email (unique), phone, role (`broker` | `admin` | `owner`), created_at
-- `brokers`: id, user_id, level (`junior` | `senior`), status (`invited` | `onboarding` | `active` | `inactive`), joined_at, onboarded_at, left_at, commission_tier (text, nullable), persona_md (text), persona_updated_at, persona_updated_by
+- `brokers`: id, user_id, level (`junior` | `senior`), status (`invited` | `onboarding` | `active` | `inactive`), joined_at, onboarded_at, left_at, commission_tier (text, nullable, legacy: no longer shown or edited, D27), in_house_split and self_generated_split (integers 0 to 100, nullable for brokers created before D27: the broker's share of in-house lead deals and of self-generated deals; the house keeps the rest), persona_md (text), persona_updated_at, persona_updated_by
 - `invites`: id, broker_id, token_hash, expires_at (7 days), used_at
 - `onboarding_steps`: id, key, position, stage, title, kind, needs_approval, instructions_md, template_file_key, video_url, accepted_types, active
 - `broker_steps`: id, broker_id, step_id, status, form_data (jsonb), submitted_at, reviewed_by, reviewed_at, review_note; unique (broker_id, step_id)
@@ -109,7 +110,7 @@ Also create a read-only Postgres role `metrics_reader` with SELECT on `broker_me
 
 - Auth: Better Auth routes; `POST /v1/invites/:token/accept` (set name, password, phone)
 - Broker: `GET /v1/me`, `GET /v1/me/steps`, `GET /v1/me/steps/:key`, `POST /v1/me/steps/:key/upload-url`, `POST /v1/me/steps/:key/submit`, `GET /v1/files/:id/download-url`
-- Admin: `GET /v1/admin/overview`, `GET /v1/admin/brokers` (filters: status, level, search), `POST /v1/admin/brokers` (create + invite), `GET/PATCH /v1/admin/brokers/:id` (level, status, left_at, commission_tier), `PUT /v1/admin/brokers/:id/persona`, `GET /v1/admin/reviews`, `POST /v1/admin/broker-steps/:id/approve`, `POST /v1/admin/broker-steps/:id/send-back`, `POST /v1/admin/broker-steps/:id/mark-done`, `POST /v1/admin/brokers/:id/steps/:key/upload-url` and `.../upload-complete` (admin uploads on behalf), `GET /v1/admin/metrics` (from the view)
+- Admin: `GET /v1/admin/overview`, `GET /v1/admin/brokers` (filters: status, level, search), `POST /v1/admin/brokers` (create + invite; both commission splits required), `GET/PATCH /v1/admin/brokers/:id` (level, status, joined_at, left_at, in_house_split, self_generated_split), `PUT /v1/admin/brokers/:id/persona`, `GET /v1/admin/reviews`, `POST /v1/admin/broker-steps/:id/approve`, `POST /v1/admin/broker-steps/:id/send-back`, `POST /v1/admin/broker-steps/:id/mark-done`, `POST /v1/admin/brokers/:id/steps/:key/upload-url` and `.../upload-complete` (admin uploads on behalf), `GET /v1/admin/metrics` (from the view)
 - `GET /health`
 - Every request validated with Zod; OpenAPI served at `/docs` in non-production
 
@@ -121,7 +122,7 @@ Active brokers (with junior/senior split), onboarding right now, average days to
 
 `pnpm import:brokers` reads:
 
-- `data/import/brokers.csv` with columns: name, email, phone, level, status, joined_at, onboarded_at, left_at, commission_tier
+- `data/import/brokers.csv` with columns: name, email, phone, level, status, joined_at, onboarded_at, left_at, commission_tier, and optionally in_house_split and self_generated_split (whole percentages; a blank cell leaves the broker's current split alone)
 - `data/import/personas/{email}.md` (optional)
 - `data/import/files/{email}/{stepKey}.{ext}` (optional; uploaded to storage and marked approved)
 
@@ -156,7 +157,7 @@ Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from
 ### Onboarding logic
 
 - **D1. Next step.** "Next step" = the lowest-numbered step in `todo`. Steps in `changes_requested` always show in the red "sent back" banner. Only when no `todo` step is left does the next step fall back to the lowest `changes_requested` step. (Matches mockup 1b, replaces the rule in "Step state machine".)
-- **D2. Admin override.** One extra transition, admin-only: any state -> `approved`, recorded with the admin as actor and an `audit_log` row. Used by "mark done" (step 11) and by admin uploads on a broker's behalf. "Mark done" on `commission_tier` also takes the tier text and saves it to `brokers.commission_tier`.
+- **D2. Admin override.** One extra transition, admin-only: any state -> `approved`, recorded with the admin as actor and an `audit_log` row. Used by "mark done" and by admin uploads on a broker's behalf. (Until D27, "mark done" on step 11 also saved the commission tier.)
 - **D3. Status labels.** Approved steps that need no approval show "Done"; `contract_nda` shows "Signed"; every other approved step shows "Approved". The admin onboarding record (3c) uses the same labels with the date.
 - **D4. Order.** Every step can be opened at any time. "Coming up" is only a label.
 - **D5. Joining.** Admin sets `joined_at` when creating the broker (defaults to today, editable). Broker status goes `invited -> onboarding` when the invite is accepted.
@@ -221,6 +222,7 @@ Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from
 - **D23. Routes beyond the spec's list**, all needed by the screens or decisions: `GET /v1/invites/:token` (1a shows the name), `POST /v1/password-reset/request`, `GET`/`POST /v1/password-reset/:token` (D8), `POST /v1/me/welcome-seen` (1d once), `GET /v1/me/steps/:key/template-url`, `GET /v1/admin/broker-steps/:id` (3d detail and queue position), `POST /v1/admin/brokers/:id/resend-invite`, `.../reset-password`, `.../remind` (D16), `POST /v1/admin/admins` (D7), `PUT /v1/uploads/:token` (proxy uploads, D11). The full list is in the OpenAPI document at `/docs`.
 - **D24. Emails** go to the broker when a step is approved or sent back, on invite, reset and reminder, and to the broker and every admin when onboarding completes. A failed email is logged and never fails the request.
 - **D25. CSRF guard.** Besides SameSite cookies, state-changing `/v1` requests that carry an `Origin` header must come from `WEB_ORIGIN`.
+- **D27. Two commission splits, set at invite (Oct 2026, Aj's request).** The single free-text commission tier is replaced by two splits, each the broker's share as a whole percentage (house = 100 minus it): **In-house leads** (deals from 365-assigned leads) and **Self-generated deals**. Both are required in the invite dialog and can be changed on the broker's profile (3c); every change writes `audit_log`. The broker sees their own two percentages on the welcome screen (1d). Step 11 is retired by migration 0005 (marked inactive, never deleted), so onboarding is 10 steps and approving the last of them activates the broker. Existing data was not migrated: brokers created before this have empty splits until an admin sets them, and the old `commission_tier` text stays in the database unused.
 - **D26. Request/response contract** lives in `packages/shared/src/api.ts` as Zod schemas. The API validates and serialises with them (so fields not listed, like persona notes on broker routes, can never be sent) and the web app imports the same types.
 
 ### Phase G: Training (decided while working unattended; confirm with Aj)

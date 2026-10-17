@@ -24,7 +24,7 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["GET", "/v1/admin/reviews"],
     ["GET", "/v1/admin/metrics"],
     ["GET", "/v1/admin/brokers"],
-    ["POST", "/v1/admin/brokers", { name: "New Person", email: "new@example.com", level: "junior" }],
+    ["POST", "/v1/admin/brokers", { name: "New Person", email: "new@example.com", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 }],
     ["GET", `/v1/admin/brokers/${brokerId}`],
     ["PATCH", `/v1/admin/brokers/${brokerId}`, { level: "senior" }],
     ["PUT", `/v1/admin/brokers/${brokerId}/persona`, { markdown: "hacked" }],

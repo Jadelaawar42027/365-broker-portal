@@ -1,7 +1,7 @@
 /**
  * File: apps/api/test/admin-brokers.int.test.ts
  * Purpose: Integration tests for admin broker management: overview numbers (3a), the brokers table with filters and
- * persona search (3b), the profile with persona and every file version (3c), edits with date validation, persona edits,
+ * persona search (3b), the profile with persona and every file version (3c), edits with date validation, commission split edits, persona edits,
  * reminders, the metrics feed and the audit rows each action writes.
  *
  * Functions:
@@ -48,7 +48,7 @@ describe("GET /v1/admin/overview", () => {
         brokerId: daniel.brokerId,
         name: "Daniel Reyes",
         approved: 0,
-        total: 11,
+        total: 10,
         nextStep: { key: "photo_id", shortTitle: "Photo ID / driver's license", status: "todo" },
         waitingOnUs: true,
         stuckDays: null,
@@ -73,7 +73,7 @@ describe("GET /v1/admin/brokers", () => {
   it("lists brokers with counts, onboarding first", async () => {
     const body = (await ctx.call("GET", "/v1/admin/brokers", { cookie: owner })).json();
     expect(body.counts).toMatchObject({ total: 4, active: 2, onboarding: 1, inactive: 1 });
-    expect(body.brokers[0]).toMatchObject({ name: "Daniel Reyes", status: "onboarding", stepsTotal: 11, stepsWaitingReview: 1 });
+    expect(body.brokers[0]).toMatchObject({ name: "Daniel Reyes", status: "onboarding", stepsTotal: 10, stepsWaitingReview: 1 });
     expect(body.brokers.find((row: { name: string }) => row.name === "Kevin Osei")).toMatchObject({ daysToOnboard: 9, onboardedAt: "2026-08-27" });
   });
 
@@ -129,9 +129,11 @@ describe("profile and edits", () => {
     const response = await ctx.call("GET", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.broker).toMatchObject({ name: "Daniel Reyes", email: "daniel@example.com", status: "onboarding", hasLogin: true });
-    expect(body.metrics).toMatchObject({ stepsApproved: 0, stepsTotal: 11 });
-    expect(body.steps).toHaveLength(11);
+    expect(body.broker).toMatchObject({ name: "Daniel Reyes", email: "daniel@example.com", status: "onboarding", hasLogin: true, inHouseSplit: null, selfGeneratedSplit: null });
+    expect(body.broker).not.toHaveProperty("commissionTier");
+    expect(body.metrics).toMatchObject({ stepsApproved: 0, stepsTotal: 10 });
+    expect(body.steps).toHaveLength(10);
+    expect(body.steps.map((step: { key: string }) => step.key)).not.toContain("commission_tier");
     expect(body.steps[0]).toMatchObject({ key: "photo_id", status: "submitted", label: "Waiting for approval", files: [expect.objectContaining({ fileName: "id.png", version: 1 })] });
   });
 
@@ -143,17 +145,35 @@ describe("profile and edits", () => {
     expect(audit.map((row) => row.action)).toEqual(["file.previewed"]);
   });
 
-  it("changes level and commission tier and records before and after", async () => {
+  it("changes level and the commission splits and records before and after", async () => {
     const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, {
       cookie: owner,
-      body: { level: "senior", commissionTier: "50/50" },
+      body: { level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     expect(response.statusCode).toBe(200);
     const [audit] = await ctx.db
       .select()
       .from(auditLog)
       .where(and(eq(auditLog.entityId, daniel.brokerId), eq(auditLog.action, "broker.updated")));
-    expect(audit).toMatchObject({ before: { level: "junior", commissionTier: null }, after: { level: "senior", commissionTier: "50/50" } });
+    expect(audit).toMatchObject({
+      before: { level: "junior", inHouseSplit: null, selfGeneratedSplit: null },
+      after: { level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
+    });
+    const profile = (await ctx.call("GET", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner })).json();
+    expect(profile.broker).toMatchObject({ inHouseSplit: 50, selfGeneratedSplit: 70 });
+    const me = (await ctx.call("GET", "/v1/me", { cookie: daniel.cookie })).json();
+    expect(me.broker).toMatchObject({ inHouseSplit: 50, selfGeneratedSplit: 70 });
+  });
+
+  it("rejects a commission split outside 0 to 100", async () => {
+    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner, body: { selfGeneratedSplit: 120 } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("validation_error");
+  });
+
+  it("never lets a broker change their own commission splits", async () => {
+    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: daniel.cookie, body: { selfGeneratedSplit: 100 } });
+    expect(response.statusCode).toBe(403);
   });
 
   it("ignores no-op edits and rejects bad dates", async () => {

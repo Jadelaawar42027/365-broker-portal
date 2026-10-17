@@ -14,13 +14,16 @@ test("admin invites a broker who creates their account", async ({ page, browser 
   await signIn(page, OWNER.email, OWNER.password);
   const profileUrl = await inviteBroker(page, "Nina Castillo", email);
   await expect(page.getByLabel("Status")).toHaveValue("invited");
+  const commission = page.getByRole("region", { name: "Commission · broker / house" });
+  await expect(commission).toContainText("In-house leads40 / 60");
+  await expect(commission).toContainText("Self-generated deals60 / 40");
 
   const brokerContext = await browser.newContext();
   const broker = await brokerContext.newPage();
   await acceptInvite(broker, email);
   await expect(broker.getByRole("heading", { level: 1 })).toContainText("Nina");
   await expect(broker.getByText("YOUR NEXT STEP · STEP 1")).toBeVisible();
-  await expect(broker.getByText("You've sent in 0 of 11 steps")).toBeVisible();
+  await expect(broker.getByText("You've sent in 0 of 10 steps")).toBeVisible();
 
   const link = new URL(await latestLink(email, "invite"));
   await broker.goto(link.pathname);

@@ -41,7 +41,8 @@ export function registerMeRoutes(app: FastifyInstance): void {
           status: brokers.status,
           joinedAt: brokers.joinedAt,
           onboardedAt: brokers.onboardedAt,
-          commissionTier: brokers.commissionTier,
+          inHouseSplit: brokers.inHouseSplit,
+          selfGeneratedSplit: brokers.selfGeneratedSplit,
           welcomeSeenAt: brokers.welcomeSeenAt,
         })
         .from(users)
@@ -58,7 +59,8 @@ export function registerMeRoutes(app: FastifyInstance): void {
                 status: user.status,
                 joinedAt: user.joinedAt,
                 onboardedAt: user.onboardedAt,
-                commissionTier: user.commissionTier,
+                inHouseSplit: user.inHouseSplit,
+                selfGeneratedSplit: user.selfGeneratedSplit,
                 showWelcome: user.status === "active" && user.onboardedAt !== null && user.welcomeSeenAt === null,
               }
             : null,

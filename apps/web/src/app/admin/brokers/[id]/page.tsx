@@ -1,6 +1,7 @@
 /**
  * File: apps/web/src/app/admin/brokers/[id]/page.tsx
  * Purpose: Screen 3c, one broker's profile: header with contact details, level and status, the key dates and numbers,
+ * the two commission splits (editable),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
  * uploader, the Persona panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
  *
@@ -14,6 +15,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountActions, BrokerControls } from "@/components/admin/broker-controls";
+import { CommissionEditor } from "@/components/admin/commission-editor";
 import { PersonaPanel } from "@/components/admin/persona-panel";
 import { StepActions } from "@/components/admin/step-actions";
 import { TrainingPanel } from "@/components/admin/training-panel";
@@ -90,13 +92,15 @@ export default async function BrokerProfilePage({
           </div>
           <BrokerControls broker={broker} today={today} />
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
           <StatTile label="Joined" value={formatDate(broker.joinedAt)} />
           <StatTile label="Onboarded" value={broker.onboardedAt ? formatDate(broker.onboardedAt) : "—"} />
           <StatTile label="Time with us" value={formatTenure(broker.joinedAt, broker.leftAt ?? today, Boolean(broker.leftAt))} />
           <StatTile label="Days to onboard" value={metrics.daysToOnboard === null ? "—" : String(metrics.daysToOnboard)} />
-          <StatTile label="Commission tier" value={broker.commissionTier ?? "—"} />
           <StatTile label="Avg. quiz score" value={training?.summary.avgBestScore == null ? "—" : `${training.summary.avgBestScore}%`} />
+        </div>
+        <div className="mt-3">
+          <CommissionEditor brokerId={broker.id} inHouseSplit={broker.inHouseSplit} selfGeneratedSplit={broker.selfGeneratedSplit} />
         </div>
         <div className="mt-5">
           <AccountActions broker={broker} />

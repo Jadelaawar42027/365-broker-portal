@@ -7,7 +7,8 @@
  * Functions:
  * - parseCsv(text): returns the rows of a CSV file as arrays of cell strings.
  * - normaliseDate(value): accepts 2026-03-11 or 3/11/2026 and returns the ISO date, or null for an empty cell; throws on anything else.
- * - parseBrokerCsv(text): validates the header and every row; returns the valid rows and a list of { line, message } errors.
+ * - normaliseSplit(value): accepts a broker commission percentage like 60 or 60% and returns the number, or null for an empty cell; throws unless it is a whole number from 0 to 100.
+ * - parseBrokerCsv(text): validates the header and every row (the in_house_split and self_generated_split columns are optional); returns the valid rows and a list of { line, message } errors.
  */
 import { BROKER_LEVELS, BROKER_STATUSES, emailSchema, parseIsoDate, type BrokerLevel, type BrokerStatus } from "@bp/shared";
 
@@ -23,6 +24,10 @@ export const BROKER_CSV_COLUMNS = [
   "commission_tier",
 ] as const;
 
+export const OPTIONAL_BROKER_CSV_COLUMNS = ["in_house_split", "self_generated_split"] as const;
+
+type BrokerCsvColumn = (typeof BROKER_CSV_COLUMNS)[number] | (typeof OPTIONAL_BROKER_CSV_COLUMNS)[number];
+
 export type BrokerCsvRow = {
   line: number;
   name: string;
@@ -34,6 +39,8 @@ export type BrokerCsvRow = {
   onboardedAt: string | null;
   leftAt: string | null;
   commissionTier: string | null;
+  inHouseSplit: number | null;
+  selfGeneratedSplit: number | null;
 };
 
 export function parseCsv(text: string): string[][] {
@@ -84,6 +91,13 @@ export function normaliseDate(value: string): string | null {
   return iso;
 }
 
+export function normaliseSplit(value: string): number | null {
+  const trimmed = value.trim().replace(/%$/, "").trim();
+  if (!trimmed) return null;
+  if (!/^\d{1,3}$/.test(trimmed) || Number(trimmed) > 100) throw new Error(`Not a split: ${value}`);
+  return Number(trimmed);
+}
+
 export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { line: number; message: string }[] } {
   const [header, ...records] = parseCsv(text);
   const errors: { line: number; message: string }[] = [];
@@ -97,7 +111,7 @@ export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { 
   const seen = new Map<string, number>();
   records.forEach((cells, index) => {
     const line = index + 2;
-    const get = (name: (typeof BROKER_CSV_COLUMNS)[number]) => (cells[columns.indexOf(name)] ?? "").trim();
+    const get = (name: BrokerCsvColumn) => (columns.includes(name) ? (cells[columns.indexOf(name)] ?? "").trim() : "");
     const problems: string[] = [];
     const name = get("name");
     if (name.length < 2) problems.push("name is missing");
@@ -119,6 +133,14 @@ export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { 
     if (dates.joined_at && dates.onboarded_at && dates.onboarded_at < dates.joined_at) problems.push("onboarded_at is before joined_at");
     if (dates.joined_at && dates.left_at && dates.left_at < dates.joined_at) problems.push("left_at is before joined_at");
     if (status === "active" && !dates.onboarded_at) problems.push("active brokers need onboarded_at");
+    const splits: Record<string, number | null> = {};
+    for (const column of OPTIONAL_BROKER_CSV_COLUMNS) {
+      try {
+        splits[column] = normaliseSplit(get(column));
+      } catch {
+        problems.push(`${column} "${get(column)}" must be a whole number from 0 to 100`);
+      }
+    }
     if (email.success) {
       const previous = seen.get(email.data);
       if (previous) problems.push(`email repeats line ${previous}`);
@@ -139,6 +161,8 @@ export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { 
       onboardedAt: dates.onboarded_at ?? null,
       leftAt: dates.left_at ?? null,
       commissionTier: get("commission_tier") || null,
+      inHouseSplit: splits.in_house_split ?? null,
+      selfGeneratedSplit: splits.self_generated_split ?? null,
     });
   });
   return { rows, errors };

@@ -29,6 +29,20 @@
       "when": 1792254036210,
       "tag": "0003_broker_training_metrics_view",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792260126310,
+      "tag": "0004_commission_splits",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792260146304,
+      "tag": "0005_retire_commission_step",
+      "breakpoints": true
     }
   ]
 }

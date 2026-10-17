@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/app/app/(main)/welcome-aboard/page.tsx
  * Purpose: Screen 1d, "You're officially a 365 broker": shown once when every step is approved, with the broker's
- * level, commission tier and onboarding date, a "Start training" button once chapters are published (a disabled
+ * level, commission splits (in-house leads and self-generated deals) and onboarding date, a "Start training" button once chapters are published (a disabled
  * "Training coming soon" before that, SPEC D6) and the first-90-days plan from the manual. Brokers who aren't active yet are sent back to their checklist.
  *
  * Functions:
@@ -28,7 +28,8 @@ export default async function WelcomeAboardPage() {
   const level = broker.level === "senior" ? "Senior broker" : "Junior broker";
   const facts = [
     `Level: ${level}`,
-    `Commission tier: ${broker.commissionTier ?? "to be confirmed"}`,
+    `In-house leads: ${broker.inHouseSplit === null ? "to be confirmed" : `${broker.inHouseSplit}%`}`,
+    `Self-generated deals: ${broker.selfGeneratedSplit === null ? "to be confirmed" : `${broker.selfGeneratedSplit}%`}`,
     ...(broker.onboardedAt ? [`Onboarded: ${formatDate(broker.onboardedAt)}`] : []),
   ];
 

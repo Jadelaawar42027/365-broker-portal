@@ -1,13 +1,13 @@
 /**
  * File: apps/api/test/invites.int.test.ts
  * Purpose: Integration tests for inviting brokers and admins: the invite email, opening and accepting the link,
- * single use, expiry, resending, duplicate emails, and the owner-only admin invite (SPEC D7, D8).
+ * single use, expiry, resending, duplicate emails, the two required commission splits (SPEC D27), and the owner-only admin invite (SPEC D7, D8).
  *
  * Functions:
  * - none
  */
 import { auditLog, brokers, users } from "@bp/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, OWNER, type TestContext } from "./helpers/context";
 
@@ -28,12 +28,14 @@ describe("inviting a broker", () => {
   it("creates the broker as invited and emails an invite link", async () => {
     const response = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Daniel Reyes", email: "Daniel.Reyes@Example.com", level: "junior", joinedAt: "2026-10-13" },
+      body: { name: "Daniel Reyes", email: "Daniel.Reyes@Example.com", level: "junior", joinedAt: "2026-10-13", inHouseSplit: 40, selfGeneratedSplit: 60 },
     });
     expect(response.statusCode).toBe(201);
     brokerId = response.json().brokerId;
     const [broker] = await ctx.db.select().from(brokers).where(eq(brokers.id, brokerId));
-    expect(broker).toMatchObject({ status: "invited", level: "junior", joinedAt: "2026-10-13" });
+    expect(broker).toMatchObject({ status: "invited", level: "junior", joinedAt: "2026-10-13", inHouseSplit: 40, selfGeneratedSplit: 60 });
+    const [created] = await ctx.db.select().from(auditLog).where(and(eq(auditLog.entityId, brokerId), eq(auditLog.action, "broker.created")));
+    expect(created?.after).toMatchObject({ inHouseSplit: 40, selfGeneratedSplit: 60 });
     const [email] = ctx.emailsTo("daniel.reyes@example.com");
     expect(email?.subject).toMatch(/Welcome to 365 Yachts/);
     expect(email?.text).toContain("wa.me/15614459241");
@@ -43,7 +45,7 @@ describe("inviting a broker", () => {
   it("refuses a second broker with the same email", async () => {
     const response = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Copy", email: "daniel.reyes@example.com", level: "senior" },
+      body: { name: "Copy", email: "daniel.reyes@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     expect(response.statusCode).toBe(409);
     expect(response.json().error).toBe("email_taken");
@@ -53,6 +55,16 @@ describe("inviting a broker", () => {
     const response = await ctx.call("POST", "/v1/admin/brokers", { cookie: owner, body: { name: "X", email: "bad", level: "pro" } });
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("validation_error");
+  });
+
+  it("needs both commission splits, each a whole percentage from 0 to 100", async () => {
+    const base = { name: "Split Person", email: "split.person@example.com", level: "junior" };
+    for (const splits of [{}, { inHouseSplit: 40 }, { selfGeneratedSplit: 60 }, { inHouseSplit: 40, selfGeneratedSplit: 101 }, { inHouseSplit: 40.5, selfGeneratedSplit: 60 }]) {
+      const response = await ctx.call("POST", "/v1/admin/brokers", { cookie: owner, body: { ...base, ...splits } });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("validation_error");
+    }
+    expect(await ctx.db.select().from(users).where(eq(users.email, base.email))).toHaveLength(0);
   });
 
   it("shows who the invite is for", async () => {
@@ -100,7 +112,7 @@ describe("invite expiry and resending", () => {
   it("expires after 7 days and a resent link replaces the old one", async () => {
     const created = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Marisol Vega", email: "marisol@example.com", level: "senior" },
+      body: { name: "Marisol Vega", email: "marisol@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     const brokerId = created.json().brokerId;
     const firstToken = ctx.linkToken(ctx.emailsTo("marisol@example.com")[0]!, "invite");

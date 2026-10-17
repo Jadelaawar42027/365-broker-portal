@@ -20,7 +20,7 @@ let marisol: Awaited<ReturnType<TestContext["createBroker"]>>;
 
 const ALL_BUT_LAST = [
   "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
-  "dbpr_filing", "license_bond", "email_signature", "platform_logins",
+  "dbpr_filing", "license_bond", "email_signature",
 ];
 
 beforeAll(async () => {
@@ -46,7 +46,7 @@ describe("review queue", () => {
     expect(response.json()).toMatchObject({
       status: "submitted",
       position: 3,
-      totalSteps: 11,
+      totalSteps: 10,
       stageTitle: "Paperwork",
       step: { key: "bio", shortTitle: "Professional bio" },
       broker: { name: "Daniel Reyes", firstName: "Daniel" },
@@ -110,39 +110,39 @@ describe("approve", () => {
 });
 
 describe("mark done and finishing onboarding", () => {
-  it("requires the commission tier on step 11", async () => {
-    const id = await ctx.stepId(daniel.brokerId, "commission_tier");
-    const response = await ctx.call("POST", `/v1/admin/broker-steps/${id}/mark-done`, { cookie: owner, body: {} });
-    expect(response.json().error).toBe("commission_tier_required");
+  it("has no commission step left to mark done", async () => {
+    const steps = (await ctx.call("GET", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner })).json().steps;
+    expect(steps.map((step: { key: string }) => step.key)).not.toContain("commission_tier");
+    expect(steps.at(-1).key).toBe("platform_logins");
   });
 
-  it("approving the last step makes the broker active and notifies broker and admins", async () => {
+  it("marking the last step done makes the broker active and notifies broker and admins", async () => {
     await ctx.setStepStatus(daniel.brokerId, ALL_BUT_LAST, "approved");
-    const id = await ctx.stepId(daniel.brokerId, "commission_tier");
+    const id = await ctx.stepId(daniel.brokerId, "platform_logins");
     const response = await ctx.call("POST", `/v1/admin/broker-steps/${id}/mark-done`, {
       cookie: owner,
-      body: { commissionTier: "60/40", note: "Agreed in the 1-on-1." },
+      body: { note: "Checked on a call." },
     });
     expect(response.json()).toEqual({ status: "approved", onboardingComplete: true });
 
     const [broker] = await ctx.db.select().from(brokers).where(eq(brokers.id, daniel.brokerId));
-    expect(broker).toMatchObject({ status: "active", onboardedAt: todayInTimeZone(), commissionTier: "60/40" });
+    expect(broker).toMatchObject({ status: "active", onboardedAt: todayInTimeZone() });
 
     const actions = (await ctx.db.select().from(auditLog).where(eq(auditLog.entityId, daniel.brokerId))).map((row) => row.action);
-    expect(actions).toEqual(expect.arrayContaining(["broker.updated", "broker.onboarded"]));
+    expect(actions).toEqual(expect.arrayContaining(["broker.onboarded"]));
 
     expect(ctx.emailsTo("daniel@example.com").at(-1)?.subject).toBe("You're officially a 365 broker");
     expect(ctx.emailsTo(OWNER.email).at(-1)?.subject).toBe("Daniel Reyes finished onboarding");
 
     const me = (await ctx.call("GET", "/v1/me", { cookie: daniel.cookie })).json();
-    expect(me.broker).toMatchObject({ status: "active", commissionTier: "60/40", showWelcome: true });
+    expect(me.broker).toMatchObject({ status: "active", showWelcome: true });
     await ctx.call("POST", "/v1/me/welcome-seen", { cookie: daniel.cookie });
     expect((await ctx.call("GET", "/v1/me", { cookie: daniel.cookie })).json().broker.showWelcome).toBe(false);
   });
 
   it("approving a regular last step through the review screen also activates the broker", async () => {
     const tom = await ctx.createBroker({ name: "Tom Halvorsen", email: "tom@example.com" });
-    await ctx.setStepStatus(tom.brokerId, [...ALL_BUT_LAST.filter((key) => key !== "w9"), "commission_tier"], "approved");
+    await ctx.setStepStatus(tom.brokerId, [...ALL_BUT_LAST.filter((key) => key !== "w9"), "platform_logins"], "approved");
     await ctx.setStepStatus(tom.brokerId, ["w9"], "submitted");
     const id = await ctx.stepId(tom.brokerId, "w9");
     const response = await ctx.call("POST", `/v1/admin/broker-steps/${id}/approve`, { cookie: owner });

@@ -1,4 +1,4 @@
-name,email,phone,level,status,joined_at,onboarded_at,left_at,commission_tier
-Jane Example,jane.example@365yachts.org,+15615550100,senior,active,2025-03-03,2025-03-11,,60/40
-John Sample,john.sample@365yachts.org,+15615550101,junior,active,2026-07-02,2026-07-10,,50/50
-Alex Former,alex.former@365yachts.org,+15615550102,junior,inactive,2026-01-09,2026-01-20,2026-06-15,50/50
+name,email,phone,level,status,joined_at,onboarded_at,left_at,commission_tier,in_house_split,self_generated_split
+Jane Example,jane.example@365yachts.org,+15615550100,senior,active,2025-03-03,2025-03-11,,60/40,50,70
+John Sample,john.sample@365yachts.org,+15615550101,junior,active,2026-07-02,2026-07-10,,50/50,40,50
+Alex Former,alex.former@365yachts.org,+15615550102,junior,inactive,2026-01-09,2026-01-20,2026-06-15,50/50,,

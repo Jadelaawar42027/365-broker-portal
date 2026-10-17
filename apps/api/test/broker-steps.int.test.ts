@@ -28,12 +28,12 @@ beforeAll(async () => {
 afterAll(() => ctx?.close());
 
 describe("GET /v1/me/steps", () => {
-  it("lists all 11 steps with step 1 as the next step", async () => {
+  it("lists all 10 steps with step 1 as the next step", async () => {
     const response = await ctx.call("GET", "/v1/me/steps", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.steps).toHaveLength(11);
-    expect(body.progress).toEqual({ total: 11, approved: 0, sent: 0 });
+    expect(body.steps).toHaveLength(10);
+    expect(body.progress).toEqual({ total: 10, approved: 0, sent: 0 });
     expect(body.nextStepKey).toBe("photo_id");
     expect(body.steps[0]).toMatchObject({ key: "photo_id", stageTitle: "Paperwork", label: "Do this next", tone: "info", isNext: true });
     expect(body.steps[1]).toMatchObject({ label: "Coming up", isNext: false });
@@ -46,7 +46,7 @@ describe("GET /v1/me/steps/:key", () => {
     const response = await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body).toMatchObject({ key: "w9", position: 5, totalSteps: 11, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
+    expect(body).toMatchObject({ key: "w9", position: 5, totalSteps: 10, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
     expect(body.config.templateLink.url).toMatch(/irs\.gov/);
     expect(body.config.reviewChecklist).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("Tax ID filled in");
@@ -104,10 +104,10 @@ describe("answer steps", () => {
     expect(full.json().status).toBe("approved");
   });
 
-  it("refuses to let the broker complete the admin-only commission step", async () => {
+  it("has no commission step any more: it can't be opened or submitted", async () => {
+    expect((await ctx.call("GET", "/v1/me/steps/commission_tier", { cookie: broker.cookie })).statusCode).toBe(404);
     const response = await ctx.call("POST", "/v1/me/steps/commission_tier/submit", { cookie: broker.cookie, body: {} });
-    expect(response.statusCode).toBe(409);
-    expect(response.json().error).toBe("admin_only_step");
+    expect(response.statusCode).toBe(404);
   });
 
   it("writes an audit row for every submission", async () => {

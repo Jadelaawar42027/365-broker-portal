@@ -1,13 +1,12 @@
 /**
  * File: apps/web/src/components/admin/step-actions.tsx
  * Purpose: The admin actions on one row of a broker's onboarding record (3c): open the submission for review, upload
- * paperwork on the broker's behalf (stored like a broker upload, marked approved), or mark the step done (SPEC D2) —
- * which asks for the agreed commission tier on step 11.
+ * paperwork on the broker's behalf (stored like a broker upload, marked approved), or mark the step done (SPEC D2).
  *
  * Functions:
  * - StepActions({ brokerId, step }): the buttons that fit the step's state, plus their dialogs (upload only for open steps or approved steps with no file, e.g. imported brokers).
  * - UploadDialog({ dialogRef, brokerId, step }): picks files, uploads them and records them as approved.
- * - MarkDoneDialog({ dialogRef, step }): confirms marking the step done, with the tier or an optional note.
+ * - MarkDoneDialog({ dialogRef, step }): confirms marking the step done, with an optional note.
  */
 "use client";
 
@@ -112,19 +111,17 @@ function MarkDoneDialog({ dialogRef, step }: { dialogRef: RefObject<HTMLDialogEl
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const needsTier = step.key === "commission_tier";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const tier = String(form.get("tier") ?? "").trim();
     const note = String(form.get("note") ?? "").trim();
     setBusy(true);
     setError(null);
     try {
       await apiRequest(`/v1/admin/broker-steps/${step.brokerStepId}/mark-done`, {
         method: "POST",
-        body: { ...(needsTier ? { commissionTier: tier } : {}), ...(note ? { note } : {}) },
+        body: note ? { note } : {},
       });
       dialogRef.current?.close();
       router.refresh();
@@ -141,12 +138,6 @@ function MarkDoneDialog({ dialogRef, step }: { dialogRef: RefObject<HTMLDialogEl
           Mark done: {step.shortTitle}
         </h2>
         <p className="text-base text-muted">The step is recorded as approved by you. If it&apos;s the last one, the broker becomes active.</p>
-        {needsTier ? (
-          <div>
-            <FieldLabel htmlFor="tier">Commission tier agreed in the 1-on-1</FieldLabel>
-            <input id="tier" name="tier" required placeholder="e.g. 60/40" autoComplete="off" className={inputClasses()} />
-          </div>
-        ) : null}
         <div>
           <FieldLabel htmlFor={`note-${step.key}`}>Note (optional)</FieldLabel>
           <input id={`note-${step.key}`} name="note" autoComplete="off" className={inputClasses()} />

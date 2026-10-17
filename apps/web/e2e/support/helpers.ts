@@ -8,13 +8,13 @@
  * - uniqueEmail(prefix): a fresh address for one test run.
  * - signIn(page, email, password): signs in on /login and waits to leave the page.
  * - latestLink(to, kind): waits for the newest email to that address and returns its invite or reset link.
- * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with the dialog and returns their profile URL.
+ * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with the dialog (in-house leads 40%, self-generated deals 60%) and returns their profile URL.
  * - acceptInvite(page, email, password): opens the invite link from the outbox and creates the account.
  * - createSignedInBroker(browser, name): uses a separate admin session to invite a broker, then accepts the invite in a new context; returns that broker's page and email.
  * - testFile(name): a small PDF or PNG payload for setInputFiles.
  * - uploadStep(page, stepKey, fileName): opens a step, uploads one file and sends it.
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
- * - completeBrokerSteps(page): does every step a broker can do themselves (all but step 11).
+ * - completeBrokerSteps(page): does all 10 steps a broker does themselves.
  */
 import { expect, type Browser, type Page } from "@playwright/test";
 import fs from "node:fs";
@@ -63,6 +63,9 @@ export async function inviteBroker(page: Page, name: string, email: string): Pro
   const dialog = page.getByRole("dialog", { name: "Invite a new broker" });
   await dialog.getByLabel("Full name").fill(name);
   await dialog.getByLabel("Email").fill(email);
+  await dialog.getByLabel("In-house leads").fill("40");
+  await dialog.getByLabel("Self-generated deals").fill("60");
+  await expect(dialog.getByText("Broker 40% · house keeps 60%")).toBeVisible();
   await dialog.getByRole("button", { name: "Send invite" }).click();
   await expect(page.getByText(`Invite sent to ${email.toLowerCase()}`)).toBeVisible();
   return page.url().split("?")[0]!;

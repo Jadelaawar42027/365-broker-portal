@@ -5,7 +5,7 @@
  * Used by the seed now and by the invite route and importer later.
  *
  * Functions:
- * - createBroker(tx, input): inserts the user, broker and todo step rows inside the given transaction; returns the broker and user ids.
+ * - createBroker(tx, input): inserts the user, broker (with level, status, dates and commission splits) and todo step rows inside the given transaction; returns the broker and user ids.
  */
 import type { BrokerLevel, BrokerStatus } from "@bp/shared";
 import { eq } from "drizzle-orm";
@@ -22,6 +22,8 @@ export type CreateBrokerInput = {
   onboardedAt?: string | null;
   leftAt?: string | null;
   commissionTier?: string | null;
+  inHouseSplit?: number | null;
+  selfGeneratedSplit?: number | null;
   personaMd?: string | null;
 };
 
@@ -40,6 +42,8 @@ export async function createBroker(tx: Transaction, input: CreateBrokerInput) {
       onboardedAt: input.onboardedAt ?? null,
       leftAt: input.leftAt ?? null,
       commissionTier: input.commissionTier ?? null,
+      inHouseSplit: input.inHouseSplit ?? null,
+      selfGeneratedSplit: input.selfGeneratedSplit ?? null,
       personaMd: input.personaMd ?? null,
     })
     .returning({ id: brokers.id });

@@ -1,7 +1,8 @@
 /**
  * File: packages/db/src/seed/steps.ts
- * Purpose: The 11 onboarding steps from docs/SPEC.md, with copy taken from the mockups and the 365 Broker
- * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later.
+ * Purpose: The 10 onboarding steps from docs/SPEC.md, with copy taken from the mockups and the 365 Broker
+ * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
+ * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27).
  *
  * Functions:
  * - none
@@ -263,25 +264,5 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
         { value: "gohighlevel", label: "I logged in to GoHighLevel and started loading my contacts", videoUrl: null },
       ],
     },
-  },
-  {
-    key: "commission_tier",
-    position: 11,
-    stage: "your_tools",
-    title: "Book your 1-on-1 to confirm your commission tier",
-    shortTitle: "Commission tier confirmed (1-on-1)",
-    summary: "Meet your Sales Executive to set your commission tier and personal targets.",
-    intro:
-      "Your commission tier and personal targets are agreed one-on-one with your Sales Executive and confirmed in writing.",
-    kind: "admin",
-    needsApproval: true,
-    instructionsMd: [
-      "1. Message us to book a 30-minute one-on-one with your Sales Executive.",
-      "2. Agree your commission tier and your personal targets.",
-      "3. We mark this step done after the meeting — nothing to upload.",
-    ].join("\n"),
-    acceptedTypes: [],
-    maxSizeBytes: MAX_UPLOAD_BYTES,
-    config: { minutes: 30 },
   },
 ];

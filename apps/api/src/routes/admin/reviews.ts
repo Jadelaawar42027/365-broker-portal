@@ -1,8 +1,8 @@
 /**
  * File: apps/api/src/routes/admin/reviews.ts
  * Purpose: Reviewing a broker's submission (3d): the detail with files and checklist and its place in the queue,
- * approve, send back with a required note, and "mark done" (the admin override, SPEC D2), which also records the
- * commission tier on step 11. Approving the last step activates the broker and notifies everyone.
+ * approve, send back with a required note, and "mark done" (the admin override, SPEC D2). Approving the last step
+ * activates the broker and notifies everyone.
  *
  * Functions:
  * - registerAdminReviewRoutes(app): mounts GET /v1/admin/broker-steps/:id and its approve, send-back and mark-done actions.
@@ -22,9 +22,8 @@ import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { badRequest, notFound } from "../../errors";
+import { notFound } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
-import { writeAudit } from "../../services/audit";
 import { firstName, stepApprovedEmail, stepSentBackEmail } from "../../services/emails";
 import { sendSafely, type EmailMessage } from "../../services/mailer";
 import {
@@ -166,7 +165,7 @@ export function registerAdminReviewRoutes(app: FastifyInstance): void {
     {
       schema: {
         tags: ["admin"],
-        summary: "Mark a step done on the broker's behalf (records the commission tier on step 11)",
+        summary: "Mark a step done on the broker's behalf",
         params: idParams,
         body: markDoneRequestSchema,
         response: actionResponses,
@@ -175,10 +174,6 @@ export function registerAdminReviewRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const row = await requireBrokerStep(app, request.params.id);
-      const isTierStep = row.key === "commission_tier";
-      if (isTierStep && !request.body.commissionTier) {
-        throw badRequest("Enter the commission tier you agreed in the one-on-one.", "commission_tier_required");
-      }
       const now = app.deps.now();
       const result = await app.deps.db.transaction(async (tx) => {
         const change = await applyStepAction(tx, {
@@ -188,18 +183,6 @@ export function registerAdminReviewRoutes(app: FastifyInstance): void {
           now,
           note: request.body.note ?? null,
         });
-        if (isTierStep) {
-          const [before] = await tx.select({ commissionTier: brokers.commissionTier }).from(brokers).where(eq(brokers.id, row.brokerId));
-          await tx.update(brokers).set({ commissionTier: request.body.commissionTier! }).where(eq(brokers.id, row.brokerId));
-          await writeAudit(tx, {
-            actorUserId: actor.userId,
-            action: "broker.updated",
-            entityType: "broker",
-            entityId: row.brokerId,
-            before: { commissionTier: before?.commissionTier ?? null },
-            after: { commissionTier: request.body.commissionTier },
-          });
-        }
         const completed = await activateIfComplete(tx, { brokerId: row.brokerId, actorUserId: actor.userId, today: todayFor(now) });
         return { status: change.to, onboardingComplete: completed };
       });

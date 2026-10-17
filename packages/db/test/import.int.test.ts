@@ -2,7 +2,7 @@
  * File: packages/db/test/import.int.test.ts
  * Purpose: Integration tests for the broker importer on a real Postgres container (storage is an in-memory fake):
  * dry runs change nothing, brokers are created and updated by email, onboarded brokers get every step approved as
- * "imported", files and personas are stored, a second run changes nothing, and nothing is ever deleted.
+ * "imported", files and personas are stored, a second run changes nothing, blank split cells keep the current splits, and nothing is ever deleted.
  *
  * Functions:
  * - memoryStorage(): a FileStorage that keeps uploaded objects in a Map.
@@ -113,7 +113,7 @@ describe("runImport", () => {
     const { input } = loadImportFolder(dir, UPLOAD_KEYS);
     const summary = await runImport(testDb.db, memoryStorage(), input!, { dryRun: true });
     expect(summary).toMatchObject({ created: ["jane@example.com", "john@example.com", "alex@example.com"], filesUploaded: 2, personasSet: 1 });
-    expect(summary.stepsApproved).toBe(11 + 2 + 11);
+    expect(summary.stepsApproved).toBe(10 + 2 + 10);
     expect(await testDb.db.select().from(users).where(eq(users.email, "jane@example.com"))).toHaveLength(0);
     expect(stored.size).toBe(0);
   });
@@ -125,7 +125,7 @@ describe("runImport", () => {
     expect(summary.withoutLogin).toEqual(["jane@example.com", "john@example.com"]);
 
     const jane = await stepsFor("jane@example.com");
-    expect(jane).toHaveLength(11);
+    expect(jane).toHaveLength(10);
     expect(jane.every((step) => step.status === "approved" && step.note === "imported")).toBe(true);
     const [janeBroker] = await testDb.db
       .select()
@@ -147,7 +147,7 @@ describe("runImport", () => {
     expect((await stepsFor("alex@example.com")).every((step) => step.status === "approved")).toBe(true);
     const audit = await testDb.db.select({ action: auditLog.action }).from(auditLog);
     expect(audit.filter((row) => row.action === "broker.imported")).toHaveLength(3);
-    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(24);
+    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(22);
   });
 
   it("is idempotent: a second run changes nothing", async () => {
@@ -160,6 +160,10 @@ describe("runImport", () => {
   });
 
   it("updates changed rows by email, records the change and never deletes anyone", async () => {
+    await testDb.db
+      .update(brokers)
+      .set({ inHouseSplit: 40, selfGeneratedSplit: 60 })
+      .where(eq(brokers.userId, testDb.db.select({ id: users.id }).from(users).where(eq(users.email, "jane@example.com"))));
     const changed = fs.mkdtempSync(path.join(os.tmpdir(), "bp-import-2-"));
     writeImportFolder(changed, [ROWS[0]!.replace("senior", "junior"), ROWS[1]!]);
     const { input } = loadImportFolder(changed, UPLOAD_KEYS);
@@ -172,6 +176,12 @@ describe("runImport", () => {
       .orderBy(auditLog.createdAt)
       .then((rows) => rows.slice(-1));
     expect(audit).toMatchObject({ before: { level: "senior" }, after: { level: "junior" } });
+    const [jane] = await testDb.db
+      .select({ inHouseSplit: brokers.inHouseSplit, selfGeneratedSplit: brokers.selfGeneratedSplit })
+      .from(brokers)
+      .innerJoin(users, eq(users.id, brokers.userId))
+      .where(eq(users.email, "jane@example.com"));
+    expect(jane).toEqual({ inHouseSplit: 40, selfGeneratedSplit: 60 });
     for (const email of ["alex@example.com", "keep@example.com"]) {
       expect(await testDb.db.select().from(users).where(eq(users.email, email))).toHaveLength(1);
     }

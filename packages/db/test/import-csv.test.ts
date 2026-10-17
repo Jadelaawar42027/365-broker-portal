@@ -1,6 +1,6 @@
 /**
  * File: packages/db/test/import-csv.test.ts
- * Purpose: Unit tests for reading brokers.csv: the CSV parser, row validation with line numbers, date formats, and
+ * Purpose: Unit tests for reading brokers.csv: the CSV parser, row validation with line numbers, date formats, the optional commission split columns, and
  * matching imported file names to onboarding steps.
  *
  * Functions:
@@ -35,10 +35,10 @@ describe("parseBrokerCsv", () => {
     const example = fs.readFileSync(fileURLToPath(new URL("../../../docs/templates/brokers-import-example.csv", import.meta.url)), "utf8");
     const { rows, errors } = parseBrokerCsv(example);
     expect(errors).toEqual([]);
-    expect(rows.map((row) => [row.email, row.status, row.commissionTier])).toEqual([
-      ["jane.example@365yachts.org", "active", "60/40"],
-      ["john.sample@365yachts.org", "active", "50/50"],
-      ["alex.former@365yachts.org", "inactive", "50/50"],
+    expect(rows.map((row) => [row.email, row.status, row.commissionTier, row.inHouseSplit, row.selfGeneratedSplit])).toEqual([
+      ["jane.example@365yachts.org", "active", "60/40", 50, 70],
+      ["john.sample@365yachts.org", "active", "50/50", 40, 50],
+      ["alex.former@365yachts.org", "inactive", "50/50", null, null],
     ]);
     expect(rows[2]).toMatchObject({ line: 4, leftAt: "2026-06-15", level: "junior" });
   });
@@ -59,6 +59,24 @@ describe("parseBrokerCsv", () => {
     expect(errors[1]!.message).toBe("active brokers need onboarded_at");
     expect(errors[2]!.message).toBe("onboarded_at is before joined_at; left_at is before joined_at");
     expect(errors[3]!.message).toBe("email repeats line 2");
+  });
+
+  it("treats the commission split columns as optional and checks them when present", () => {
+    const withoutSplits = parseBrokerCsv([HEADER, "Ok Person,ok@example.com,,junior,onboarding,2026-10-01,,,"].join("\n"));
+    expect(withoutSplits.errors).toEqual([]);
+    expect(withoutSplits.rows[0]).toMatchObject({ inHouseSplit: null, selfGeneratedSplit: null });
+    const text = [
+      `${HEADER},in_house_split,self_generated_split`,
+      "Ok Person,ok@example.com,,junior,onboarding,2026-10-01,,,,40,60%",
+      "Too Much,much@example.com,,junior,onboarding,2026-10-01,,,,140,60",
+      "Fraction,frac@example.com,,junior,onboarding,2026-10-01,,,,40,62.5",
+    ].join("\n");
+    const { rows, errors } = parseBrokerCsv(text);
+    expect(rows.map((row) => [row.email, row.inHouseSplit, row.selfGeneratedSplit])).toEqual([["ok@example.com", 40, 60]]);
+    expect(errors).toEqual([
+      { line: 3, message: 'in_house_split "140" must be a whole number from 0 to 100' },
+      { line: 4, message: 'self_generated_split "62.5" must be a whole number from 0 to 100' },
+    ]);
   });
 
   it("rejects a file with missing columns or no content", () => {

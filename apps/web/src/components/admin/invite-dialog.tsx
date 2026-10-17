@@ -1,6 +1,7 @@
 /**
  * File: apps/web/src/components/admin/invite-dialog.tsx
- * Purpose: The "+ Invite a new broker" button and its dialog: name, email, mobile, level and joining date. Creating
+ * Purpose: The "+ Invite a new broker" button and its dialog: name, email, mobile, level, joining date and the two
+ * commission splits (in-house leads and self-generated deals), both required. Creating
  * the broker emails them the invite link; the admin is then taken to the new broker's profile.
  *
  * Functions:
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest, ApiError } from "@/lib/api-client";
+import { CommissionSplitFields, readSplits } from "./commission-split-fields";
 
 export function InviteBrokerButton({ today }: { today: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -50,6 +52,7 @@ function InviteDialog({ dialogRef, today }: { dialogRef: RefObject<HTMLDialogEle
           ...(phone ? { phone } : {}),
           level: String(form.get("level")),
           joinedAt: String(form.get("joinedAt")),
+          ...readSplits(form),
         },
       });
       dialogRef.current?.close();
@@ -65,7 +68,7 @@ function InviteDialog({ dialogRef, today }: { dialogRef: RefObject<HTMLDialogEle
     <dialog
       ref={dialogRef}
       aria-labelledby="invite-title"
-      className="m-auto w-[min(520px,calc(100vw-32px))] rounded-2xl border border-line bg-white p-0 text-ink overscroll-contain backdrop:bg-navy/50"
+      className="m-auto max-h-[calc(100dvh-32px)] w-[min(520px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-line bg-white p-0 text-ink overscroll-contain backdrop:bg-navy/50"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-7">
         <div className="flex items-start justify-between gap-4">
@@ -108,6 +111,7 @@ function InviteDialog({ dialogRef, today }: { dialogRef: RefObject<HTMLDialogEle
             <input id="invite-joined" name="joinedAt" type="date" required defaultValue={today} className={inputClasses()} />
           </div>
         </div>
+        <CommissionSplitFields idPrefix="invite" />
         {error ? <FormMessage tone="error">{error}</FormMessage> : null}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={() => dialogRef.current?.close()}>

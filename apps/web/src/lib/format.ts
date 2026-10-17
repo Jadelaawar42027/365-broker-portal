@@ -17,6 +17,7 @@
  * - formatPhone(phone): "(561) 555-0188" for US numbers given as +1 / 10 digits; anything else is returned as typed.
  * - toDate(iso): turns a date-only ISO string into a Date at Florida noon, and a timestamp into a Date.
  * - floridaDay(date): the "YYYY-MM-DD" day of a Date in Florida.
+ * - formatSplit(brokerPct): "60 / 40" (broker / house) from the broker's commission percentage, or "Not set".
  */
 const TIME_ZONE = "America/New_York";
 
@@ -93,4 +94,8 @@ export function formatPhone(phone: string): string {
   const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
   if (local.length !== 10) return phone;
   return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
+}
+
+export function formatSplit(brokerPct: number | null | undefined): string {
+  return brokerPct === null || brokerPct === undefined ? "Not set" : `${brokerPct} / ${100 - brokerPct}`;
 }

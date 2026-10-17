@@ -1,8 +1,8 @@
 /**
  * File: apps/api/src/routes/admin/brokers.ts
  * Purpose: Admin routes for managing brokers (3b, 3c): the filtered list (with training progress from the
- * broker_training_metrics view), inviting a new broker, the full profile with
- * files and persona, editing level/status/dates, the persona, resending an invite, sending a reset link and reminders.
+ * broker_training_metrics view), inviting a new broker with their two commission splits, the full profile with
+ * files and persona, editing level/status/dates/commission splits, the persona, resending an invite, sending a reset link and reminders.
  * Setting a broker to inactive deletes their sessions at once (SPEC D9). Every change writes audit_log.
  *
  * Functions:
@@ -104,6 +104,8 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           level: request.body.level,
           status: "invited",
           joinedAt: request.body.joinedAt ?? todayFor(now),
+          inHouseSplit: request.body.inHouseSplit,
+          selfGeneratedSplit: request.body.selfGeneratedSplit,
         });
         const issued = await issueAccountToken(tx, { userId: created.userId, purpose: "invite", createdBy: actor.userId, now });
         await writeAudit(tx, {
@@ -111,7 +113,13 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           action: "broker.created",
           entityType: "broker",
           entityId: created.brokerId,
-          after: { status: "invited", level: request.body.level, email: request.body.email },
+          after: {
+            status: "invited",
+            level: request.body.level,
+            email: request.body.email,
+            inHouseSplit: request.body.inHouseSplit,
+            selfGeneratedSplit: request.body.selfGeneratedSplit,
+          },
         });
         return { brokerId: created.brokerId, token: issued };
       });
@@ -157,7 +165,8 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           joinedAt: broker.joinedAt,
           onboardedAt: broker.onboardedAt,
           leftAt: broker.leftAt,
-          commissionTier: broker.commissionTier,
+          inHouseSplit: broker.inHouseSplit,
+          selfGeneratedSplit: broker.selfGeneratedSplit,
           hasLogin: await hasPasswordLogin(db, user.id),
         },
         metrics: {
@@ -209,7 +218,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     {
       schema: {
         tags: ["admin"],
-        summary: "Change level, status, joining/leaving date or commission tier",
+        summary: "Change level, status, joining/leaving date or the commission splits",
         params: idParams,
         body: updateBrokerRequestSchema,
         response: { 200: okResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema },

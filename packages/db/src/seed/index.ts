@@ -1,6 +1,6 @@
 /**
  * File: packages/db/src/seed/index.ts
- * Purpose: Seeds a database with the 11 onboarding steps, the owner account, the training chapters from the manual
+ * Purpose: Seeds a database with the 10 onboarding steps, the owner account, the training chapters from the manual
  * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
  * users and chapters are left alone.
  *
@@ -228,6 +228,8 @@ async function seedDaniel(tx: Transaction, context: SampleContext) {
     level: "junior",
     status: "onboarding",
     joinedAt: addDays(today, -4),
+    inHouseSplit: 40,
+    selfGeneratedSplit: 50,
   });
   await addPasswordLogin(tx, userId, context.password);
   const step = (key: string) => stepIds.get(key)!;
@@ -284,7 +286,8 @@ async function seedKevin(tx: Transaction, context: SampleContext) {
     status: "active",
     joinedAt,
     onboardedAt: "2026-08-27",
-    commissionTier: "60/40",
+    inHouseSplit: 40,
+    selfGeneratedSplit: 60,
     personaMd: SAMPLE_PERSONA,
   });
   await tx
@@ -333,6 +336,8 @@ async function seedMarisol(tx: Transaction, context: SampleContext) {
     level: "senior",
     status: "invited",
     joinedAt: context.today,
+    inHouseSplit: 50,
+    selfGeneratedSplit: 70,
   });
   const { token, tokenHash } = createAccountToken();
   await tx.insert(accountTokens).values({

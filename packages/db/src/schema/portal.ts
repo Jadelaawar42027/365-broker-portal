@@ -1,6 +1,7 @@
 /**
  * File: packages/db/src/schema/portal.ts
- * Purpose: The portal's own tables: brokers, account tokens (invites and resets, SPEC D8), the onboarding step
+ * Purpose: The portal's own tables: brokers (with their two commission splits, the broker's percentage on in-house
+ * leads and on self-generated deals), account tokens (invites and resets, SPEC D8), the onboarding step
  * template, each broker's progress rows, uploaded files (never overwritten) and the audit log.
  *
  * Functions:
@@ -51,6 +52,8 @@ export const brokers = pgTable(
     onboardedAt: date("onboarded_at", { mode: "string" }),
     leftAt: date("left_at", { mode: "string" }),
     commissionTier: text("commission_tier"),
+    inHouseSplit: integer("in_house_split"),
+    selfGeneratedSplit: integer("self_generated_split"),
     personaMd: text("persona_md"),
     personaUpdatedAt: timestamp("persona_updated_at", { withTimezone: true }),
     personaUpdatedBy: uuid("persona_updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -60,6 +63,11 @@ export const brokers = pgTable(
   },
   (table) => [
     index("brokers_status_idx").on(table.status),
+    check("brokers_in_house_split_range", sql`${table.inHouseSplit} IS NULL OR ${table.inHouseSplit} BETWEEN 0 AND 100`),
+    check(
+      "brokers_self_generated_split_range",
+      sql`${table.selfGeneratedSplit} IS NULL OR ${table.selfGeneratedSplit} BETWEEN 0 AND 100`,
+    ),
     check("brokers_left_after_joined", sql`${table.leftAt} IS NULL OR ${table.leftAt} >= ${table.joinedAt}`),
     check(
       "brokers_onboarded_after_joined",

@@ -26,6 +26,12 @@ const phoneSchema = z
   .string()
   .trim()
   .regex(/^[0-9()+\-.\s]{7,20}$/, "Enter a phone number like (561) 000-0000.");
+const commissionSplitSchema = z
+  .number({ error: "Enter the broker's share as a percentage." })
+  .int("Use a whole percentage, like 60.")
+  .min(0, "A split can't be below 0%.")
+  .max(100, "A split can't be above 100%.")
+  .describe("The broker's share in percent; the house keeps the rest");
 
 export const errorResponseSchema = z.object({
   error: z.string(),
@@ -56,7 +62,8 @@ export const meResponseSchema = z.object({
       status: z.enum(BROKER_STATUSES),
       joinedAt: z.string(),
       onboardedAt: z.string().nullable(),
-      commissionTier: z.string().nullable(),
+      inHouseSplit: z.number().int().nullable(),
+      selfGeneratedSplit: z.number().int().nullable(),
       showWelcome: z.boolean(),
     })
     .nullable(),
@@ -282,6 +289,8 @@ export const createBrokerRequestSchema = z.object({
   phone: phoneSchema.optional(),
   level: z.enum(BROKER_LEVELS),
   joinedAt: isoDateSchema.optional(),
+  inHouseSplit: commissionSplitSchema,
+  selfGeneratedSplit: commissionSplitSchema,
 });
 export type CreateBrokerRequest = z.infer<typeof createBrokerRequestSchema>;
 
@@ -321,7 +330,8 @@ export const brokerProfileResponseSchema = z.object({
     joinedAt: z.string(),
     onboardedAt: z.string().nullable(),
     leftAt: z.string().nullable(),
-    commissionTier: z.string().nullable(),
+    inHouseSplit: z.number().int().nullable(),
+    selfGeneratedSplit: z.number().int().nullable(),
     hasLogin: z.boolean(),
   }),
   metrics: z.object({
@@ -346,7 +356,8 @@ export const updateBrokerRequestSchema = z
     status: z.enum(BROKER_STATUSES).optional(),
     joinedAt: isoDateSchema.optional(),
     leftAt: isoDateSchema.nullable().optional(),
-    commissionTier: z.string().trim().max(100).nullable().optional(),
+    inHouseSplit: commissionSplitSchema.optional(),
+    selfGeneratedSplit: commissionSplitSchema.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: "Send at least one field to change." });
 export type UpdateBrokerRequest = z.infer<typeof updateBrokerRequestSchema>;
@@ -382,7 +393,6 @@ export const sendBackRequestSchema = z.object({
 });
 
 export const markDoneRequestSchema = z.object({
-  commissionTier: z.string().trim().min(1).max(100).optional(),
   note: z.string().trim().max(2000).optional(),
 });
 
