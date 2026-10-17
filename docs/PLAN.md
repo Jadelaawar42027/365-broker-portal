@@ -7,7 +7,7 @@ Approved by Aj on Oct 17, 2026. `docs/SPEC.md` (including its "Decisions" sectio
 - [x] A. Monorepo scaffold (Oct 17, 2026)
 - [x] B. Database and shared logic (Oct 17, 2026)
 - [x] C. API (Oct 17, 2026)
-- [ ] D. Broker screens
+- [x] D. Broker screens (Oct 17, 2026)
 - [ ] E. Admin screens
 - [ ] F. Import, end-to-end tests, deploy docs
 
@@ -82,9 +82,16 @@ brokerPortal/
 - Phase B: `pnpm db:metrics-user` and the `@bp/db/testing` helper (Testcontainers Postgres with migrations) were added; the API's integration tests reuse it.
 - Phase C: extra routes, storage key nonce, email rules, CSRF origin check and the shared API contract are recorded as SPEC D22-D26. Added `pnpm admin:invite` and `pnpm storage:cors`.
 - Phase C: the S3 adapter lives in `@bp/shared/node` (not `apps/api`) because the seed and the phase F importer also upload files.
+- Phase D: no new npm dependencies. UI primitives (buttons, pills, icons, progress bar) are small hand-written components in shadcn/ui style instead of generated shadcn/ui files, so every file carries its header; persona Markdown uses a tiny safe block parser (no raw HTML). Web tests cover pure helpers; screens are checked with the visual-check skill now and journeys with Playwright in phase F.
+- Phase D: "sent" on the 1b header counts sent-back steps too (mockup: 5 sent, 3 approved, 1 waiting, 1 sent back). `countProgress` in @bp/shared changed accordingly.
+- Phase D: the 1c video card is shown only when a step has a video URL; none do yet, so it is hidden rather than showing a "[Video from Shelly — to upload]" placeholder. "Call Shelly" panels are WhatsApp buttons (D13); text promises say email (D15).
+- Phase D: pages shown before sign-in read SUPPORT_CONTACT_NAME / SUPPORT_WHATSAPP_NUMBER from the web service's own environment, so DEPLOY.md must set them on `web` as well as `api`.
 - Phase A: TypeScript is pinned to 6.0.x and ESLint to 9.x: typescript-eslint does not support TypeScript 7 yet, and the Next.js React/a11y lint plugins do not support ESLint 10 yet.
 
 ## Notes for later phases
+
+- Local machine: the repo lives in an iCloud-synced Desktop folder. iCloud created "file 2.ts" conflict copies inside apps/web/.next (deleted). If odd duplicate files appear again, moving the repo out of Desktop/Documents avoids it.
+- Visual checks run against an isolated database `broker_portal_visual` (same Postgres container) with web on :3200 and api on :4200 in proxy upload mode, so the developer's own data and bucket CORS are untouched.
 
 - Phase C: the seed creates approved upload steps without file rows (no storage client yet). Once storage exists, the seed uploads small placeholder files for the sample brokers so "View file" works locally.
 - Phase C: the contract & NDA step has no template file yet (`template_file_key` is empty). Aj needs to provide the blank contract and NDA; the W-9 step links to the IRS form.

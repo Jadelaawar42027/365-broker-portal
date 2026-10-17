@@ -110,6 +110,10 @@ export { Box };`,
       filename,
     },
     {
+      code: `${header("x.ts")}\nexport const schema = z.string().refine((value: string) => value.length > 0);`,
+      filename,
+    },
+    {
       code: `${header("x.ts", [" * - make(): builds.", " * - make.run(): nested method.", " * - helper(n): inner helper."])}
 export function make() { const helper = (n: number) => n; return { run() { return helper(1); } }; }`,
       filename,
@@ -123,6 +127,11 @@ export function make() { const helper = (n: number) => n; return { run() { retur
     },
     {
       code: `${header("x.ts", [" * - Box.open(): opens."])}\nexport class Box { constructor() {} open() { return 1; } }`,
+      filename,
+      errors: [{ messageId: "unlisted" }],
+    },
+    {
+      code: `${header("x.ts")}\nexport const cached = cache(async () => 1);`,
       filename,
       errors: [{ messageId: "unlisted" }],
     },

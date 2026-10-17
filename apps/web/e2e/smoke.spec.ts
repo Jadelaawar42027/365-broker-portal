@@ -1,15 +1,17 @@
 /**
  * File: apps/web/e2e/smoke.spec.ts
- * Purpose: Phase A smoke test: the web app serves the home page and the API started by `pnpm dev` answers /health.
+ * Purpose: Smoke test: the web app sends signed-out visitors to the sign-in page, and the API started by `pnpm dev`
+ * answers /health. The full user journeys arrive in phase F.
  *
  * Functions:
  * - none
  */
 import { expect, test } from "@playwright/test";
 
-test("home page renders the portal name", async ({ page }) => {
+test("signed-out visitors land on the sign-in page", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "365 Yachts Broker Portal" })).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
 test("API started by pnpm dev answers /health", async ({ request }) => {

@@ -47,5 +47,6 @@ describe("formatFileSize", () => {
     expect(formatFileSize(500)).toBe("500 B");
     expect(formatFileSize(412 * 1024)).toBe("412 KB");
     expect(formatFileSize(1.25 * 1024 * 1024)).toBe("1.3 MB");
+    expect(formatFileSize(10 * 1024 * 1024)).toBe("10 MB");
   });
 });

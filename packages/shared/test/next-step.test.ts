@@ -46,12 +46,12 @@ describe("findSentBackSteps", () => {
 });
 
 describe("countProgress", () => {
-  it("counts approved and sent steps like the 1b header", () => {
+  it("counts sent-back steps as sent, like the 1b header (5 sent, 3 approved)", () => {
     const steps = rows([
       "approved", "approved", "submitted", "changes_requested", "todo", "approved",
       "todo", "todo", "todo", "todo", "todo",
     ]);
-    expect(countProgress(steps)).toEqual({ total: 11, approved: 3, sent: 4 });
+    expect(countProgress(steps)).toEqual({ total: 11, approved: 3, sent: 5 });
   });
 });
 

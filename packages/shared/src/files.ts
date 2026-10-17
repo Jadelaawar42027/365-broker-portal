@@ -7,7 +7,7 @@
  * - safeFileName(name): strips paths and unsafe characters, keeps the extension, caps the length; never returns an empty string.
  * - buildStorageKey(input): returns the storage key for one uploaded file.
  * - storageKeyPrefix(brokerId, stepKey): returns the key prefix every file of that broker step must start with.
- * - formatFileSize(bytes): returns "412 KB" / "1.2 MB" style text.
+ * - formatFileSize(bytes): returns "412 KB" / "1.2 MB" / "10 MB" style text.
  */
 export function safeFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
@@ -41,5 +41,5 @@ export function storageKeyPrefix(brokerId: string, stepKey: string): string {
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`;
 }

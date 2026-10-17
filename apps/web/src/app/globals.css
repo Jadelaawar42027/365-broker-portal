@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/app/globals.css
- * Purpose: Global styles: loads Tailwind CSS v4 and defines the 365 Yachts design tokens from docs/mockups
- * (navy #0A1F3D, blue #1D5FBF, page background, Manrope font) as Tailwind theme values.
+ * Purpose: Global styles: loads Tailwind CSS v4 and defines the 365 Yachts design tokens taken from docs/mockups
+ * (navy, blue, page background, status tints, Manrope) as Tailwind theme values, plus the focus ring and touch behaviour.
  *
  * Functions:
  * - none
@@ -10,19 +10,55 @@
 
 @theme {
   --color-navy: #0a1f3d;
+  --color-navy-soft: #16305a;
   --color-brand: #1d5fbf;
+  --color-brand-dark: #174e9e;
+  --color-brand-soft: #eaf1fb;
   --color-page: #f5f7fb;
+  --color-line: #e3e8f0;
   --color-ink: #0a1f3d;
   --color-muted: #4a5a70;
+  --color-success: #1b6b3a;
+  --color-success-soft: #e3f4ea;
+  --color-approve: #1e6b3c;
+  --color-warn: #8a4b00;
+  --color-warn-soft: #fff1d6;
+  --color-warn-line: #f1d9a8;
+  --color-danger: #a3191d;
+  --color-danger-soft: #fdf0f0;
+  --color-danger-line: #f2c4c4;
+  --color-neutral-soft: #eef1f5;
+  --color-whatsapp: #0e7a3e;
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
+  color-scheme: light;
   color: var(--color-ink);
   background: var(--color-page);
+  -webkit-text-size-adjust: 100%;
+}
+
+a,
+button,
+input,
+label,
+select,
+textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgb(29 95 191 / 0.15);
 }
 
 :focus-visible {
   outline: 3px solid var(--color-brand);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

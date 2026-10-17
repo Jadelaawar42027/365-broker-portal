@@ -7,7 +7,7 @@
  * - sortByPosition(steps): returns a copy of steps ordered by position.
  * - findNextStep(steps): returns the lowest todo step, else the lowest changes_requested step, else null.
  * - findSentBackSteps(steps): returns every changes_requested step in position order.
- * - countProgress(steps): returns total, approved and sent (submitted or approved) counts.
+ * - countProgress(steps): returns total, approved and sent counts; "sent" is every step the broker has sent in at least once (submitted, approved or sent back), as on mockup 1b.
  * - isOnboardingComplete(steps): returns true when there is at least one step and every step is approved.
  */
 import type { StepStatus } from "./constants";
@@ -33,8 +33,8 @@ export function findSentBackSteps<T extends StepProgressRow>(steps: readonly T[]
 
 export function countProgress(steps: readonly StepProgressRow[]) {
   const approved = steps.filter((step) => step.status === "approved").length;
-  const submitted = steps.filter((step) => step.status === "submitted").length;
-  return { total: steps.length, approved, sent: approved + submitted };
+  const sent = steps.filter((step) => step.status !== "todo").length;
+  return { total: steps.length, approved, sent };
 }
 
 export function isOnboardingComplete(steps: readonly StepProgressRow[]): boolean {

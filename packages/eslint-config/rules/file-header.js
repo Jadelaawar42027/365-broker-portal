@@ -7,9 +7,10 @@
  * - findRepoRoot(startPath): walks up from a file to the folder holding pnpm-workspace.yaml; returns it or null.
  * - getHeaderComment(sourceCode): returns the block comment that opens the file, or null.
  * - readListedFunctions(headerText): returns the names listed under "Functions:" in a header.
- * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const, method of a top-level object literal and class method (constructors included).
+ * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const (including one wrapped in a call such as cache(fn)), method of a top-level object literal and class method (constructors included).
  * - collectAllFunctionNames(program): returns the names of every named function, method and function-valued variable anywhere in the file.
  * - isFunctionNode(node): true for function declarations, function expressions and arrow functions.
+ * - isWrappedFunction(node): true for a plain wrapper call around a function, such as cache(fn) or memo(fn) (not method chains like z.string().refine(fn)).
  * - resolveRootDir(context): returns the repo root from the rule options or by searching upward.
  * - requireFileHeader.create(context): reports a missing header, a wrong "File:" path, or a missing Purpose/Functions section.
  * - noCommentsOutsideHeader.create(context): reports every comment other than the file header.
@@ -76,7 +77,9 @@ function collectDeclaredFunctions(program) {
         if (
           declarator.id.type === "Identifier" &&
           init &&
-          (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression")
+          (init.type === "ArrowFunctionExpression" ||
+            init.type === "FunctionExpression" ||
+            isWrappedFunction(init))
         ) {
           declared.push({ name: declarator.id.name, node: declarator });
         } else if (init && init.type === "ObjectExpression") {
@@ -113,6 +116,15 @@ function isFunctionNode(node) {
   );
 }
 
+function isWrappedFunction(node) {
+  return (
+    !!node &&
+    node.type === "CallExpression" &&
+    node.callee.type === "Identifier" &&
+    node.arguments.some(isFunctionNode)
+  );
+}
+
 function collectAllFunctionNames(program) {
   const names = new Set();
   const visit = (node) => {
@@ -120,7 +132,8 @@ function collectAllFunctionNames(program) {
     if ((node.type === "FunctionDeclaration" || node.type === "FunctionExpression") && node.id) {
       names.add(node.id.name);
     }
-    if (node.type === "VariableDeclarator" && node.id.type === "Identifier" && isFunctionNode(node.init)) {
+    const wrapsFunction = node.type === "VariableDeclarator" && isWrappedFunction(node.init);
+    if (node.type === "VariableDeclarator" && node.id.type === "Identifier" && (isFunctionNode(node.init) || wrapsFunction)) {
       names.add(node.id.name);
     }
     if (

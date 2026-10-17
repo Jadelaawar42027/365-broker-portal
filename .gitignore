@@ -16,3 +16,4 @@ data/uploads/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+.playwright-mcp/
