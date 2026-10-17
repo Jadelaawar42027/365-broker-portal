@@ -1,0 +1,28 @@
+/**
+ * File: apps/web/src/app/globals.css
+ * Purpose: Global styles: loads Tailwind CSS v4 and defines the 365 Yachts design tokens from docs/mockups
+ * (navy #0A1F3D, blue #1D5FBF, page background, Manrope font) as Tailwind theme values.
+ *
+ * Functions:
+ * - none
+ */
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0a1f3d;
+  --color-brand: #1d5fbf;
+  --color-page: #f5f7fb;
+  --color-ink: #0a1f3d;
+  --color-muted: #4a5a70;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color: var(--color-ink);
+  background: var(--color-page);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}

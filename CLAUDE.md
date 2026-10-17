@@ -13,13 +13,13 @@ Read these before doing anything:
 
 ## Stack (MVP)
 
-- pnpm workspaces + Turborepo, TypeScript everywhere, Node 22
+- pnpm workspaces + Turborepo, TypeScript everywhere, Node 24
 - `apps/web` - Next.js (App Router), Tailwind, shadcn/ui
 - `apps/api` - Fastify + Zod, OpenAPI generated from the Zod schemas
 - `packages/db` - Postgres via Drizzle ORM, migrations, seed and import scripts
 - `packages/shared` - Zod schemas, types, the onboarding state machine, metrics helpers
 - Postgres on Railway (production), Docker Postgres locally and in tests
-- File storage: S3-compatible API. Railway Storage Bucket in production, MinIO locally
+- File storage: S3-compatible API. Railway Storage Bucket in production, SeaweedFS locally and in tests (MinIO no longer publishes Docker images; SPEC D21)
 - Auth: Better Auth (email + password, invite links)
 - Tests: Vitest (unit + integration), Testcontainers (real Postgres in integration tests), Playwright (end-to-end)
 
@@ -30,7 +30,8 @@ Keep these working at all times and update this list if they change.
 - `pnpm dev` - run web + api locally (needs `docker compose up -d` first)
 - `pnpm test` - unit + integration tests
 - `pnpm test:e2e` - Playwright end-to-end tests
-- `pnpm lint` and `pnpm typecheck`
+- `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
+- `pnpm build` - production build of web + api
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio`
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`
 

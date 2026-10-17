@@ -1,0 +1,29 @@
+/**
+ * File: apps/web/eslint.config.mjs
+ * Purpose: ESLint config for the Next.js app: the workspace base config plus the Next.js, React Hooks
+ * and accessibility (jsx-a11y) rules, with browser globals for client code.
+ *
+ * Functions:
+ * - none
+ */
+import { baseConfig } from "@bp/eslint-config";
+import nextPlugin from "@next/eslint-plugin-next";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
+import { defineConfig } from "eslint/config";
+import globals from "globals";
+
+export default defineConfig([
+  ...baseConfig,
+  {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: { globals: { ...globals.browser } },
+    plugins: { "@next/next": nextPlugin, "react-hooks": reactHooks, "jsx-a11y": jsxA11y },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
+      ...reactHooks.configs.recommended.rules,
+      ...jsxA11y.flatConfigs.recommended.rules,
+    },
+  },
+]);

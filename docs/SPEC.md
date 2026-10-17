@@ -148,3 +148,65 @@ Upserts by email, never deletes, prints a summary, supports `--dry-run`. Existin
 - Both apps must build and start with plain `pnpm` commands from the repo root (for example `pnpm --filter @bp/api build` and `pnpm --filter @bp/api start`)
 - Env vars documented in `.env.example`; `api` uses `${{Postgres.DATABASE_URL}}` and the bucket's credentials via Railway variable references
 - Aj connects the GitHub repo in Railway himself after he pushes
+
+## Decisions
+
+Agreed with Aj on Oct 17, 2026, after the planning pass. Where these differ from the sections above, the decisions win.
+
+### Onboarding logic
+
+- **D1. Next step.** "Next step" = the lowest-numbered step in `todo`. Steps in `changes_requested` always show in the red "sent back" banner. Only when no `todo` step is left does the next step fall back to the lowest `changes_requested` step. (Matches mockup 1b, replaces the rule in "Step state machine".)
+- **D2. Admin override.** One extra transition, admin-only: any state -> `approved`, recorded with the admin as actor and an `audit_log` row. Used by "mark done" (step 11) and by admin uploads on a broker's behalf. "Mark done" on `commission_tier` also takes the tier text and saves it to `brokers.commission_tier`.
+- **D3. Status labels.** Approved steps that need no approval show "Done"; `contract_nda` shows "Signed"; every other approved step shows "Approved". The admin onboarding record (3c) uses the same labels with the date.
+- **D4. Order.** Every step can be opened at any time. "Coming up" is only a label.
+- **D5. Joining.** Admin sets `joined_at` when creating the broker (defaults to today, editable). Broker status goes `invited -> onboarding` when the invite is accepted.
+
+### Training placeholders (phase 2 visible but locked)
+
+- **D6.** Broker nav keeps "Training" with a lock icon. It opens `/app/training`, a locked page listing the Volume One chapters greyed out (titles only) with the banner "Training opens soon. You'll get access once your onboarding is approved."
+- 1d keeps "Start training" as a disabled button labelled "Training coming soon". 1b keeps "Training unlocks when all 11 are done".
+- Admin sidebar: Overview, Brokers, Reviews, and "Chapters & quizzes" shown with a "Soon" badge and not clickable. "Onboarding steps" and "Settings" are hidden.
+- 3a: the quiz score card becomes "Waiting for review" (count); the training panel is dropped.
+- 3b: the Training and Avg. quiz columns stay and show "—" for everyone.
+- The chapter list lives in one place, `packages/shared` (`VOLUME_ONE_CHAPTERS`): Part 0 · Start Here, 01 · Week One Setup, 02 · Licensing & Compliance, 03 · Commission Structure, 04 · Commission Income Management, 05 · KPIs & Benchmarks, 06 · Quick Start Checklist. Phase 2 reuses it.
+
+### Accounts and auth
+
+- **D7. Admin accounts.** Owner-only `POST /v1/admin/admins` invites an admin by email, plus a `pnpm admin:invite` script. No Settings screen this weekend.
+- **D8. Account tokens.** Invites and password resets share one token mechanism: an `account_tokens` table (id, user_id, broker_id nullable, purpose `invite` | `password_reset`, token_hash, expires_at, used_at) replaces `invites`. Invites expire after 7 days, reset links after 24 hours; tokens are single-use and stored only as hashes.
+  - `POST /v1/admin/brokers/:id/resend-invite` issues a fresh invite and invalidates the old one.
+  - `POST /v1/admin/brokers/:id/reset-password` emails a reset link; `/login` has a "Forgot password?" link that does the same for the user's own email (always answers the same way so it does not reveal which emails exist).
+  - `/reset/[token]` sets a new password; completing it deletes the user's other sessions.
+- **D9. Inactive brokers.** An inactive broker cannot log in, and setting a broker to `inactive` deletes all their sessions. The API auth guard also rejects any session that belongs to an inactive broker. Integration tests cover both.
+- **D10. Cookies.** The web app proxies `/v1/*` and `/api/auth/*` to the api over Railway's private network, so the browser only talks to the web origin and the session cookie is first-party. The api keeps a public domain for `/docs` and the future bot.
+
+### Files
+
+- **D11. Storage interface.** One storage interface in the api with two upload modes: direct presigned PUT (default) and upload through the api for files up to 10 MB (fallback if the Railway bucket rejects cross-origin PUTs). Callers never know which mode is active; a `STORAGE_UPLOAD_MODE` env var (`direct` | `proxy`) switches it.
+- **D12. Submissions.** One submission can hold up to 5 files sharing one version number. "Remove" before sending only discards a file that has not been submitted; file rows are created on submit and never deleted.
+
+### Support, notifications and copy
+
+- **D13. WhatsApp support.** Support is through WhatsApp. Env vars `SUPPORT_CONTACT_NAME` and `SUPPORT_WHATSAPP_NUMBER` (international format, digits only, e.g. `15614459241`).
+  - Everywhere the mockups say "Call Shelly" or "Stuck? Just call" (1a footer, 1c side card), show a green "Message {name} on WhatsApp" button instead.
+  - It opens `https://wa.me/<number>?text=<message>` in a new tab with a pre-filled message naming the broker and their step, e.g. "Hi Shelly, it's Daniel Reyes. I need help with step 5: Upload your W-9." On 1a it says "I need help creating my account."
+  - The link is built by a pure function in `packages/shared` (`buildWhatsAppLink`) with unit tests for URL encoding and for returning nothing when the number is missing, which hides the button.
+  - `/app/help` is mainly this button.
+- **D14. Names.** The red banner uses the real reviewer's name and the 3d "Send back to {first name}" button uses the real broker's name. Other copy that says "Shelly" uses `SUPPORT_CONTACT_NAME`.
+- **D15. No SMS copy.** Copy that promises a text ("We text you a reminder", "You get a text") says email instead. The phone number is still collected.
+- **D16. Extra mockup elements kept.**
+  - "Send reminder" (3a) sends a templated email through the notification code and writes `audit_log`.
+  - "Export CSV" (3b) downloads the currently filtered table, built in the browser.
+  - "Take a photo" (1c) is a file input with `capture`.
+  - 3d "Check before approving" shows a per-step checklist from `onboarding_steps.config`; it is a reading aid and is not saved.
+
+### Data and metrics
+
+- **D17. Schema additions.** `onboarding_steps.config` (jsonb: choices, checkboxes, max size, review checklist); `brokers.welcome_seen_at` (the onboarding-complete screen shows once); Better Auth's user table is `users`, with `role` and `phone` as additional fields.
+- **D18. metrics_reader.** The migration creates `metrics_reader` as a NOLOGIN role with SELECT on `broker_metrics` only. `pnpm db:metrics-user` creates a login user in that role from `METRICS_READER_PASSWORD`.
+- **D19.** 3a's "Avg. days to onboard" subtitle says "Last 10 brokers" (the mockup's "Last 6" is placeholder).
+
+### Tooling
+
+- **D20.** Node 24 (`engines.node >=24`, `.nvmrc`), not Node 22.
+- **D21. Local S3 is SeaweedFS, not MinIO.** MinIO stopped publishing pullable Docker images (quay.io/minio returns 401, Docker Hub `minio/minio` is gone). Local development and integration tests use `chrislusf/seaweedfs` (S3 API on port 8333, credentials in `docker/seaweedfs/s3.json`). Production is unchanged (Railway Storage Bucket); the API only speaks plain S3. Decided by Aj, Oct 17, 2026.
