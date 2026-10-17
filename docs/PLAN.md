@@ -9,7 +9,7 @@ Approved by Aj on Oct 17, 2026. `docs/SPEC.md` (including its "Decisions" sectio
 - [x] C. API (Oct 17, 2026)
 - [x] D. Broker screens (Oct 17, 2026)
 - [x] E. Admin screens (Oct 17, 2026)
-- [ ] F. Import, end-to-end tests, deploy docs
+- [x] F. Import, end-to-end tests, deploy docs (Oct 17, 2026)
 
 ## Folder structure
 
@@ -88,6 +88,9 @@ brokerPortal/
 - Phase D: pages shown before sign-in read SUPPORT_CONTACT_NAME / SUPPORT_WHATSAPP_NUMBER from the web service's own environment, so DEPLOY.md must set them on `web` as well as `api`.
 - Phase E: the admin sidebar is 248px wide (mockup ~220px) so "Chapters & quizzes" fits on one line with its "Soon" badge. The 3a quiz card is "Waiting for review", the 3c fifth tile is "Commission tier", and the 3c record shows admin actions (Review, Upload, Mark done) on a second line under steps that aren't approved. Setting a broker inactive asks for confirmation and records today as left_at; reactivating clears it.
 - Phase E: added a `/admin/reviews` list page (the sidebar "Reviews" item and "See all" on 3a need somewhere to land); it is not in the mockups.
+- Phase F: the importer validates the whole folder first and imports nothing if any row or file is wrong; it runs in one transaction, and a dry run rehearses everything and rolls back. Brokers imported as active (or inactive with an onboarded date) get every step approved with the note "imported" and `welcome_seen_at` set. Imported brokers have no password; admins send invites from the profile.
+- Phase F: Railway pre-deploy runs `pnpm --filter @bp/api release` (built migrations + idempotent seed) instead of drizzle-kit, so deploys don't depend on dev tools.
+- Phase F: e2e tests run on their own database (`broker_portal_e2e`, reset by `pnpm --filter @bp/db e2e:reset`, which refuses any other name) and ports 3100/4100, and read invite/reset links from `EMAIL_OUTBOX_DIR` (refused in production). The status pill on 3b now renders "Active" as text rather than via CSS capitalisation.
 - Phase A: TypeScript is pinned to 6.0.x and ESLint to 9.x: typescript-eslint does not support TypeScript 7 yet, and the Next.js React/a11y lint plugins do not support ESLint 10 yet.
 
 ## Notes for later phases

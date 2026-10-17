@@ -29,6 +29,7 @@ export const baseConfig = defineConfig([
   globalIgnores([
     "**/dist/**",
     "**/.next/**",
+    "**/.next-e2e/**",
     "**/coverage/**",
     "**/node_modules/**",
     "**/next-env.d.ts",

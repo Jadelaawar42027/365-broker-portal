@@ -7,6 +7,7 @@
  * Functions:
  * - BrokersPage({ searchParams }): loads the filtered list and renders the table.
  * - statusTone(status): the pill colour for a broker status.
+ * - capitalise(word): "active" → "Active", for levels and statuses.
  */
 import { formatTenure, todayInTimeZone, type BrokerListResponse, type BrokerStatus } from "@bp/shared";
 import type { Metadata } from "next";
@@ -24,6 +25,10 @@ function statusTone(status: BrokerStatus): PillTone {
   if (status === "active") return "success";
   if (status === "inactive") return "neutral";
   return "brand-soft";
+}
+
+function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 export default async function BrokersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -88,11 +93,9 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
                         {row.name}
                       </Link>
                     </td>
-                    <td className="px-3 py-3 capitalize">{row.level}</td>
+                    <td className="px-3 py-3">{capitalise(row.level)}</td>
                     <td className="px-3 py-3">
-                      <Pill tone={statusTone(row.status)} className="capitalize">
-                        {row.status}
-                      </Pill>
+                      <Pill tone={statusTone(row.status)}>{capitalise(row.status)}</Pill>
                     </td>
                     <td className="px-3 py-3 tabular-nums text-muted">{formatDate(row.joinedAt)}</td>
                     <td className="px-3 py-3 tabular-nums text-muted">{row.onboardedAt ? formatDate(row.onboardedAt) : "—"}</td>

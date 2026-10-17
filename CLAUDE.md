@@ -29,7 +29,7 @@ Keep these working at all times and update this list if they change.
 
 - `pnpm dev` - run web + api locally (needs `docker compose up -d` first)
 - `pnpm test` - unit + integration tests
-- `pnpm test:e2e` - Playwright end-to-end tests
+- `pnpm test:e2e` - Playwright end-to-end tests (needs `docker compose up -d`; resets and uses its own `broker_portal_e2e` database and ports 3100/4100)
 - `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
 - `pnpm build` - production build of web + api
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`; sample brokers are never seeded when `NODE_ENV=production`)
@@ -37,6 +37,7 @@ Keep these working at all times and update this list if they change.
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`
 - `pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` - create an admin and print their invite link (owner task, SPEC D7)
 - `pnpm storage:cors` - allow the web origin to upload straight to the bucket (run once per bucket; SPEC D11)
+- `pnpm --filter @bp/api release` - production pre-deploy: migrations + idempotent seed (built by `pnpm build`; see docs/DEPLOY.md)
 
 ## Rule 1: Comments - file headers only, never inline
 

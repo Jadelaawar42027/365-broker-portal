@@ -15,7 +15,7 @@ test("signed-out visitors land on the sign-in page", async ({ page }) => {
 });
 
 test("API started by pnpm dev answers /health", async ({ request }) => {
-  const response = await request.get(process.env.E2E_API_URL ?? "http://localhost:4000/health");
+  const response = await request.get(process.env.E2E_API_URL ?? "http://localhost:4100/health");
   expect(response.ok()).toBe(true);
   expect(await response.json()).toEqual({ status: "ok" });
 });
