@@ -4,7 +4,7 @@
  * mockups use, optionally with a sub-label such as "Admin".
  *
  * Functions:
- * - BrandLockup({ tone, sublabel, size }): the tile plus "365 YACHTS", for light or navy backgrounds.
+ * - BrandLockup({ tone, sublabel, size }): the tile plus "365 YACHTS" in three sizes, for light or navy backgrounds.
  */
 export function BrandLockup({
   tone = "dark",
@@ -13,16 +13,17 @@ export function BrandLockup({
 }: {
   tone?: "dark" | "light";
   sublabel?: string;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
 }) {
   const tile = tone === "light" ? "bg-white text-navy" : "bg-navy text-white";
   const word = tone === "light" ? "text-white" : "text-navy";
-  const tileSize = size === "lg" ? "size-15 text-xl rounded-xl" : "size-11 text-[15px] rounded-[10px]";
+  const tileSize = size === "lg" ? "size-15 text-xl rounded-xl" : size === "sm" ? "size-10 text-sm rounded-[10px]" : "size-11 text-[15px] rounded-[10px]";
+  const wordSize = size === "lg" ? "text-2xl tracking-[0.18em]" : size === "sm" ? "text-base tracking-[0.14em]" : "text-lg tracking-[0.18em]";
   return (
     <span className="inline-flex items-center gap-3.5" translate="no">
       <span className={`grid place-items-center font-extrabold ${tile} ${tileSize}`}>365</span>
       <span className="flex flex-col leading-tight">
-        <span className={`font-extrabold tracking-[0.18em] ${word} ${size === "lg" ? "text-2xl" : "text-lg"}`}>365 YACHTS</span>
+        <span className={`whitespace-nowrap font-extrabold ${word} ${wordSize}`}>365 YACHTS</span>
         {sublabel ? <span className="text-[15px] font-medium text-[#c9d3e3]">{sublabel}</span> : null}
       </span>
     </span>

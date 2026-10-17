@@ -6,7 +6,7 @@
  * - none
  */
 import { describe, expect, it } from "vitest";
-import { firstName, formatDate, formatLongDate, formatSentAt, formatShortDate, greeting, initials, ordinal, relativeTime } from "../src/lib/format";
+import { firstName, formatDate, formatLongDate, formatPhone, formatSentAt, formatShortDate, greeting, initials, ordinal, relativeTime } from "../src/lib/format";
 
 const now = new Date("2026-10-17T14:42:00Z");
 
@@ -45,6 +45,12 @@ describe("dates", () => {
     expect(formatSentAt("2026-10-17T14:42:00Z", now)).toBe("Today, 10:42");
     expect(formatSentAt("2026-10-16T20:05:00Z", now)).toBe("Yesterday, 16:05");
     expect(formatSentAt("2026-10-13T14:00:00Z", now)).toBe("Oct 13, 10:00");
+  });
+
+  it("formats US phone numbers and leaves others alone", () => {
+    expect(formatPhone("+15615550188")).toBe("(561) 555-0188");
+    expect(formatPhone("561-445-9241")).toBe("(561) 445-9241");
+    expect(formatPhone("+44 20 7946 0958")).toBe("+44 20 7946 0958");
   });
 
   it("writes ordinals", () => {

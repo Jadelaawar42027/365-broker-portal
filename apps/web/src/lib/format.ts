@@ -14,6 +14,7 @@
  * - formatSentAt(iso, now): "Today, 10:42", "Yesterday, 16:05" or "Oct 13, 10:42".
  * - greeting(now): "Good morning", "Good afternoon" or "Good evening" by Florida time.
  * - ordinal(n): "1st", "2nd", "3rd", "4th"...
+ * - formatPhone(phone): "(561) 555-0188" for US numbers given as +1 / 10 digits; anything else is returned as typed.
  * - toDate(iso): turns a date-only ISO string into a Date at Florida noon, and a timestamp into a Date.
  * - floridaDay(date): the "YYYY-MM-DD" day of a Date in Florida.
  */
@@ -85,4 +86,11 @@ export function ordinal(n: number): string {
   const tens = n % 100;
   if (tens >= 11 && tens <= 13) return `${n}th`;
   return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+
+export function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (local.length !== 10) return phone;
+  return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
 }

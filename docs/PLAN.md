@@ -8,7 +8,7 @@ Approved by Aj on Oct 17, 2026. `docs/SPEC.md` (including its "Decisions" sectio
 - [x] B. Database and shared logic (Oct 17, 2026)
 - [x] C. API (Oct 17, 2026)
 - [x] D. Broker screens (Oct 17, 2026)
-- [ ] E. Admin screens
+- [x] E. Admin screens (Oct 17, 2026)
 - [ ] F. Import, end-to-end tests, deploy docs
 
 ## Folder structure
@@ -86,6 +86,8 @@ brokerPortal/
 - Phase D: "sent" on the 1b header counts sent-back steps too (mockup: 5 sent, 3 approved, 1 waiting, 1 sent back). `countProgress` in @bp/shared changed accordingly.
 - Phase D: the 1c video card is shown only when a step has a video URL; none do yet, so it is hidden rather than showing a "[Video from Shelly — to upload]" placeholder. "Call Shelly" panels are WhatsApp buttons (D13); text promises say email (D15).
 - Phase D: pages shown before sign-in read SUPPORT_CONTACT_NAME / SUPPORT_WHATSAPP_NUMBER from the web service's own environment, so DEPLOY.md must set them on `web` as well as `api`.
+- Phase E: the admin sidebar is 248px wide (mockup ~220px) so "Chapters & quizzes" fits on one line with its "Soon" badge. The 3a quiz card is "Waiting for review", the 3c fifth tile is "Commission tier", and the 3c record shows admin actions (Review, Upload, Mark done) on a second line under steps that aren't approved. Setting a broker inactive asks for confirmation and records today as left_at; reactivating clears it.
+- Phase E: added a `/admin/reviews` list page (the sidebar "Reviews" item and "See all" on 3a need somewhere to land); it is not in the mockups.
 - Phase A: TypeScript is pinned to 6.0.x and ESLint to 9.x: typescript-eslint does not support TypeScript 7 yet, and the Next.js React/a11y lint plugins do not support ESLint 10 yet.
 
 ## Notes for later phases
