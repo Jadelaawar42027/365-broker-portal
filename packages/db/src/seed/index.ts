@@ -1,7 +1,8 @@
 /**
  * File: packages/db/src/seed/index.ts
- * Purpose: Seeds a database with the 11 onboarding steps, the owner account and (outside production) three
- * sample brokers in different states. Safe to run again: existing steps and users are left alone.
+ * Purpose: Seeds a database with the 11 onboarding steps, the owner account, the training chapters from the manual
+ * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
+ * users and chapters are left alone.
  *
  * Functions:
  * - seedDatabase(db, options): runs the whole seed in one transaction; returns a summary of what changed and any invite links created.
@@ -27,12 +28,14 @@ import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } f
 import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
 import { samplePdf, samplePng } from "./sample-files";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
+import { seedTraining } from "./training";
 
 export type SeedOptions = {
   owner?: { name: string; email: string; password: string } | null;
   sampleBrokers?: { password: string } | null;
   storage?: FileStorage | null;
   refreshSteps?: boolean;
+  training?: { publish: boolean } | null;
   now?: Date;
   webOrigin?: string;
 };
@@ -41,6 +44,7 @@ export type SeedSummary = {
   stepsInserted: number;
   stepsUpdated: number;
   owner: "created" | "existing" | "skipped";
+  trainingChaptersInserted: number;
   sampleBrokers: { email: string; outcome: "created" | "existing" }[];
   inviteLinks: { email: string; url: string }[];
 };
@@ -72,12 +76,17 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
       stepsInserted: 0,
       stepsUpdated: 0,
       owner: "skipped",
+      trainingChaptersInserted: 0,
       sampleBrokers: [],
       inviteLinks: [],
     };
     const steps = await seedSteps(tx, options.refreshSteps ?? false);
     summary.stepsInserted = steps.inserted;
     summary.stepsUpdated = steps.updated;
+
+    if (options.training) {
+      summary.trainingChaptersInserted = (await seedTraining(tx, { publish: options.training.publish, now })).chaptersInserted;
+    }
 
     let ownerId: string | null = null;
     if (options.owner) {

@@ -1,7 +1,9 @@
 /**
  * File: packages/db/scripts/seed.ts
- * Purpose: `pnpm db:seed` entry point. Seeds the onboarding steps, the owner from SEED_OWNER_* and, outside
- * production, three sample brokers (with placeholder files when S3_* is set). Flags: --refresh-steps overwrites step copy, --no-samples skips sample brokers.
+ * Purpose: `pnpm db:seed` entry point. Seeds the onboarding steps, the owner from SEED_OWNER_*, the training chapters
+ * from the manual (published outside production, drafts in production) and, outside production, three sample brokers
+ * (with placeholder files when S3_* is set). Flags: --refresh-steps overwrites step copy, --no-samples skips sample
+ * brokers, --no-training skips the training chapters.
  *
  * Functions:
  * - readOwner(env): returns the owner account settings from the environment, or null (with a warning) if any are missing; throws on an invalid email or short password.
@@ -32,6 +34,7 @@ function readOwner(env: NodeJS.ProcessEnv) {
 function printSummary(summary: SeedSummary, samplePassword: string | null): void {
   console.log(`Onboarding steps: ${summary.stepsInserted} added, ${summary.stepsUpdated} refreshed.`);
   console.log(`Owner account: ${summary.owner}.`);
+  console.log(`Training chapters added: ${summary.trainingChaptersInserted}.`);
   for (const sample of summary.sampleBrokers) {
     console.log(`Sample broker ${sample.email}: ${sample.outcome}.`);
   }
@@ -57,6 +60,7 @@ async function main(argv: string[]): Promise<void> {
       owner: readOwner(process.env),
       sampleBrokers: samplePassword ? { password: passwordSchema.parse(samplePassword) } : null,
       refreshSteps: argv.includes("--refresh-steps"),
+      training: argv.includes("--no-training") ? null : { publish: !production },
       webOrigin: process.env.WEB_ORIGIN,
     });
     printSummary(summary, samplePassword);

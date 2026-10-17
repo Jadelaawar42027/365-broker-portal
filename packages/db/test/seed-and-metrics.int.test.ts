@@ -133,6 +133,7 @@ describe("seed", () => {
       stepsInserted: 0,
       stepsUpdated: 0,
       owner: "existing",
+      trainingChaptersInserted: 0,
       sampleBrokers: [
         { email: "daniel.reyes@example.com", outcome: "existing" },
         { email: "kevin.osei@example.com", outcome: "existing" },

@@ -1,8 +1,8 @@
 /**
  * File: apps/api/src/release.ts
  * Purpose: The Railway pre-deploy command (`pnpm --filter @bp/api release`): applies database migrations, then runs the
- * idempotent seed (onboarding steps if missing, the owner from SEED_OWNER_* if set). Sample brokers are never created
- * in production. If this fails, Railway does not switch traffic to the new deploy.
+ * idempotent seed (onboarding steps if missing, the owner from SEED_OWNER_* if set, training chapters from the manual
+ * as drafts if their codes are new). Sample brokers are never created in production. If this fails, Railway does not switch traffic to the new deploy.
  *
  * Functions:
  * - releaseMigrationsFolder(): the packages/db/drizzle folder, found relative to the built file in apps/api/dist.
@@ -29,8 +29,8 @@ async function release(): Promise<void> {
       : null;
   const { db, close } = createDb(url, { max: 1 });
   try {
-    const summary = await seedDatabase(db, { owner, sampleBrokers: null });
-    console.log(`Onboarding steps added: ${summary.stepsInserted}. Owner account: ${summary.owner}.`);
+    const summary = await seedDatabase(db, { owner, sampleBrokers: null, training: { publish: false } });
+    console.log(`Onboarding steps added: ${summary.stepsInserted}. Owner account: ${summary.owner}. Training chapters added as drafts: ${summary.trainingChaptersInserted}.`);
   } finally {
     await close();
   }

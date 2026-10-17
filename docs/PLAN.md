@@ -117,5 +117,6 @@ Started Oct 17, 2026, built unattended. Each step is committed separately once l
 - [x] G4. Broker screens 2a-2d (training home, lesson reader with video, quiz, result); visual-check at 390 and 1280
 - [x] G5. Admin screen 3e (chapters, lesson editor with callouts and video, question editor, publish, stats); unlock nav item; training columns on 3b, training panel on 3c, training panel on 3a; visual-check at 1280
   - Skipped: mockup 3e's "Draft questions from lessons (AI)" and "Upload SOP" buttons (need an AI API key and the later ingest phase), and 3a/3c's "Book a 1-on-1" (no booking feature exists). Browser MP4 upload was not clicked through locally: the shared local SeaweedFS bucket has no CORS rule for the test origin, and changing it could break Aj's own dev setup. The server side is covered by integration tests and production CORS was verified.
-- [ ] G6. Content: Volume One (Part 0, Modules 01-06) as lessons and questions; Volume Two as coming-soon chapters; drafts in production, live in development
+- [x] G6. Content: Volume One (Part 0, Modules 01-06) as 24 lessons and 73 questions; Volume Two as coming-soon chapters; drafts in production, live in development
+  - Kept the manual's wording, so most lessons read in 1 to 2 minutes (shown as at least 2). Existing chapters are never overwritten by the seed.
 - [ ] G7. Playwright: broker learns, fails, re-reads, passes, next chapter unlocks; admin creates a lesson with an embed video, adds questions, publishes, sees stats

@@ -2,7 +2,7 @@
  * File: packages/db/scripts/e2e-reset.ts
  * Purpose: Prepares the end-to-end test database before Playwright starts the servers: drops and recreates the
  * database named in DATABASE_URL (which must end in "_e2e", so it can never touch real data), applies migrations,
- * seeds the steps, owner and sample brokers (with placeholder files), lets the e2e web origin upload to the bucket,
+ * seeds the steps, owner, sample brokers (with placeholder files) and the training chapters (published), lets the e2e web origin upload to the bucket,
  * and empties the email outbox folder.
  *
  * Functions:
@@ -42,6 +42,7 @@ async function main(): Promise<void> {
         password: process.env.SEED_OWNER_PASSWORD ?? "e2e-owner-password",
       },
       sampleBrokers: { password: process.env.SEED_SAMPLE_PASSWORD ?? "sample-broker-pass" },
+      training: { publish: true },
       storage,
       webOrigin: process.env.WEB_ORIGIN,
     });
