@@ -23,5 +23,8 @@
       "Read(./**/.env.*)",
       "Read(./data/import/**)"
     ]
+  },
+  "enabledPlugins": {
+    "frontend-design@anthropic-plugin-directory": true
   }
 }
