@@ -114,6 +114,10 @@ export { Box };`,
       filename,
     },
     {
+      code: `${header("x.ts")}\nexport const table = pgTable("t", {}, (columns: unknown) => [columns]);`,
+      filename,
+    },
+    {
       code: `${header("x.ts", [" * - make(): builds.", " * - make.run(): nested method.", " * - helper(n): inner helper."])}
 export function make() { const helper = (n: number) => n; return { run() { return helper(1); } }; }`,
       filename,

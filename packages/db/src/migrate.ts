@@ -5,7 +5,7 @@
  *
  * Functions:
  * - migrationsFolder(): returns the absolute path of the drizzle migrations folder.
- * - runMigrations(url): opens a single connection, applies pending migrations and closes it.
+ * - runMigrations(url, folder): opens a single connection, applies pending migrations from folder (default: this package's drizzle folder) and closes it.
  */
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -16,10 +16,10 @@ export function migrationsFolder(): string {
   return fileURLToPath(new URL("../drizzle", import.meta.url));
 }
 
-export async function runMigrations(url: string): Promise<void> {
+export async function runMigrations(url: string, folder: string = migrationsFolder()): Promise<void> {
   const sql = postgres(url, { max: 1, onnotice: () => {} });
   try {
-    await migrate(drizzle({ client: sql }), { migrationsFolder: migrationsFolder() });
+    await migrate(drizzle({ client: sql }), { migrationsFolder: folder });
   } finally {
     await sql.end({ timeout: 5 });
   }

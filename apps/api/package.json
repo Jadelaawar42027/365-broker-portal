@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "admin:invite": "tsx scripts/admin-invite.ts",
-    "storage:cors": "tsx scripts/storage-cors.ts"
+    "storage:cors": "tsx scripts/storage-cors.ts",
+    "release": "node dist/release.js"
   },
   "dependencies": {
     "@bp/db": "workspace:*",

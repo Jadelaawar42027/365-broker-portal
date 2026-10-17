@@ -37,10 +37,15 @@ const apiEnvSchema = z
     EMAIL_FROM: z.string().default("365 Yachts <onboarding@365yachts.org>"),
     SUPPORT_CONTACT_NAME: z.string().trim().min(1).default("Shelly"),
     SUPPORT_WHATSAPP_NUMBER: optionalString,
+    EMAIL_OUTBOX_DIR: optionalString,
   })
   .refine((env) => env.NODE_ENV !== "production" || env.WEB_ORIGIN.startsWith("https://"), {
     path: ["WEB_ORIGIN"],
     message: "must use https in production",
+  })
+  .refine((env) => env.NODE_ENV !== "production" || !env.EMAIL_OUTBOX_DIR, {
+    path: ["EMAIL_OUTBOX_DIR"],
+    message: "is for local development and tests only",
   });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

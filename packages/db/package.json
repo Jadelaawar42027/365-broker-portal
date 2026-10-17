@@ -16,7 +16,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "import:brokers": "tsx scripts/import-brokers.ts",
-    "db:metrics-user": "tsx scripts/metrics-user.ts"
+    "db:metrics-user": "tsx scripts/metrics-user.ts",
+    "e2e:reset": "tsx scripts/e2e-reset.ts"
   },
   "dependencies": {
     "@bp/shared": "workspace:*",

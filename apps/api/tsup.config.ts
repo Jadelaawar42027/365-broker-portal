@@ -1,6 +1,6 @@
 /**
  * File: apps/api/tsup.config.ts
- * Purpose: Builds the API into one ESM bundle in dist/ for `pnpm --filter @bp/api start`. Workspace packages
+ * Purpose: Builds the API (dist/server.js) and the pre-deploy release command (dist/release.js) as ESM bundles. Workspace packages
  * (@bp/*) are bundled in because they ship TypeScript source; npm dependencies stay external.
  *
  * Functions:
@@ -9,7 +9,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/server.ts"],
+  entry: ["src/server.ts", "src/release.ts"],
   format: ["esm"],
   platform: "node",
   target: "node24",

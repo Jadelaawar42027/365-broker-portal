@@ -10,7 +10,7 @@
  * - collectDeclaredFunctions(program): returns name and node for every top-level function, function-valued const (including one wrapped in a call such as cache(fn)), method of a top-level object literal and class method (constructors included).
  * - collectAllFunctionNames(program): returns the names of every named function, method and function-valued variable anywhere in the file.
  * - isFunctionNode(node): true for function declarations, function expressions and arrow functions.
- * - isWrappedFunction(node): true for a plain wrapper call around a function, such as cache(fn) or memo(fn) (not method chains like z.string().refine(fn)).
+ * - isWrappedFunction(node): true for a plain wrapper call whose first argument is a function, such as cache(fn) or memo(fn) (not method chains like z.string().refine(fn), nor calls like pgTable(name, columns, fn)).
  * - resolveRootDir(context): returns the repo root from the rule options or by searching upward.
  * - requireFileHeader.create(context): reports a missing header, a wrong "File:" path, or a missing Purpose/Functions section.
  * - noCommentsOutsideHeader.create(context): reports every comment other than the file header.
@@ -121,7 +121,7 @@ function isWrappedFunction(node) {
     !!node &&
     node.type === "CallExpression" &&
     node.callee.type === "Identifier" &&
-    node.arguments.some(isFunctionNode)
+    isFunctionNode(node.arguments[0])
   );
 }
 

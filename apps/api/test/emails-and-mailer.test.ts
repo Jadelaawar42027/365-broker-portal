@@ -1,7 +1,7 @@
 /**
  * File: apps/api/test/emails-and-mailer.test.ts
  * Purpose: Unit tests for the email wording and the two mailers: Resend (HTTP call shape and error handling, with
- * fetch stubbed) and the console fallback, plus sendSafely never throwing.
+ * fetch stubbed) and the console fallback with its optional outbox folder, plus sendSafely never throwing.
  *
  * Functions:
  * - fakeLog(): returns a logger stub that records info and error calls.
@@ -52,14 +52,16 @@ describe("email wording", () => {
   });
 });
 
+const required = {
+  DATABASE_URL: "postgres://x",
+  BETTER_AUTH_SECRET: "s".repeat(32),
+  S3_BUCKET: "b",
+  S3_ACCESS_KEY_ID: "k",
+  S3_SECRET_ACCESS_KEY: "s",
+};
+
 describe("mailers", () => {
-  const env = loadApiEnv({
-    DATABASE_URL: "postgres://x",
-    BETTER_AUTH_SECRET: "s".repeat(32),
-    S3_BUCKET: "b",
-    S3_ACCESS_KEY_ID: "k",
-    S3_SECRET_ACCESS_KEY: "s",
-  });
+  const env = loadApiEnv(required);
 
   it("posts to Resend with the API key", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
@@ -86,6 +88,22 @@ describe("mailers", () => {
     expect(String(calls.info[0]?.[1])).toContain("not sent");
     await createConsoleMailer(log).send({ to: "x", subject: "y", text: "z" });
     expect(calls.info).toHaveLength(2);
+  });
+
+  it("saves a JSON copy of each email when EMAIL_OUTBOX_DIR is set", async () => {
+    const dir = await import("node:fs/promises").then((fs) => fs.mkdtemp(`${process.env.TMPDIR ?? "/tmp"}/bp-outbox-`));
+    const { log } = fakeLog();
+    await createMailer({ ...env, EMAIL_OUTBOX_DIR: dir }, log).send({ to: "d@e.f", subject: "Invite", text: "http://x/invite/abc" });
+    const fs = await import("node:fs/promises");
+    const [file] = await fs.readdir(dir);
+    expect(JSON.parse(await fs.readFile(`${dir}/${file}`, "utf8"))).toMatchObject({ to: "d@e.f", subject: "Invite", text: "http://x/invite/abc" });
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("refuses an outbox folder in production", () => {
+    expect(() =>
+      loadApiEnv({ ...required, NODE_ENV: "production", WEB_ORIGIN: "https://team.365yachts.org", EMAIL_OUTBOX_DIR: "/tmp/x" }),
+    ).toThrow(/EMAIL_OUTBOX_DIR: is for local development and tests only/);
   });
 
   it("picks Resend when a key is set", () => {
