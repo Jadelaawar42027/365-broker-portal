@@ -6,7 +6,8 @@
  * - ProgressBar({ value, max, tone, label, className }): a rounded bar with an accessible progressbar role.
  * - Avatar({ name, size, tone }): a round avatar with the person's initials.
  * - Card({ children, className, as }): a white rounded card with the mockups' border.
- * - inputClasses(): Tailwind classes for text inputs, selects and textareas.
+ * - inputClasses(): Tailwind classes for text inputs and textareas.
+ * - selectClasses(): the same look for <select> (selects count as read-only in CSS, so they need their own classes).
  * - FieldLabel({ htmlFor, children }): a bold form label.
  */
 import type { ReactNode } from "react";
@@ -51,6 +52,10 @@ export function Card({ children, className = "", as: Tag = "div" }: { children: 
 
 export function inputClasses(): string {
   return "block w-full min-h-[52px] rounded-xl border border-[#cdd5e1] bg-white px-4 text-[17px] text-ink placeholder:text-[#6b7a90] focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/25 read-only:bg-page read-only:text-muted";
+}
+
+export function selectClasses(): string {
+  return "block w-full min-h-[52px] rounded-xl border border-[#cdd5e1] bg-white px-4 text-[17px] text-ink focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/25 disabled:opacity-60";
 }
 
 export function FieldLabel({ htmlFor, children }: { htmlFor: string; children: ReactNode }) {

@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/components/admin/admin-nav.tsx
- * Purpose: The admin sidebar's links (Overview, Brokers, Reviews with the waiting count) with the current section
- * highlighted, the locked "Chapters & quizzes" item marked "Soon" (SPEC D6), and the signed-in admin with "Sign out".
+ * Purpose: The admin sidebar's links (Overview, Brokers, Reviews with the waiting count, Chapters & quizzes) with the
+ * current section highlighted, and the signed-in admin with "Sign out".
  *
  * Functions:
  * - AdminNav({ waitingReviews }): the navigation list.
@@ -22,6 +22,7 @@ export function AdminNav({ waitingReviews }: { waitingReviews: number }) {
     { href: "/admin", label: "Overview", active: pathname === "/admin" },
     { href: "/admin/brokers", label: "Brokers", active: pathname.startsWith("/admin/brokers") },
     { href: "/admin/reviews", label: "Reviews", active: pathname.startsWith("/admin/reviews"), badge: waitingReviews },
+    { href: "/admin/training", label: "Chapters & quizzes", active: pathname.startsWith("/admin/training") },
   ];
   return (
     <nav aria-label="Admin" className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
@@ -43,13 +44,6 @@ export function AdminNav({ waitingReviews }: { waitingReviews: number }) {
           ) : null}
         </Link>
       ))}
-      <span
-        aria-disabled="true"
-        className="flex min-h-11 shrink-0 cursor-not-allowed items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-base whitespace-nowrap font-semibold text-[#9fb0c9]"
-      >
-        Chapters &amp; quizzes
-        <span className="rounded-full border border-[#9fb0c9]/60 px-1.5 py-0.5 text-[11px] font-bold tracking-wide">Soon</span>
-      </span>
     </nav>
   );
 }

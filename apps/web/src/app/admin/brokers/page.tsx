@@ -1,13 +1,14 @@
 /**
  * File: apps/web/src/app/admin/brokers/page.tsx
  * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us and onboarding
- * progress, with search (including persona text), status and level filters, CSV export and the invite button. The
- * Training and Avg. quiz columns stay and show "—" until training ships (SPEC D6).
+ * progress, training progress and average best quiz score (from the broker_training_metrics view), with search
+ * (including persona text), status and level filters, CSV export and the invite button.
  *
  * Functions:
  * - BrokersPage({ searchParams }): loads the filtered list and renders the table.
  * - statusTone(status): the pill colour for a broker status.
  * - capitalise(word): "active" → "Active", for levels and statuses.
+ * - trainingLabel(training): "3 of 7 chapters", "All 7 chapters", or "—" before training has started.
  */
 import { formatTenure, todayInTimeZone, type BrokerListResponse, type BrokerStatus } from "@bp/shared";
 import type { Metadata } from "next";
@@ -25,6 +26,12 @@ function statusTone(status: BrokerStatus): PillTone {
   if (status === "active") return "success";
   if (status === "inactive") return "neutral";
   return "brand-soft";
+}
+
+function trainingLabel(training: BrokerListResponse["brokers"][number]["training"]): string {
+  if (!training || training.chaptersTotal === 0) return "—";
+  if (training.chaptersPassed >= training.chaptersTotal) return `All ${training.chaptersTotal} chapters`;
+  return `${training.chaptersPassed} of ${training.chaptersTotal} chapters`;
 }
 
 function capitalise(word: string): string {
@@ -85,6 +92,7 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
             ) : (
               data.brokers.map((row) => {
                 const done = row.stepsApproved === row.stepsTotal && row.stepsTotal > 0;
+                const trainingStarted = row.status === "active" || row.status === "inactive";
                 return (
                   <tr key={row.brokerId} className="border-t border-line hover:bg-page">
                     <td className="px-4 py-3">
@@ -108,8 +116,8 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-muted">—</td>
-                    <td className="px-3 py-3 text-muted">—</td>
+                    <td className={`px-3 py-3 ${trainingStarted ? "" : "text-muted"}`}>{trainingStarted ? trainingLabel(row.training) : "—"}</td>
+                    <td className="px-3 py-3 font-bold tabular-nums">{trainingStarted && row.training?.avgBestScore != null ? `${row.training.avgBestScore}%` : <span className="font-normal text-muted">—</span>}</td>
                   </tr>
                 );
               })

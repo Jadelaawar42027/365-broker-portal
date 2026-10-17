@@ -80,9 +80,10 @@ describe("buildBrokersCsv", () => {
       stepsWaitingReview: 0,
       lastActivityAt: null,
     };
-    expect(buildBrokersCsv([row])).toBe(
-      "name,email,level,status,joined_at,onboarded_at,left_at,tenure_days,days_to_onboard,steps_approved,steps_total\n" +
-        '"Osei, Kevin ""KO""",kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11\n',
+    expect(buildBrokersCsv([row, { ...row, name: "Kevin", training: { chaptersPassed: 3, chaptersTotal: 7, avgBestScore: 79 } }])).toBe(
+      "name,email,level,status,joined_at,onboarded_at,left_at,tenure_days,days_to_onboard,steps_approved,steps_total,chapters_passed,chapters_total,avg_quiz_score\n" +
+        '"Osei, Kevin ""KO""",kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,,,\n' +
+        "Kevin,kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,3,7,79\n",
     );
   });
 });

@@ -1,14 +1,14 @@
 /**
  * File: apps/web/src/app/admin/page.tsx
- * Purpose: Screen 3a, the admin overview: active and onboarding counts, average days to onboard, submissions waiting
- * for review, and every broker who is onboarding with their progress, next step and a "stuck" flag after 4 quiet days.
- * The training panel and quiz card are replaced as agreed (SPEC D6).
+ * Purpose: Screen 3a, the admin overview: active and onboarding counts, average days to onboard, the average
+ * first-attempt quiz score, submissions waiting for review, every broker who is onboarding with their progress, next step and a
+ * "stuck" flag after 4 quiet days, and "Training — who needs a hand" (failed a chapter twice, or 7+ days idle).
  *
  * Functions:
  * - OverviewPage(): loads the overview numbers and renders the screen.
  * - nextStepText(row): "Next: W-9 (sent, waiting on you)" style wording for an in-progress broker.
  */
-import { todayInTimeZone, type OverviewResponse } from "@bp/shared";
+import { todayInTimeZone, type OverviewResponse, type TrainingOverviewResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
@@ -30,10 +30,12 @@ function nextStepText(row: OverviewResponse["inProgress"][number]): string {
 }
 
 export default async function OverviewPage() {
-  const { data } = await serverGet<OverviewResponse>("/v1/admin/overview");
+  const [{ data }, { data: training }] = await Promise.all([
+    serverGet<OverviewResponse>("/v1/admin/overview"),
+    serverGet<TrainingOverviewResponse>("/v1/admin/training/overview"),
+  ]);
   if (!data) throw new Error("Could not load the overview.");
   const now = new Date();
-  const oldest = data.reviews[0]?.submittedAt;
 
   return (
     <div className="space-y-6">
@@ -58,9 +60,9 @@ export default async function OverviewPage() {
           detail="Last 10 brokers"
         />
         <StatCard
-          label="Waiting for review"
-          value={String(data.counts.waitingReview)}
-          detail={oldest ? `Oldest sent ${relativeTime(oldest, now)}` : "All caught up"}
+          label="Avg. quiz score"
+          value={training?.averageFirstAttemptScore == null ? "—" : `${training.averageFirstAttemptScore}%`}
+          detail="All brokers, first attempt"
         />
       </div>
 
@@ -136,6 +138,29 @@ export default async function OverviewPage() {
           )}
         </section>
       </div>
+
+      <section aria-labelledby="training-help-title" className="overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="border-b border-line px-6 py-5">
+          <h2 id="training-help-title" className="text-xl font-bold">
+            Training — who needs a hand
+          </h2>
+        </div>
+        {!training || training.needsHelp.length === 0 ? (
+          <p className="px-6 py-8 text-lg text-muted">Nobody is stuck in training right now.</p>
+        ) : (
+          <ul>
+            {training.needsHelp.map((row) => (
+              <li key={`${row.brokerId}-${row.kind}`} className="flex flex-col gap-1 border-b border-line px-6 py-4 last:border-b-0 md:flex-row md:items-center md:justify-between md:gap-6">
+                <p className="text-lg font-bold">{row.name}</p>
+                <p className="flex-1 text-base text-muted md:text-right">{row.reason}</p>
+                <Link href={`/admin/brokers/${row.brokerId}`} className="inline-flex min-h-11 shrink-0 items-center self-start rounded-lg text-base font-semibold text-brand underline underline-offset-2 md:self-center">
+                  See progress<span className="sr-only"> for {row.name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
