@@ -1,12 +1,13 @@
 /**
  * File: apps/api/src/routes/me.ts
  * Purpose: Who is signed in (for the web app's header and redirects) and the "onboarding complete screen seen" flag,
- * so screen 1d shows exactly once (docs/SPEC.md).
+ * so screen 1d shows exactly once (docs/SPEC.md). A broker's two commission splits come from their latest commission
+ * history row (SPEC D29).
  *
  * Functions:
  * - registerMeRoutes(app): mounts GET /v1/me and POST /v1/me/welcome-seen.
  */
-import { brokers, users } from "@bp/db";
+import { brokers, currentCommission, users } from "@bp/db";
 import { errorResponseSchema, meResponseSchema, okResponseSchema } from "@bp/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -41,14 +42,13 @@ export function registerMeRoutes(app: FastifyInstance): void {
           status: brokers.status,
           joinedAt: brokers.joinedAt,
           onboardedAt: brokers.onboardedAt,
-          inHouseSplit: brokers.inHouseSplit,
-          selfGeneratedSplit: brokers.selfGeneratedSplit,
           welcomeSeenAt: brokers.welcomeSeenAt,
         })
         .from(users)
         .leftJoin(brokers, eq(brokers.userId, users.id))
         .where(eq(users.id, actor.userId));
       const user = row!;
+      const commission = user.brokerId ? await currentCommission(app.deps.db, user.brokerId) : null;
       return {
         user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
         broker:
@@ -59,8 +59,8 @@ export function registerMeRoutes(app: FastifyInstance): void {
                 status: user.status,
                 joinedAt: user.joinedAt,
                 onboardedAt: user.onboardedAt,
-                inHouseSplit: user.inHouseSplit,
-                selfGeneratedSplit: user.selfGeneratedSplit,
+                inHouseSplit: commission?.inHousePct ?? null,
+                selfGeneratedSplit: commission?.selfGeneratedPct ?? null,
                 showWelcome: user.status === "active" && user.onboardedAt !== null && user.welcomeSeenAt === null,
               }
             : null,

@@ -50,6 +50,20 @@
       "when": 1792308309513,
       "tag": "0006_step_guidance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792310452692,
+      "tag": "0007_commission_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792310459069,
+      "tag": "0008_commission_history_backfill",
+      "breakpoints": true
     }
   ]
 }

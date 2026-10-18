@@ -6,7 +6,7 @@
  * Functions:
  * - none
  */
-import { auditLog, brokers, users } from "@bp/db";
+import { auditLog, brokers, commissionHistory, users } from "@bp/db";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, OWNER, type TestContext } from "./helpers/context";
@@ -28,12 +28,17 @@ describe("inviting a broker", () => {
   it("creates the broker as invited and emails an invite link", async () => {
     const response = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Daniel Reyes", email: "Daniel.Reyes@Example.com", level: "junior", joinedAt: "2026-10-13", inHouseSplit: 40, selfGeneratedSplit: 60 },
+      body: { name: "Daniel Reyes", phone: "+1 561 555 0123", email: "Daniel.Reyes@Example.com", level: "junior", joinedAt: "2026-10-13", inHouseSplit: 40, selfGeneratedSplit: 60 },
     });
     expect(response.statusCode).toBe(201);
     brokerId = response.json().brokerId;
     const [broker] = await ctx.db.select().from(brokers).where(eq(brokers.id, brokerId));
-    expect(broker).toMatchObject({ status: "invited", level: "junior", joinedAt: "2026-10-13", inHouseSplit: 40, selfGeneratedSplit: 60 });
+    expect(broker).toMatchObject({ status: "invited", level: "junior", joinedAt: "2026-10-13" });
+    expect(response.json().inviteUrl).toBeNull();
+    const [user] = await ctx.db.select().from(users).where(eq(users.id, broker!.userId));
+    expect(user!.phone).toBe("+15615550123");
+    const [history] = await ctx.db.select().from(commissionHistory).where(eq(commissionHistory.brokerId, brokerId));
+    expect(history).toMatchObject({ inHousePct: 40, selfGeneratedPct: 60, effectiveFrom: "2026-10-13", note: "Set at invite" });
     const [created] = await ctx.db.select().from(auditLog).where(and(eq(auditLog.entityId, brokerId), eq(auditLog.action, "broker.created")));
     expect(created?.after).toMatchObject({ inHouseSplit: 40, selfGeneratedSplit: 60 });
     const [email] = ctx.emailsTo("daniel.reyes@example.com");
@@ -45,7 +50,7 @@ describe("inviting a broker", () => {
   it("refuses a second broker with the same email", async () => {
     const response = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Copy", email: "daniel.reyes@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
+      body: { name: "Copy", phone: "+15615550199", email: "daniel.reyes@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     expect(response.statusCode).toBe(409);
     expect(response.json().error).toBe("email_taken");
@@ -58,7 +63,7 @@ describe("inviting a broker", () => {
   });
 
   it("needs both commission splits, each a whole percentage from 0 to 100", async () => {
-    const base = { name: "Split Person", email: "split.person@example.com", level: "junior" };
+    const base = { name: "Split Person", phone: "+15615550111", email: "split.person@example.com", level: "junior" };
     for (const splits of [{}, { inHouseSplit: 40 }, { selfGeneratedSplit: 60 }, { inHouseSplit: 40, selfGeneratedSplit: 101 }, { inHouseSplit: 40.5, selfGeneratedSplit: 60 }]) {
       const response = await ctx.call("POST", "/v1/admin/brokers", { cookie: owner, body: { ...base, ...splits } });
       expect(response.statusCode).toBe(400);
@@ -112,7 +117,7 @@ describe("invite expiry and resending", () => {
   it("expires after 7 days and a resent link replaces the old one", async () => {
     const created = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
-      body: { name: "Marisol Vega", email: "marisol@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
+      body: { name: "Marisol Vega", phone: "+15615550177", email: "marisol@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     const brokerId = created.json().brokerId;
     const firstToken = ctx.linkToken(ctx.emailsTo("marisol@example.com")[0]!, "invite");

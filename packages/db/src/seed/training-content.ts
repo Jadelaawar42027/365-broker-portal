@@ -88,7 +88,7 @@ Tiers reward performance and ensure consistency in lead follow-up and conversion
       todoItems: [
         "A co-broked deal splits the 10% commission 50/50 between the two brokerages.",
         "A solo deal pays you about twice as much, so build your own listings.",
-        "Bonuses open 90 days after your contract is signed, once you've closed two deals.",
+        "Bonuses and incentives can open within 90 days of your signed contract, once you've closed at least two deals.",
         "You're paid by same-day wire once funds arrive and contracts are complete.",
       ],
       callouts: [

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   acceptInviteRequestSchema,
   brokerListQuerySchema,
+  commissionChangeRequestSchema,
   createBrokerRequestSchema,
   meResponseSchema,
   PRODUCT_NAME,
@@ -55,7 +56,7 @@ describe("request schemas", () => {
   });
 
   it("need both commission splits, as whole percentages from 0 to 100, to invite a broker", () => {
-    const valid = { name: "Daniel Reyes", email: "dan@example.com", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 };
+    const valid = { name: "Daniel Reyes", phone: "+15615550123", email: "dan@example.com", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 };
     expect(createBrokerRequestSchema.safeParse(valid).success).toBe(true);
     expect(createBrokerRequestSchema.safeParse({ ...valid, inHouseSplit: 0, selfGeneratedSplit: 100 }).success).toBe(true);
     const { inHouseSplit: _inHouse, ...withoutInHouse } = valid;
@@ -66,10 +67,26 @@ describe("request schemas", () => {
     expect(createBrokerRequestSchema.safeParse({ ...valid, inHouseSplit: "40" }).success).toBe(false);
   });
 
-  it("let an admin change one commission split at a time, within 0 to 100", () => {
-    expect(updateBrokerRequestSchema.safeParse({ selfGeneratedSplit: 70 }).success).toBe(true);
-    expect(updateBrokerRequestSchema.safeParse({ inHouseSplit: 120 }).success).toBe(false);
-    expect(updateBrokerRequestSchema.safeParse({ inHouseSplit: null }).success).toBe(false);
+  it("invite with a name, an E.164 phone, a level and both splits; the email is optional", () => {
+    const valid = { name: "Nina Castillo", phone: "+1 (561) 555-0123", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 };
+    const parsed = createBrokerRequestSchema.parse(valid);
+    expect(parsed.phone).toBe("+15615550123");
+    expect(parsed.email).toBeUndefined();
+    expect(createBrokerRequestSchema.safeParse({ ...valid, phone: "(561) 555-0123" }).success).toBe(false);
+    const { phone: _phone, ...withoutPhone } = valid;
+    expect(createBrokerRequestSchema.safeParse(withoutPhone).success).toBe(false);
+  });
+
+  it("change a commission split with both percentages, an optional start date and note", () => {
+    expect(commissionChangeRequestSchema.safeParse({ inHouseSplit: 40, selfGeneratedSplit: 65 }).success).toBe(true);
+    expect(commissionChangeRequestSchema.safeParse({ inHouseSplit: 40, selfGeneratedSplit: 65, effectiveFrom: "2026-10-01", note: "Top performer" }).success).toBe(true);
+    expect(commissionChangeRequestSchema.safeParse({ selfGeneratedSplit: 65 }).success).toBe(false);
+    expect(commissionChangeRequestSchema.safeParse({ inHouseSplit: 120, selfGeneratedSplit: 65 }).success).toBe(false);
+    expect(commissionChangeRequestSchema.safeParse({ inHouseSplit: 40, selfGeneratedSplit: 65, effectiveFrom: "2026-02-30" }).success).toBe(false);
+  });
+
+  it("no longer change commission splits through the broker edit", () => {
+    expect(updateBrokerRequestSchema.safeParse({ selfGeneratedSplit: 70 }).success).toBe(false);
   });
 
   it("need a real note to send a step back", () => {

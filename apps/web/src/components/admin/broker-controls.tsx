@@ -6,7 +6,8 @@
  *
  * Functions:
  * - BrokerControls({ broker, today }): renders the menus and actions.
- * - AccountActions({ broker }): the buttons that fit the broker's current state, each confirming in place.
+ * - AccountActions({ broker }): the buttons that fit the broker's current state, each confirming in place; a broker who hasn't signed up can be sent a fresh invite link by hand (always) or by email (when they have one, SPEC D29).
+ * - makeInviteLink(): asks the API for a fresh invite link and shows it with a Copy button.
  * - patch(body): sends the change to the API and refreshes the page.
  */
 "use client";
@@ -17,6 +18,7 @@ import { useState } from "react";
 import { FormMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
 import { apiRequest, ApiError } from "@/lib/api-client";
+import { CopyLink } from "./invite-dialog";
 import { RemindButton } from "./remind-button";
 
 type Broker = BrokerProfileResponse["broker"];
@@ -88,6 +90,17 @@ export function BrokerControls({ broker, today }: { broker: Broker; today: strin
 
 export function AccountActions({ broker }: { broker: Broker }) {
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+
+  async function makeInviteLink() {
+    setMessage(null);
+    try {
+      const { inviteUrl: url } = await apiRequest<{ inviteUrl: string }>(`/v1/admin/brokers/${broker.id}/invite-link`, { method: "POST", body: {} });
+      setInviteUrl(url);
+    } catch (caught) {
+      setMessage({ tone: "error", text: caught instanceof ApiError ? caught.message : "That didn't work. Try again." });
+    }
+  }
 
   async function run(path: string, done: string) {
     setMessage(null);
@@ -108,13 +121,25 @@ export function AccountActions({ broker }: { broker: Broker }) {
             Send password reset link
           </Button>
         ) : (
-          <Button variant="outline" onClick={() => run(`/v1/admin/brokers/${broker.id}/resend-invite`, `New invite emailed to ${broker.email}.`)}>
-            Resend invite
-          </Button>
+          <>
+            {broker.email ? (
+              <Button variant="outline" onClick={() => run(`/v1/admin/brokers/${broker.id}/resend-invite`, `New invite emailed to ${broker.email}.`)}>
+                Resend invite
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={() => void makeInviteLink()}>
+              Make a new invite link
+            </Button>
+          </>
         )}
         {broker.status === "onboarding" ? <RemindButton brokerId={broker.id} variant="button" /> : null}
       </div>
       {message ? <FormMessage tone={message.tone}>{message.text}</FormMessage> : null}
+      {inviteUrl ? (
+        <div className="max-w-[640px] rounded-xl border border-line bg-white px-5 py-4">
+          <CopyLink url={inviteUrl} />
+        </div>
+      ) : null}
     </div>
   );
 }

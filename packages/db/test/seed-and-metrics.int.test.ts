@@ -99,14 +99,13 @@ describe("seed", () => {
 
   it("gives every sample broker both commission splits", async () => {
     const rows = await testDb.db
-      .select({ email: users.email, inHouseSplit: brokers.inHouseSplit, selfGeneratedSplit: brokers.selfGeneratedSplit })
-      .from(brokers)
-      .innerJoin(users, eq(users.id, brokers.userId))
-      .orderBy(users.email);
+      .select({ email: brokerMetrics.email, inHousePct: brokerMetrics.inHousePct, selfGeneratedPct: brokerMetrics.selfGeneratedPct })
+      .from(brokerMetrics)
+      .orderBy(brokerMetrics.email);
     expect(rows).toEqual([
-      { email: "daniel.reyes@example.com", inHouseSplit: 40, selfGeneratedSplit: 50 },
-      { email: "kevin.osei@example.com", inHouseSplit: 40, selfGeneratedSplit: 60 },
-      { email: "marisol.vega@example.com", inHouseSplit: 50, selfGeneratedSplit: 70 },
+      { email: "daniel.reyes@example.com", inHousePct: 40, selfGeneratedPct: 50 },
+      { email: "kevin.osei@example.com", inHousePct: 40, selfGeneratedPct: 60 },
+      { email: "marisol.vega@example.com", inHousePct: 50, selfGeneratedPct: 70 },
     ]);
   });
 

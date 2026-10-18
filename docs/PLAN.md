@@ -105,6 +105,19 @@ brokerPortal/
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
 
+## Phase H1: Commission structure (D29)
+
+Started Oct 18, 2026. Built without running tests (Rule 3); tests are written for "run tests". Migrations additive only. Step 11 stays retired (Aj: excluded from H1).
+
+- [x] `commission_history` table (broker, in-house %, self-generated %, effective from, changed by, note); the latest row is the current split. Migrated: one first row per broker from the D27 columns, with any old `commission_tier` text as its note. The D27 columns and `commission_tier` stay in place, unused.
+- [x] Shared: the manual's tiers (in-house 30/40/50, self-generated 30–80) plus "Custom %"; E.164 phone; invite email optional
+- [x] API: invite (name, E.164 phone, optional email, level, both splits); no email → the invite link is returned for the admin to copy, and the broker gives their own email when accepting; commission change endpoint (adds a history row, audit_log); profile with current split and history; list rows, metrics feed and `broker_metrics` with both splits; importer writes history rows
+- [x] Web: invite dialog (dropdowns with Custom %, copyable link when there's no email); profile commission panel with history; two columns on 3b; CSV export; accept-invite asks for an email when there is none
+- [x] Tests written (not run): shared, db (history migration, view), API (invite, commission history, accept without email), importer, e2e journeys
+  - Existing tests updated for the new behaviour (not weakened): shared api-contract, db commission-splits / seed-and-metrics / import, API invites / permissions / admin-brokers, web content-helpers (CSV), e2e invite helper.
+  - New: shared commission-and-contact, db commission-history, API commission-structure, e2e journey 1 "invite without an email".
+  - Not yet run: say "run tests" or "full check".
+
 ## Onboarding guidance (D28, Oct 18, 2026)
 
 Aj's decision after phase G: the onboarding modules belong in the onboarding steps, and training is the real training. Not yet committed: waiting for Aj to check the wording.
@@ -116,7 +129,8 @@ Aj's decision after phase G: the onboarding modules belong in the onboarding ste
 - [x] Admin "Onboarding steps" editor (guidance, video slots with embed or MP4 upload, knowledge check); bullets and callouts in the lesson editor
 - [x] Training reduced to "I · How you get paid & measured" (Modules 03–05) plus Volume Two shells; old chapters removed from the seed
 - [x] Tests: shared guidance rules, content and seed tests, API integration (guidance, check, videos, admin editor, permissions), Playwright journeys 7 (rewritten) and 8 (new); visual-check at 390 and 1280
-- After deploy: delete the old draft chapters (Part 0, 01–06) in the admin; record the step 7 and step 10 videos; fill the GoHighLevel walkthrough slot
+- [x] The deploy deletes the old Part 0 and 01–06 drafts if never published and untouched by brokers (audited, logged)
+- After deploy: check the deploy log for the deleted drafts; record the step 7 and step 10 videos; fill the GoHighLevel walkthrough slot
 
 ## Phase G: Training
 

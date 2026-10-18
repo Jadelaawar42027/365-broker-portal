@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/app/admin/brokers/[id]/page.tsx
  * Purpose: Screen 3c, one broker's profile: header with contact details, level and status, the key dates and numbers,
- * the two commission splits (editable),
+ * the two commission splits with their history and a "Change commission" form (SPEC D29),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
  * uploader, the Persona panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
  *
@@ -74,7 +74,7 @@ export default async function BrokerProfilePage({
         All brokers
       </Link>
 
-      {invited ? <FormMessage tone="success">Invite sent to {broker.email}. The link works for 7 days.</FormMessage> : null}
+      {invited && broker.email ? <FormMessage tone="success">Invite sent to {broker.email}. The link works for 7 days.</FormMessage> : null}
 
       <section aria-labelledby="broker-name" className="rounded-2xl border border-line bg-white px-6 py-6">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
@@ -85,7 +85,7 @@ export default async function BrokerProfilePage({
                 {broker.name}
               </h1>
               <p className="mt-1 text-[17px] text-muted">
-                {broker.email}
+                {broker.email ?? "No email yet"}
                 {broker.phone ? ` · ${formatPhone(broker.phone)}` : ""}
               </p>
             </div>
@@ -100,7 +100,13 @@ export default async function BrokerProfilePage({
           <StatTile label="Avg. quiz score" value={training?.summary.avgBestScore == null ? "—" : `${training.summary.avgBestScore}%`} />
         </div>
         <div className="mt-3">
-          <CommissionEditor brokerId={broker.id} inHouseSplit={broker.inHouseSplit} selfGeneratedSplit={broker.selfGeneratedSplit} />
+          <CommissionEditor
+            brokerId={broker.id}
+            today={today}
+            inHouseSplit={broker.inHouseSplit}
+            selfGeneratedSplit={broker.selfGeneratedSplit}
+            history={data.commissionHistory}
+          />
         </div>
         <div className="mt-5">
           <AccountActions broker={broker} />

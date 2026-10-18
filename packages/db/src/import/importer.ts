@@ -10,7 +10,7 @@
  * - matchStepKey(baseName, stepKeys): the upload step a file name belongs to ("w9" or "w9-page2" → "w9"), or null.
  * - loadImportFolder(dir, uploadStepKeys): reads brokers.csv, personas/{email}.md and files/{email}/{stepKey}.{ext}; returns the parsed input and any errors.
  * - runImport(db, storage, input, options): applies the import (or rehearses it with dryRun) and returns the summary.
- * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them; blank commission split cells leave the current splits alone.
+ * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them; commission splits go into the commission history (a new broker's old commission_tier becomes the first row's note; changed splits add a row; blank cells leave the current splits alone).
  * - approveForImport(tx, context, brokerStepId, before): marks one step approved as imported and records it in audit_log.
  * - audit(tx, entry): inserts an audit_log row with no actor (the importer).
  * - DryRunRollback.constructor(summary): the error used to roll back a dry run while keeping its summary.
@@ -22,6 +22,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { and, eq, isNull } from "drizzle-orm";
 import { createBroker } from "../brokers";
+import { addCommissionChange, currentCommission } from "../commission";
 import type { Database, Transaction } from "../client";
 import { accounts, auditLog, brokerSteps, brokers, files, onboardingSteps, sessions, users } from "../schema";
 import { parseBrokerCsv, type BrokerCsvRow } from "./csv";
@@ -150,22 +151,28 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     joinedAt: row.joinedAt,
     onboardedAt: row.onboardedAt,
     leftAt: row.leftAt,
-    commissionTier: row.commissionTier,
-    ...(row.inHouseSplit === null ? {} : { inHouseSplit: row.inHouseSplit }),
-    ...(row.selfGeneratedSplit === null ? {} : { selfGeneratedSplit: row.selfGeneratedSplit }),
   };
+  const commission = { inHouseSplit: row.inHouseSplit, selfGeneratedSplit: row.selfGeneratedSplit };
 
   let brokerId: string;
   let userId: string;
   if (!existing) {
-    const created = await createBroker(tx, { name: row.name, email: row.email, phone: row.phone, personaMd: persona, ...desired });
+    const created = await createBroker(tx, {
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      personaMd: persona,
+      ...desired,
+      ...commission,
+      commissionNote: row.commissionTier ? `Previous commission tier: ${row.commissionTier}` : null,
+    });
     brokerId = created.brokerId;
     userId = created.userId;
     if (persona) {
       await tx.update(brokers).set({ personaUpdatedAt: now }).where(eq(brokers.id, brokerId));
       summary.personasSet += 1;
     }
-    await audit(tx, { action: "broker.imported", entityType: "broker", entityId: brokerId, after: { email: row.email, ...desired } });
+    await audit(tx, { action: "broker.imported", entityType: "broker", entityId: brokerId, after: { email: row.email, ...desired, ...commission, commissionTier: row.commissionTier } });
     summary.created.push(row.email);
   } else {
     const broker = existing.broker!;
@@ -178,6 +185,13 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     if (existing.user.name !== row.name) userChanges.name = row.name;
     if (row.phone && existing.user.phone !== row.phone) userChanges.phone = row.phone;
     const personaChanged = persona !== null && broker.personaMd !== persona;
+    const current = await currentCommission(tx, broker.id);
+    const nextCommission = {
+      inHousePct: commission.inHouseSplit ?? current.inHousePct,
+      selfGeneratedPct: commission.selfGeneratedSplit ?? current.selfGeneratedPct,
+    };
+    const commissionChanged = nextCommission.inHousePct !== current.inHousePct || nextCommission.selfGeneratedPct !== current.selfGeneratedPct;
+    if (commissionChanged) await addCommissionChange(tx, { brokerId: broker.id, ...nextCommission, note: "Imported" });
     if (Object.keys(brokerChanges).length > 0 || personaChanged) {
       await tx
         .update(brokers)
@@ -187,14 +201,22 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     if (Object.keys(userChanges).length > 0) await tx.update(users).set(userChanges).where(eq(users.id, userId));
     if (brokerChanges.status === "inactive") await tx.delete(sessions).where(eq(sessions.userId, userId));
     if (personaChanged) summary.personasSet += 1;
-    const changed = Object.keys(brokerChanges).length > 0 || Object.keys(userChanges).length > 0 || personaChanged;
+    const changed = Object.keys(brokerChanges).length > 0 || Object.keys(userChanges).length > 0 || personaChanged || commissionChanged;
     if (changed) {
       await audit(tx, {
         action: "broker.imported",
         entityType: "broker",
         entityId: brokerId,
-        before: Object.fromEntries(Object.keys(brokerChanges).map((key) => [key, broker[key as keyof typeof broker]])),
-        after: { ...brokerChanges, ...userChanges, ...(personaChanged ? { personaMd: persona } : {}) },
+        before: {
+          ...Object.fromEntries(Object.keys(brokerChanges).map((key) => [key, broker[key as keyof typeof broker]])),
+          ...(commissionChanged ? { inHouseSplit: current.inHousePct, selfGeneratedSplit: current.selfGeneratedPct } : {}),
+        },
+        after: {
+          ...brokerChanges,
+          ...userChanges,
+          ...(personaChanged ? { personaMd: persona } : {}),
+          ...(commissionChanged ? { inHouseSplit: nextCommission.inHousePct, selfGeneratedSplit: nextCommission.selfGeneratedPct } : {}),
+        },
       });
       summary.updated.push(row.email);
     } else {

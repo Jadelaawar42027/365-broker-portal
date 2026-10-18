@@ -6,7 +6,7 @@
  * users and chapters are left alone.
  *
  * Functions:
- * - seedDatabase(db, options): runs the whole seed in one transaction; returns a summary of what changed and any invite links created.
+ * - seedDatabase(db, options): runs the whole seed in one transaction (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
  * - seedSteps(tx, refresh): inserts missing onboarding steps (or overwrites them when refresh is true); returns inserted and updated counts.
  * - addPasswordLogin(tx, userId, password): creates the Better Auth credential account holding the hashed password.
  * - ensureOwner(tx, owner): creates the owner user and login if the email is new; returns the owner id and whether it was created.
@@ -30,7 +30,7 @@ import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
 import { samplePdf, samplePng } from "./sample-files";
 import { seedStepGuidance } from "./step-content";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
-import { seedTraining } from "./training";
+import { removeRetiredTrainingDrafts, seedTraining } from "./training";
 
 export type SeedOptions = {
   owner?: { name: string; email: string; password: string } | null;
@@ -38,6 +38,7 @@ export type SeedOptions = {
   storage?: FileStorage | null;
   refreshSteps?: boolean;
   training?: { publish: boolean } | null;
+  removeRetiredTrainingDrafts?: boolean;
   now?: Date;
   webOrigin?: string;
 };
@@ -48,6 +49,7 @@ export type SeedSummary = {
   stepsGuided: number;
   owner: "created" | "existing" | "skipped";
   trainingChaptersInserted: number;
+  trainingDraftsDeleted?: string[];
   sampleBrokers: { email: string; outcome: "created" | "existing" }[];
   inviteLinks: { email: string; url: string }[];
 };
@@ -88,6 +90,10 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
     summary.stepsInserted = steps.inserted;
     summary.stepsUpdated = steps.updated;
     summary.stepsGuided = await seedStepGuidance(tx);
+
+    if (options.removeRetiredTrainingDrafts) {
+      summary.trainingDraftsDeleted = await removeRetiredTrainingDrafts(tx, now);
+    }
 
     if (options.training) {
       summary.trainingChaptersInserted = (await seedTraining(tx, { publish: options.training.publish, now })).chaptersInserted;

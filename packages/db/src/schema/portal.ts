@@ -1,7 +1,8 @@
 /**
  * File: packages/db/src/schema/portal.ts
- * Purpose: The portal's own tables: brokers (with their two commission splits, the broker's percentage on in-house
- * leads and on self-generated deals), account tokens (invites and resets, SPEC D8), the onboarding step
+ * Purpose: The portal's own tables: brokers, their commission history (SPEC D29: one row per change of the two splits,
+ * in-house leads % and self-generated deals %; the latest row is the current split; the older split columns on brokers
+ * and commission_tier are kept but no longer used), account tokens (invites and resets, SPEC D8), the onboarding step
  * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten) and the audit log.
  *
  * Functions:
@@ -72,6 +73,30 @@ export const brokers = pgTable(
     check(
       "brokers_onboarded_after_joined",
       sql`${table.onboardedAt} IS NULL OR ${table.onboardedAt} >= ${table.joinedAt}`,
+    ),
+  ],
+);
+
+export const commissionHistory = pgTable(
+  "commission_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brokerId: uuid("broker_id")
+      .notNull()
+      .references(() => brokers.id, { onDelete: "cascade" }),
+    inHousePct: integer("in_house_pct"),
+    selfGeneratedPct: integer("self_generated_pct"),
+    effectiveFrom: date("effective_from", { mode: "string" }).notNull().default(sql`CURRENT_DATE`),
+    changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+    note: text("note"),
+    createdAt,
+  },
+  (table) => [
+    index("commission_history_broker_idx").on(table.brokerId, table.effectiveFrom, table.createdAt),
+    check("commission_history_in_house_range", sql`${table.inHousePct} IS NULL OR ${table.inHousePct} BETWEEN 0 AND 100`),
+    check(
+      "commission_history_self_generated_range",
+      sql`${table.selfGeneratedPct} IS NULL OR ${table.selfGeneratedPct} BETWEEN 0 AND 100`,
     ),
   ],
 );

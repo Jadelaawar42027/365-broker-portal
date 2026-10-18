@@ -69,15 +69,18 @@ Python uses the same content as a module docstring. SQL and CSS use a block comm
 ## Rule 2: Git - never push
 
 - NEVER run `git push`, `gh`, or `git remote` commands, and never open pull requests. Aj pushes to GitHub himself.
-- You may make local commits at the end of each phase, only when `pnpm lint`, `pnpm typecheck` and `pnpm test` all pass. Message format: `phase B: database schema and seed`.
+- Never commit unless Aj says "commit". Then make a local commit with a message like `phase B: database schema and seed`.
 - Never commit `.env*` files (except `.env.example`), anything in `data/import/`, uploaded files, or real broker data.
 
-## Rule 3: Tests are part of every change
+## Rule 3: Tests only when asked
 
-- Every feature ships with unit tests (pure logic) and integration tests (API route + real Postgres).
-- Every user journey in `docs/SPEC.md` has a Playwright test.
-- Permission tests are mandatory: a broker must never read or change another broker's data, and only admins reach `/v1/admin/*`.
-- A task is done only when `pnpm lint`, `pnpm typecheck` and `pnpm test` pass. Say which tests you added.
+- While I'm making changes, do NOT run tests, write new tests or run visual-check unless I ask. Just make the change.
+- After a change, only run `pnpm typecheck` on the packages you touched (it's fast and catches broken code). Fix any type errors.
+- When I say "run tests", run `pnpm lint`, `pnpm typecheck` and `pnpm test`, and fix failures.
+- When I say "add tests", write unit/integration tests for the changes since the last commit.
+- When I say "check the screens", run the visual-check skill on the screens that changed.
+- When I say "full check", do all of the above plus `pnpm test:e2e`.
+- Never delete or weaken an existing test to make a change pass. If a change will clearly break an existing test, tell me which one instead of fixing it silently.
 
 ## Rule 4: Database
 
@@ -88,8 +91,8 @@ Python uses the same content as a module docstring. SQL and CSS use a block comm
 ## Rule 5: UI
 
 - Match `docs/mockups/` closely: 365 navy `#0A1F3D`, blue `#1D5FBF`, white cards, Manrope font, large text, touch targets of at least 44px.
-- Broker screens are mobile-first; check them at 390px and 1280px wide.
-- Use the frontend-design skill when building screens. After building or changing a screen, run the `visual-check` skill and fix differences before moving on.
+- Broker screens are mobile-first; design them for 390px and 1280px wide.
+- Use the frontend-design skill when building screens. Run the `visual-check` skill only when Aj asks ("check the screens" or "full check"), then fix the differences.
 - Real `<button>`, `<a>`, `<label>`; visible focus states; text contrast at least 4.5:1.
 
 ## Rule 6: Security and secrets

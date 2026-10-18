@@ -1,15 +1,17 @@
 /**
  * File: packages/db/src/brokers.ts
  * Purpose: Database operations for creating a broker. Creating one always creates their user row, their broker
- * row and one broker_steps row per active onboarding step together, so no broker can exist without a checklist.
+ * row, one broker_steps row per active onboarding step and (when splits or a note are given) the first commission
+ * history row together, so no broker can exist without a checklist.
  * Used by the seed now and by the invite route and importer later.
  *
  * Functions:
- * - createBroker(tx, input): inserts the user, broker (with level, status, dates and commission splits) and todo step rows inside the given transaction; returns the broker and user ids.
+ * - createBroker(tx, input): inserts the user, broker (with level, status and dates), its first commission history row and todo step rows inside the given transaction; returns the broker and user ids.
  */
 import type { BrokerLevel, BrokerStatus } from "@bp/shared";
 import { eq } from "drizzle-orm";
 import type { Transaction } from "./client";
+import { addCommissionChange } from "./commission";
 import { brokerSteps, brokers, onboardingSteps, users } from "./schema";
 
 export type CreateBrokerInput = {
@@ -21,9 +23,10 @@ export type CreateBrokerInput = {
   joinedAt: string;
   onboardedAt?: string | null;
   leftAt?: string | null;
-  commissionTier?: string | null;
   inHouseSplit?: number | null;
   selfGeneratedSplit?: number | null;
+  commissionNote?: string | null;
+  commissionChangedBy?: string | null;
   personaMd?: string | null;
 };
 
@@ -41,9 +44,6 @@ export async function createBroker(tx: Transaction, input: CreateBrokerInput) {
       joinedAt: input.joinedAt,
       onboardedAt: input.onboardedAt ?? null,
       leftAt: input.leftAt ?? null,
-      commissionTier: input.commissionTier ?? null,
-      inHouseSplit: input.inHouseSplit ?? null,
-      selfGeneratedSplit: input.selfGeneratedSplit ?? null,
       personaMd: input.personaMd ?? null,
     })
     .returning({ id: brokers.id });
@@ -51,6 +51,17 @@ export async function createBroker(tx: Transaction, input: CreateBrokerInput) {
     .select({ id: onboardingSteps.id })
     .from(onboardingSteps)
     .where(eq(onboardingSteps.active, true));
+  const hasCommission = input.inHouseSplit != null || input.selfGeneratedSplit != null || Boolean(input.commissionNote);
+  if (hasCommission) {
+    await addCommissionChange(tx, {
+      brokerId: broker!.id,
+      inHousePct: input.inHouseSplit ?? null,
+      selfGeneratedPct: input.selfGeneratedSplit ?? null,
+      effectiveFrom: input.joinedAt,
+      changedBy: input.commissionChangedBy ?? null,
+      note: input.commissionNote ?? null,
+    });
+  }
   if (steps.length > 0) {
     await tx.insert(brokerSteps).values(steps.map((step) => ({ brokerId: broker!.id, stepId: step.id })));
   }

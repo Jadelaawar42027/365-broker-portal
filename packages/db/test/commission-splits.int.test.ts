@@ -1,6 +1,7 @@
 /**
  * File: packages/db/test/commission-splits.int.test.ts
- * Purpose: Integration tests on a real Postgres container for the two commission splits (SPEC D27): createBroker
+ * Purpose: Integration tests on a real Postgres container for the two commission splits (SPEC D27, kept in the
+ * commission history since D29): createBroker
  * stores them, the database refuses splits outside 0 to 100, and migration 0005 retires an existing step 11
  * (commission_tier) without deleting it or any broker's history, writes one audit row, and is safe to run again.
  *
@@ -12,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { auditLog, brokerMetrics, brokerSteps, brokers, createBroker, onboardingSteps, seedDatabase } from "../src";
+import { auditLog, brokerMetrics, brokerSteps, brokers, createBroker, currentCommission, onboardingSteps, seedDatabase } from "../src";
 import { startTestDatabase } from "../src/testing";
 
 const MIGRATION = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "drizzle", "0005_retire_commission_step.sql");
@@ -51,8 +52,7 @@ afterAll(async () => {
 
 describe("commission splits", () => {
   it("stores both splits when a broker is created", async () => {
-    const [row] = await testDb.db.select().from(brokers).where(eq(brokers.id, brokerId));
-    expect(row).toMatchObject({ inHouseSplit: 30, selfGeneratedSplit: 55, commissionTier: null });
+    expect(await currentCommission(testDb.db, brokerId)).toEqual({ inHousePct: 30, selfGeneratedPct: 55 });
   });
 
   it("refuses a split outside 0 to 100", async () => {

@@ -8,7 +8,8 @@
  * - uniqueEmail(prefix): a fresh address for one test run.
  * - signIn(page, email, password): signs in on /login and waits to leave the page.
  * - latestLink(to, kind): waits for the newest email to that address and returns its invite or reset link.
- * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with the dialog (in-house leads 40%, self-generated deals 60%) and returns their profile URL.
+ * - fillInviteForm(dialog, name, email): fills the invite dialog: name, phone, optional email, junior, in-house leads 40%, self-generated deals 60%.
+ * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with an email and returns their profile URL.
  * - acceptInvite(page, email, password): opens the invite link from the outbox and creates the account.
  * - createSignedInBroker(browser, name): uses a separate admin session to invite a broker, then accepts the invite in a new context; returns that broker's page and email.
  * - testFile(name): a small PDF or PNG payload for setInputFiles.
@@ -17,7 +18,7 @@
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
  * - completeBrokerSteps(page): does all 10 steps a broker does themselves (passing step 8's deposit check).
  */
-import { expect, type Browser, type Page } from "@playwright/test";
+import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,15 +59,21 @@ export async function latestLink(to: string, kind: "invite" | "reset"): Promise<
   return link!;
 }
 
+export async function fillInviteForm(dialog: Locator, name: string, email: string | null): Promise<void> {
+  await dialog.getByLabel("Full name").fill(name);
+  await dialog.getByLabel("Personal phone").fill("+1 561 555 0199");
+  if (email) await dialog.getByLabel("Email (optional)").fill(email);
+  await dialog.getByLabel("In-house leads").selectOption("40");
+  await dialog.getByLabel("Self-generated deals").selectOption("60");
+  await expect(dialog.getByText("Broker 40% · house keeps 60%")).toBeVisible();
+  await expect(dialog.getByText("Broker 60% · house keeps 40%")).toBeVisible();
+}
+
 export async function inviteBroker(page: Page, name: string, email: string): Promise<string> {
   await page.goto("/admin");
   await page.getByRole("button", { name: "Invite a new broker" }).click();
   const dialog = page.getByRole("dialog", { name: "Invite a new broker" });
-  await dialog.getByLabel("Full name").fill(name);
-  await dialog.getByLabel("Email").fill(email);
-  await dialog.getByLabel("In-house leads").fill("40");
-  await dialog.getByLabel("Self-generated deals").fill("60");
-  await expect(dialog.getByText("Broker 40% · house keeps 60%")).toBeVisible();
+  await fillInviteForm(dialog, name, email);
   await dialog.getByRole("button", { name: "Send invite" }).click();
   await expect(page.getByText(`Invite sent to ${email.toLowerCase()}`)).toBeVisible();
   return page.url().split("?")[0]!;

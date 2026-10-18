@@ -1,12 +1,13 @@
 /**
  * File: packages/db/src/index.ts
- * Purpose: Public entry of @bp/db: the schema, the client factory, migrations, broker creation, the seed,
+ * Purpose: Public entry of @bp/db: the schema, the client factory, migrations, broker creation, commission history, the seed,
  * the broker importer and the metrics login helper.
  *
  * Functions:
  * - none
  */
 export { createBroker, type CreateBrokerInput } from "./brokers";
+export { addCommissionChange, commissionHistoryFor, currentCommission, type CommissionChangeInput } from "./commission";
 export { createDb, type Database, type DbOrTx, type Transaction } from "./client";
 export { readDatabaseUrl } from "./database-url";
 export { parseBrokerCsv, parseCsv, type BrokerCsvRow } from "./import/csv";

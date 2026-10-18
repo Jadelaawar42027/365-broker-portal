@@ -8,8 +8,9 @@
  * - createResendMailer(apiKey, from): returns a Mailer that posts to the Resend HTTP API.
  * - createConsoleMailer(log, outboxDir): returns a Mailer that logs each email instead of sending it, saving a JSON copy in outboxDir if given.
  * - createMailer(env, log): picks the Resend or console mailer from the environment.
- * - sendSafely(mailer, log, messages): sends each message, logging failures instead of throwing.
+ * - sendSafely(mailer, log, messages): sends each message (skipping placeholder addresses of brokers invited without an email, SPEC D29), logging failures instead of throwing.
  */
+import { isPlaceholderEmail } from "@bp/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -53,6 +54,7 @@ export function createMailer(env: ApiEnv, log: FastifyBaseLogger): Mailer {
 
 export async function sendSafely(mailer: Mailer, log: FastifyBaseLogger, messages: EmailMessage[]): Promise<void> {
   for (const message of messages) {
+    if (isPlaceholderEmail(message.to)) continue;
     try {
       await mailer.send(message);
     } catch (error) {

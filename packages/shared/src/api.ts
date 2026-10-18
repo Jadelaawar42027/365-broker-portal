@@ -19,6 +19,8 @@ import {
   VIDEO_PROVIDERS,
   VIDEO_SOURCES,
 } from "./constants";
+import { commissionPctSchema } from "./commission";
+import { e164PhoneSchema } from "./contact";
 import { guidanceViewSchema } from "./guidance";
 import { emailSchema, isoDateSchema, passwordSchema, stepConfigSchema } from "./schemas";
 
@@ -29,12 +31,6 @@ const phoneSchema = z
   .string()
   .trim()
   .regex(/^[0-9()+\-.\s]{7,20}$/, "Enter a phone number like (561) 000-0000.");
-const commissionSplitSchema = z
-  .number({ error: "Enter the broker's share as a percentage." })
-  .int("Use a whole percentage, like 60.")
-  .min(0, "A split can't be below 0%.")
-  .max(100, "A split can't be above 100%.")
-  .describe("The broker's share in percent; the house keeps the rest");
 
 export const errorResponseSchema = z.object({
   error: z.string(),
@@ -210,7 +206,7 @@ export const downloadUrlResponseSchema = z.object({ url: z.string(), expiresAt: 
 export type DownloadUrlResponse = z.infer<typeof downloadUrlResponseSchema>;
 
 export const inviteInfoResponseSchema = z.object({
-  email: z.string(),
+  email: z.string().nullable().describe("Null when the broker was invited without an email and must give one"),
   name: z.string(),
   firstName: z.string(),
   role: z.enum(USER_ROLES),
@@ -221,6 +217,7 @@ export const acceptInviteRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   password: passwordSchema,
   phone: phoneSchema,
+  email: emailSchema.optional().describe("Required when the invite has no email yet; becomes the sign-in email"),
 });
 export type AcceptInviteRequest = z.infer<typeof acceptInviteRequestSchema>;
 
@@ -275,12 +272,14 @@ export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
 export const brokerListRowSchema = z.object({
   brokerId: z.string(),
   name: z.string(),
-  email: z.string(),
+  email: z.string().nullable(),
   level: z.enum(BROKER_LEVELS),
   status: z.enum(BROKER_STATUSES),
   joinedAt: z.string(),
   onboardedAt: z.string().nullable(),
   leftAt: z.string().nullable(),
+  inHouseSplit: z.number().int().nullable(),
+  selfGeneratedSplit: z.number().int().nullable(),
   tenureDays: z.number().int(),
   daysToOnboard: z.number().int().nullable(),
   stepsApproved: z.number().int(),
@@ -313,16 +312,41 @@ export type BrokerListResponse = z.infer<typeof brokerListResponseSchema>;
 
 export const createBrokerRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
-  email: emailSchema,
-  phone: phoneSchema.optional(),
+  phone: e164PhoneSchema,
+  email: emailSchema.optional(),
   level: z.enum(BROKER_LEVELS),
   joinedAt: isoDateSchema.optional(),
-  inHouseSplit: commissionSplitSchema,
-  selfGeneratedSplit: commissionSplitSchema,
+  inHouseSplit: commissionPctSchema,
+  selfGeneratedSplit: commissionPctSchema,
 });
 export type CreateBrokerRequest = z.infer<typeof createBrokerRequestSchema>;
 
-export const createBrokerResponseSchema = z.object({ brokerId: z.string() });
+export const createBrokerResponseSchema = z.object({
+  brokerId: z.string(),
+  inviteUrl: z.string().nullable().describe("The invite link to send by hand, when the broker was invited without an email"),
+});
+export type CreateBrokerResponse = z.infer<typeof createBrokerResponseSchema>;
+
+export const inviteLinkResponseSchema = z.object({ inviteUrl: z.string() });
+
+export const commissionHistoryEntrySchema = z.object({
+  id: z.string(),
+  inHouseSplit: z.number().int().nullable(),
+  selfGeneratedSplit: z.number().int().nullable(),
+  effectiveFrom: z.string(),
+  changedByName: z.string().nullable(),
+  note: z.string().nullable(),
+  createdAt: timestampSchema,
+});
+export type CommissionHistoryEntry = z.infer<typeof commissionHistoryEntrySchema>;
+
+export const commissionChangeRequestSchema = z.object({
+  inHouseSplit: commissionPctSchema,
+  selfGeneratedSplit: commissionPctSchema,
+  effectiveFrom: isoDateSchema.optional(),
+  note: z.string().trim().max(500).optional(),
+});
+export type CommissionChangeRequest = z.infer<typeof commissionChangeRequestSchema>;
 
 export const adminStepRowSchema = z.object({
   brokerStepId: z.string(),
@@ -351,7 +375,7 @@ export const brokerProfileResponseSchema = z.object({
     id: z.string(),
     userId: z.string(),
     name: z.string(),
-    email: z.string(),
+    email: z.string().nullable(),
     phone: z.string().nullable(),
     level: z.enum(BROKER_LEVELS),
     status: z.enum(BROKER_STATUSES),
@@ -375,6 +399,7 @@ export const brokerProfileResponseSchema = z.object({
     updatedByName: z.string().nullable(),
   }),
   steps: z.array(adminStepRowSchema),
+  commissionHistory: z.array(commissionHistoryEntrySchema),
 });
 export type BrokerProfileResponse = z.infer<typeof brokerProfileResponseSchema>;
 
@@ -384,8 +409,6 @@ export const updateBrokerRequestSchema = z
     status: z.enum(BROKER_STATUSES).optional(),
     joinedAt: isoDateSchema.optional(),
     leftAt: isoDateSchema.nullable().optional(),
-    inHouseSplit: commissionSplitSchema.optional(),
-    selfGeneratedSplit: commissionSplitSchema.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: "Send at least one field to change." });
 export type UpdateBrokerRequest = z.infer<typeof updateBrokerRequestSchema>;

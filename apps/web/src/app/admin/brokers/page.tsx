@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/app/admin/brokers/page.tsx
- * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us and onboarding
+ * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us, both commission splits (SPEC D29) and onboarding
  * progress, training progress and average best quiz score (from the broker_training_metrics view), with search
  * (including persona text), status and level filters, CSV export and the invite button.
  *
@@ -60,7 +60,7 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex flex-wrap gap-3">
           <ExportCsvButton rows={data.brokers} />
-          <InviteBrokerButton today={today} />
+          <InviteBrokerButton />
         </div>
       </div>
 
@@ -77,6 +77,8 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
               <th scope="col" className="px-3 py-4">Joined</th>
               <th scope="col" className="px-3 py-4">Onboarded</th>
               <th scope="col" className="px-3 py-4">Time with us</th>
+              <th scope="col" className="px-3 py-4" title="Broker's share on in-house leads">In-house</th>
+              <th scope="col" className="px-3 py-4" title="Broker's share on self-generated deals">Self-gen.</th>
               <th scope="col" className="px-3 py-4">Onboarding</th>
               <th scope="col" className="px-3 py-4">Training</th>
               <th scope="col" className="px-3 py-4">Avg. quiz</th>
@@ -85,7 +87,7 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
           <tbody className="text-base">
             {data.brokers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-lg text-muted">
+                <td colSpan={11} className="px-4 py-10 text-center text-lg text-muted">
                   No brokers match. Try another search or filter.
                 </td>
               </tr>
@@ -108,6 +110,8 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
                     <td className="px-3 py-3 tabular-nums text-muted">{formatDate(row.joinedAt)}</td>
                     <td className="px-3 py-3 tabular-nums text-muted">{row.onboardedAt ? formatDate(row.onboardedAt) : "—"}</td>
                     <td className="px-3 py-3">{formatTenure(row.joinedAt, row.leftAt ?? today, Boolean(row.leftAt))}</td>
+                    <td className="px-3 py-3 tabular-nums">{row.inHouseSplit === null ? <span className="text-muted">—</span> : `${row.inHouseSplit}%`}</td>
+                    <td className="px-3 py-3 tabular-nums">{row.selfGeneratedSplit === null ? <span className="text-muted">—</span> : `${row.selfGeneratedSplit}%`}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
                         <ProgressBar value={row.stepsApproved} max={row.stepsTotal} tone={done ? "success" : "brand"} label={`${row.name}: ${row.stepsApproved} of ${row.stepsTotal} steps approved`} className="w-20" />

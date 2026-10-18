@@ -1,7 +1,7 @@
 /**
  * File: apps/api/test/admin-brokers.int.test.ts
  * Purpose: Integration tests for admin broker management: overview numbers (3a), the brokers table with filters and
- * persona search (3b), the profile with persona and every file version (3c), edits with date validation, commission split edits, persona edits,
+ * persona search (3b), the profile with persona and every file version (3c), edits with date validation, commission split changes (SPEC D29), persona edits,
  * reminders, the metrics feed and the audit rows each action writes.
  *
  * Functions:
@@ -145,20 +145,19 @@ describe("profile and edits", () => {
     expect(audit.map((row) => row.action)).toEqual(["file.previewed"]);
   });
 
-  it("changes level and the commission splits and records before and after", async () => {
-    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, {
-      cookie: owner,
-      body: { level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
-    });
+  it("changes level and records before and after", async () => {
+    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner, body: { level: "senior" } });
     expect(response.statusCode).toBe(200);
     const [audit] = await ctx.db
       .select()
       .from(auditLog)
       .where(and(eq(auditLog.entityId, daniel.brokerId), eq(auditLog.action, "broker.updated")));
-    expect(audit).toMatchObject({
-      before: { level: "junior", inHouseSplit: null, selfGeneratedSplit: null },
-      after: { level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
-    });
+    expect(audit).toMatchObject({ before: { level: "junior" }, after: { level: "senior" } });
+  });
+
+  it("changes the commission split through the history and shows it on the profile and to the broker", async () => {
+    const response = await ctx.call("POST", `/v1/admin/brokers/${daniel.brokerId}/commission`, { cookie: owner, body: { inHouseSplit: 50, selfGeneratedSplit: 70 } });
+    expect(response.statusCode).toBe(201);
     const profile = (await ctx.call("GET", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner })).json();
     expect(profile.broker).toMatchObject({ inHouseSplit: 50, selfGeneratedSplit: 70 });
     const me = (await ctx.call("GET", "/v1/me", { cookie: daniel.cookie })).json();
@@ -166,13 +165,15 @@ describe("profile and edits", () => {
   });
 
   it("rejects a commission split outside 0 to 100", async () => {
-    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner, body: { selfGeneratedSplit: 120 } });
+    const response = await ctx.call("POST", `/v1/admin/brokers/${daniel.brokerId}/commission`, { cookie: owner, body: { inHouseSplit: 50, selfGeneratedSplit: 120 } });
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("validation_error");
   });
 
   it("never lets a broker change their own commission splits", async () => {
-    const response = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: daniel.cookie, body: { selfGeneratedSplit: 100 } });
+    const patch = await ctx.call("PATCH", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: daniel.cookie, body: { level: "senior" } });
+    expect(patch.statusCode).toBe(403);
+    const response = await ctx.call("POST", `/v1/admin/brokers/${daniel.brokerId}/commission`, { cookie: daniel.cookie, body: { inHouseSplit: 100, selfGeneratedSplit: 100 } });
     expect(response.statusCode).toBe(403);
   });
 

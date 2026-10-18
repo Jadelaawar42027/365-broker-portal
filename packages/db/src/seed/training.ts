@@ -7,12 +7,14 @@
  *
  * Functions:
  * - seedTraining(tx, options): inserts every missing chapter with its lessons, questions and options; returns how many chapters were added.
+ * - removeRetiredTrainingDrafts(tx, now): deletes the pre-D28 Volume One chapters (Part 0 and 01 to 06) that were never published and that no broker has progress or quiz attempts on; writes audit_log and returns the labels it deleted.
  * - insertChapter(tx, chapter, position, publish, now): inserts one chapter and its content.
  * - lessonReadMinutes(bodyMd): the read time shown to brokers, at least two minutes.
  */
 import { estimateReadMinutes } from "@bp/shared";
 import type { Transaction } from "../client";
-import { chapters, lessons, questionOptions, questions } from "../schema";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { auditLog, chapters, lessonProgress, lessons, questionOptions, questions, quizAttempts } from "../schema";
 import { TRAINING_SEED_CHAPTERS, type TrainingSeedChapter } from "./training-content";
 
 const MIN_READ_MINUTES = 2;
@@ -82,4 +84,36 @@ export async function seedTraining(tx: Transaction, options: { publish: boolean;
     chaptersInserted += 1;
   }
   return { chaptersInserted };
+}
+
+const RETIRED_CHAPTER_CODES = ["0", "01", "02", "03", "04", "05", "06"];
+
+export async function removeRetiredTrainingDrafts(tx: Transaction, now: Date): Promise<string[]> {
+  const candidates = await tx
+    .select({ id: chapters.id, code: chapters.code, title: chapters.title })
+    .from(chapters)
+    .where(and(inArray(chapters.code, RETIRED_CHAPTER_CODES), eq(chapters.volume, 1), eq(chapters.status, "draft"), isNull(chapters.publishedAt)));
+  const deleted: string[] = [];
+  for (const chapter of candidates) {
+    const [attempt] = await tx.select({ id: quizAttempts.id }).from(quizAttempts).where(eq(quizAttempts.chapterId, chapter.id)).limit(1);
+    if (attempt) continue;
+    const [progress] = await tx
+      .select({ id: lessonProgress.id })
+      .from(lessonProgress)
+      .innerJoin(lessons, eq(lessons.id, lessonProgress.lessonId))
+      .where(eq(lessons.chapterId, chapter.id))
+      .limit(1);
+    if (progress) continue;
+    await tx.delete(chapters).where(eq(chapters.id, chapter.id));
+    await tx.insert(auditLog).values({
+      actorUserId: null,
+      action: "chapter.retired_draft_deleted",
+      entityType: "chapter",
+      entityId: chapter.id,
+      before: { code: chapter.code, title: chapter.title, status: "draft" },
+      after: { deletedAt: now.toISOString(), reason: "Volume One onboarding chapters moved into the onboarding steps (SPEC D28)" },
+    });
+    deleted.push(chapter.code === "0" ? `Part 0 · ${chapter.title}` : `${chapter.code} · ${chapter.title}`);
+  }
+  return deleted;
 }

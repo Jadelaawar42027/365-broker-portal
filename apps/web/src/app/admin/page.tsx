@@ -8,7 +8,7 @@
  * - OverviewPage(): loads the overview numbers and renders the screen.
  * - nextStepText(row): "Next: W-9 (sent, waiting on you)" style wording for an in-progress broker.
  */
-import { todayInTimeZone, type OverviewResponse, type TrainingOverviewResponse } from "@bp/shared";
+import type { OverviewResponse, TrainingOverviewResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
@@ -44,7 +44,7 @@ export default async function OverviewPage() {
           <h1 className="text-[35px] leading-tight font-extrabold tracking-tight">Overview</h1>
           <p className="mt-1 text-[17px] text-muted">{formatLongDate(now)}</p>
         </div>
-        <InviteBrokerButton today={todayInTimeZone(now)} />
+        <InviteBrokerButton />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -2,7 +2,9 @@
  * File: packages/db/test/import.int.test.ts
  * Purpose: Integration tests for the broker importer on a real Postgres container (storage is an in-memory fake):
  * dry runs change nothing, brokers are created and updated by email, onboarded brokers get every step approved as
- * "imported", files and personas are stored, a second run changes nothing, blank split cells keep the current splits, and nothing is ever deleted.
+ * "imported", files and personas are stored, an old commission tier becomes the first commission history note, changed
+ * split columns add a history row, a second run changes nothing, blank split cells keep the current split, and
+ * nothing is ever deleted.
  *
  * Functions:
  * - memoryStorage(): a FileStorage that keeps uploaded objects in a Map.
@@ -15,7 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { auditLog, brokerSteps, brokers, createBroker, files, onboardingSteps, seedDatabase, users } from "../src";
+import { addCommissionChange, auditLog, brokerSteps, brokers, commissionHistoryFor, createBroker, currentCommission, files, onboardingSteps, seedDatabase, users } from "../src";
 import { loadImportFolder, runImport } from "../src/import/importer";
 import { ONBOARDING_STEP_SEEDS } from "../src/seed/steps";
 import { startTestDatabase } from "../src/testing";
@@ -132,7 +134,9 @@ describe("runImport", () => {
       .from(brokers)
       .innerJoin(users, eq(users.id, brokers.userId))
       .where(eq(users.email, "jane@example.com"));
-    expect(janeBroker!.brokers).toMatchObject({ status: "active", level: "senior", onboardedAt: "2025-03-11", commissionTier: "60/40" });
+    expect(janeBroker!.brokers).toMatchObject({ status: "active", level: "senior", onboardedAt: "2025-03-11" });
+    const janeHistory = await commissionHistoryFor(testDb.db, janeBroker!.brokers.id);
+    expect(janeHistory.map((row) => [row.inHousePct, row.selfGeneratedPct, row.note])).toEqual([[null, null, "Previous commission tier: 60/40"]]);
     expect(janeBroker!.brokers.personaMd).toContain("Former Navy officer");
     expect(janeBroker!.brokers.welcomeSeenAt).not.toBeNull();
 
@@ -160,10 +164,8 @@ describe("runImport", () => {
   });
 
   it("updates changed rows by email, records the change and never deletes anyone", async () => {
-    await testDb.db
-      .update(brokers)
-      .set({ inHouseSplit: 40, selfGeneratedSplit: 60 })
-      .where(eq(brokers.userId, testDb.db.select({ id: users.id }).from(users).where(eq(users.email, "jane@example.com"))));
+    const [janeRow] = await testDb.db.select({ id: brokers.id }).from(brokers).innerJoin(users, eq(users.id, brokers.userId)).where(eq(users.email, "jane@example.com"));
+    await addCommissionChange(testDb.db, { brokerId: janeRow!.id, inHousePct: 40, selfGeneratedPct: 60, note: "Set by Shelly" });
     const changed = fs.mkdtempSync(path.join(os.tmpdir(), "bp-import-2-"));
     writeImportFolder(changed, [ROWS[0]!.replace("senior", "junior"), ROWS[1]!]);
     const { input } = loadImportFolder(changed, UPLOAD_KEYS);
@@ -176,16 +178,30 @@ describe("runImport", () => {
       .orderBy(auditLog.createdAt)
       .then((rows) => rows.slice(-1));
     expect(audit).toMatchObject({ before: { level: "senior" }, after: { level: "junior" } });
-    const [jane] = await testDb.db
-      .select({ inHouseSplit: brokers.inHouseSplit, selfGeneratedSplit: brokers.selfGeneratedSplit })
-      .from(brokers)
-      .innerJoin(users, eq(users.id, brokers.userId))
-      .where(eq(users.email, "jane@example.com"));
-    expect(jane).toEqual({ inHouseSplit: 40, selfGeneratedSplit: 60 });
+    expect(await currentCommission(testDb.db, janeRow!.id)).toEqual({ inHousePct: 40, selfGeneratedPct: 60 });
+    expect((await commissionHistoryFor(testDb.db, janeRow!.id)).map((row) => row.note)).not.toContain("Imported");
     for (const email of ["alex@example.com", "keep@example.com"]) {
       expect(await testDb.db.select().from(users).where(eq(users.email, email))).toHaveLength(1);
     }
     fs.rmSync(changed, { recursive: true, force: true });
+  });
+
+  it("adds a commission history row when the CSV's split columns change a broker's split", async () => {
+    const withSplits = fs.mkdtempSync(path.join(os.tmpdir(), "bp-import-splits-"));
+    writeImportFolder(withSplits, []);
+    fs.writeFileSync(
+      path.join(withSplits, "brokers.csv"),
+      `${HEADER},in_house_split,self_generated_split\nJane Example,jane@example.com,+15615550100,junior,active,2025-03-03,2025-03-11,,60/40,50,70\n`,
+    );
+    const { input } = loadImportFolder(withSplits, UPLOAD_KEYS);
+    const summary = await runImport(testDb.db, memoryStorage(), input!, { dryRun: false });
+    expect(summary.updated).toEqual(["jane@example.com"]);
+    const [janeRow] = await testDb.db.select({ id: brokers.id }).from(brokers).innerJoin(users, eq(users.id, brokers.userId)).where(eq(users.email, "jane@example.com"));
+    expect(await currentCommission(testDb.db, janeRow!.id)).toEqual({ inHousePct: 50, selfGeneratedPct: 70 });
+    expect((await commissionHistoryFor(testDb.db, janeRow!.id))[0]!.note).toBe("Imported");
+    const again = await runImport(testDb.db, memoryStorage(), input!, { dryRun: false });
+    expect(again.unchanged).toEqual(["jane@example.com"]);
+    fs.rmSync(withSplits, { recursive: true, force: true });
   });
 
   it("skips admin accounts and warns about personas with no CSV row", async () => {

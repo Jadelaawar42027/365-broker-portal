@@ -73,6 +73,8 @@ describe("buildBrokersCsv", () => {
       joinedAt: "2026-08-18",
       onboardedAt: "2026-08-27",
       leftAt: null,
+      inHouseSplit: 40,
+      selfGeneratedSplit: 60,
       tenureDays: 60,
       daysToOnboard: 9,
       stepsApproved: 11,
@@ -80,10 +82,17 @@ describe("buildBrokersCsv", () => {
       stepsWaitingReview: 0,
       lastActivityAt: null,
     };
-    expect(buildBrokersCsv([row, { ...row, name: "Kevin", training: { chaptersPassed: 3, chaptersTotal: 7, avgBestScore: 79 } }])).toBe(
-      "name,email,level,status,joined_at,onboarded_at,left_at,tenure_days,days_to_onboard,steps_approved,steps_total,chapters_passed,chapters_total,avg_quiz_score\n" +
-        '"Osei, Kevin ""KO""",kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,,,\n' +
-        "Kevin,kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,3,7,79\n",
+    expect(
+      buildBrokersCsv([
+        row,
+        { ...row, name: "Kevin", training: { chaptersPassed: 3, chaptersTotal: 7, avgBestScore: 79 } },
+        { ...row, name: "Nina", email: null, inHouseSplit: null, selfGeneratedSplit: 65 },
+      ]),
+    ).toBe(
+      "name,email,level,status,joined_at,onboarded_at,left_at,tenure_days,days_to_onboard,steps_approved,steps_total,in_house_split_pct,self_generated_split_pct,chapters_passed,chapters_total,avg_quiz_score\n" +
+        '"Osei, Kevin ""KO""",kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,40,60,,,\n' +
+        "Kevin,kevin@example.com,junior,active,2026-08-18,2026-08-27,,60,9,11,11,40,60,3,7,79\n" +
+        "Nina,,junior,active,2026-08-18,2026-08-27,,60,9,11,11,,65,,,\n",
     );
   });
 });

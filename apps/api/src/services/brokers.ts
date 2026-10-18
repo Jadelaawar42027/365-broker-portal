@@ -4,14 +4,14 @@
  * brokers table search also matches persona text with a simple ILIKE (docs/SPEC.md).
  *
  * Functions:
- * - toBrokerListRow(row): shapes a broker_metrics row for API responses.
+ * - toBrokerListRow(row): shapes a broker_metrics row for API responses (placeholder emails become null; the current commission split comes from the view).
  * - escapeLike(value): escapes %, _ and \ so user text is matched literally in ILIKE.
  * - listBrokerMetrics(db, filters): returns broker_metrics rows filtered by status, level and search, in table order.
  * - countBrokersByStatus(db): returns how many brokers are in each status, plus the total.
  * - loadBrokerWithUser(db, brokerId): returns the broker row joined with its user, or throws 404.
  */
 import { brokerMetrics, brokers, users, type DbOrTx } from "@bp/db";
-import type { BrokerLevel, BrokerListRow, BrokerStatus } from "@bp/shared";
+import { visibleEmail, type BrokerLevel, type BrokerListRow, type BrokerStatus } from "@bp/shared";
 import { and, desc, eq, getViewSelectedFields, ilike, or, sql, type SQL } from "drizzle-orm";
 import { notFound } from "../errors";
 import { toIso } from "./steps";
@@ -22,12 +22,14 @@ export function toBrokerListRow(row: MetricsRow): BrokerListRow {
   return {
     brokerId: row.brokerId,
     name: row.name,
-    email: row.email,
+    email: visibleEmail(row.email),
     level: row.level,
     status: row.status,
     joinedAt: row.joinedAt,
     onboardedAt: row.onboardedAt,
     leftAt: row.leftAt,
+    inHouseSplit: row.inHousePct,
+    selfGeneratedSplit: row.selfGeneratedPct,
     tenureDays: row.tenureDays,
     daysToOnboard: row.daysToOnboard,
     stepsApproved: row.stepsApproved,

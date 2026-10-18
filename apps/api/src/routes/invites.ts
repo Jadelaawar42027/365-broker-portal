@@ -2,6 +2,7 @@
  * File: apps/api/src/routes/invites.ts
  * Purpose: Public routes behind the invite link (screen 1a). Opening the link shows who it is for; accepting it sets
  * the name, phone and password, moves a broker from invited to onboarding, uses up the link and signs the user in.
+ * A broker invited without an email (SPEC D29) gives their own email when accepting; it becomes their sign-in email.
  *
  * Functions:
  * - registerInviteRoutes(app): mounts GET /v1/invites/:token and POST /v1/invites/:token/accept.
@@ -12,12 +13,15 @@ import {
   acceptInviteResponseSchema,
   errorResponseSchema,
   inviteInfoResponseSchema,
+  isPlaceholderEmail,
+  visibleEmail,
 } from "@bp/shared";
 import { fromNodeHeaders } from "better-auth/node";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { badRequest, conflict } from "../errors";
 import { consumeAccountToken, findUsableToken, setUserPassword } from "../services/account-tokens";
 import { writeAudit } from "../services/audit";
 import { firstName } from "../services/emails";
@@ -39,7 +43,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     },
     async (request) => {
       const invite = await findUsableToken(app.deps.db, request.params.token, "invite", app.deps.now());
-      return { email: invite.email, name: invite.name, firstName: firstName(invite.name), role: invite.role };
+      return { email: visibleEmail(invite.email), name: invite.name, firstName: firstName(invite.name), role: invite.role };
     },
   );
 
@@ -51,18 +55,25 @@ export function registerInviteRoutes(app: FastifyInstance): void {
         summary: "Create the account from an invite and sign in",
         params: tokenParams,
         body: acceptInviteRequestSchema,
-        response: { 200: acceptInviteResponseSchema, 404: errorResponseSchema, 410: errorResponseSchema },
+        response: { 200: acceptInviteResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, 410: errorResponseSchema },
       },
     },
     async (request, reply) => {
       const { db, auth } = app.deps;
       const now = app.deps.now();
       const invite = await findUsableToken(db, request.params.token, "invite", now);
+      const needsEmail = isPlaceholderEmail(invite.email);
+      if (needsEmail && !request.body.email) throw badRequest("Enter the email you'll sign in with.", "email_required");
+      const signInEmail = needsEmail ? request.body.email! : invite.email;
+      if (needsEmail) {
+        const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, signInEmail));
+        if (taken) throw conflict("Someone already uses this email. Try another, or ask us for help.", "email_taken");
+      }
       await db.transaction(async (tx) => {
         await consumeAccountToken(tx, invite.tokenId, now);
         await tx
           .update(users)
-          .set({ name: request.body.name, phone: request.body.phone, emailVerified: true })
+          .set({ name: request.body.name, phone: request.body.phone, emailVerified: true, ...(needsEmail ? { email: signInEmail } : {}) })
           .where(eq(users.id, invite.userId));
         await setUserPassword(tx, invite.userId, request.body.password);
         const started = await tx
@@ -75,6 +86,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
           action: "user.invite_accepted",
           entityType: "user",
           entityId: invite.userId,
+          ...(needsEmail ? { after: { email: signInEmail } } : {}),
         });
         if (started[0]) {
           await writeAudit(tx, {
@@ -88,7 +100,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
         }
       });
       const signIn = await auth.api.signInEmail({
-        body: { email: invite.email, password: request.body.password },
+        body: { email: signInEmail, password: request.body.password },
         headers: fromNodeHeaders(request.headers),
         asResponse: true,
       });

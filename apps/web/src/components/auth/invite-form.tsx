@@ -4,7 +4,7 @@
  * then takes the new broker to their checklist (or an admin to the admin overview).
  *
  * Functions:
- * - InviteForm({ token, email, name }): renders the form and handles submission.
+ * - InviteForm({ token, email, name }): renders the form and handles submission; when the invite has no email (SPEC D29), asks for the email the broker will sign in with.
  */
 "use client";
 
@@ -17,7 +17,7 @@ import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { FormMessage } from "./form-message";
 
-export function InviteForm({ token, email, name }: { token: string; email: string; name: string }) {
+export function InviteForm({ token, email, name }: { token: string; email: string | null; name: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +30,12 @@ export function InviteForm({ token, email, name }: { token: string; email: strin
     try {
       const result = await apiRequest<{ role: string }>(`/v1/invites/${encodeURIComponent(token)}/accept`, {
         method: "POST",
-        body: { name, password: String(form.get("password")), phone: String(form.get("phone")) },
+        body: {
+          name,
+          password: String(form.get("password")),
+          phone: String(form.get("phone")),
+          ...(email ? {} : { email: String(form.get("email") ?? "").trim() }),
+        },
       });
       router.replace(result.role === "broker" ? "/app" : "/admin");
       router.refresh();
@@ -43,8 +48,12 @@ export function InviteForm({ token, email, name }: { token: string; email: strin
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate={false}>
       <div>
-        <FieldLabel htmlFor="email">Email</FieldLabel>
-        <input id="email" name="email" type="email" spellCheck={false} value={email} readOnly autoComplete="username" className={inputClasses()} />
+        <FieldLabel htmlFor="email">{email ? "Email" : "Your email (you'll sign in with it)"}</FieldLabel>
+        {email ? (
+          <input id="email" name="email" type="email" spellCheck={false} value={email} readOnly autoComplete="username" className={inputClasses()} />
+        ) : (
+          <input id="email" name="email" type="email" required spellCheck={false} autoComplete="email" className={inputClasses()} />
+        )}
       </div>
       <div>
         <FieldLabel htmlFor="password">Choose a password</FieldLabel>
