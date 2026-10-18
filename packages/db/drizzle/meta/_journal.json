@@ -43,6 +43,13 @@
       "when": 1792260146304,
       "tag": "0005_retire_commission_step",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792308309513,
+      "tag": "0006_step_guidance",
+      "breakpoints": true
     }
   ]
 }

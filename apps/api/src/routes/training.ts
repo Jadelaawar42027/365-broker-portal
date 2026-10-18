@@ -228,6 +228,8 @@ export function registerTrainingRoutes(app: FastifyInstance): void {
         title: lesson.title,
         readMinutes: lesson.readMinutes,
         bodyMd: full!.bodyMd,
+        todoItems: full!.todoItems ?? [],
+        callouts: full!.callouts ?? [],
         kind: lesson.kind,
         video: await videoView(app, lesson.id),
         videoPlaceholder: full!.videoPlaceholder,

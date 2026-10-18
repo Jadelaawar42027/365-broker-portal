@@ -105,6 +105,19 @@ brokerPortal/
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
 
+## Onboarding guidance (D28, Oct 18, 2026)
+
+Aj's decision after phase G: the onboarding modules belong in the onboarding steps, and training is the real training. Not yet committed: waiting for Aj to check the wording.
+
+- [x] Additive migration 0006: guidance columns on steps and lessons; `step_videos`, `step_questions`, `step_question_options`
+- [x] Step guidance content from Modules 01, 02 and 06 (week one): bullets, callouts (every NEVER and WATCH), full text, video slots on steps 7 and 10, deposit check on step 8; seeded only into steps without bullets
+- [x] Broker step page and lesson page in the short layout; Part 0 welcome on 1d
+- [x] Knowledge check (up to 3 questions per step), checked answer by answer, enforced on submit
+- [x] Admin "Onboarding steps" editor (guidance, video slots with embed or MP4 upload, knowledge check); bullets and callouts in the lesson editor
+- [x] Training reduced to "I · How you get paid & measured" (Modules 03–05) plus Volume Two shells; old chapters removed from the seed
+- [x] Tests: shared guidance rules, content and seed tests, API integration (guidance, check, videos, admin editor, permissions), Playwright journeys 7 (rewritten) and 8 (new); visual-check at 390 and 1280
+- After deploy: delete the old draft chapters (Part 0, 01–06) in the admin; record the step 7 and step 10 videos; fill the GoHighLevel walkthrough slot
+
 ## Phase G: Training
 
 Started Oct 17, 2026, built unattended. Each step is committed separately once lint, typecheck and tests pass. Nothing is pushed. Migrations are additive only (new tables, new enums, new view, nullable or defaulted new columns).

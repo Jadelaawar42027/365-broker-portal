@@ -28,7 +28,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/components/training/lesson-video.tsx"],
+    files: ["src/components/training/lesson-video.tsx", "src/components/broker/step-videos.tsx"],
     rules: { "jsx-a11y/media-has-caption": "off" },
   },
 ]);

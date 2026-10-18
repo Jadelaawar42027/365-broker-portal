@@ -1,11 +1,15 @@
 /**
  * File: apps/web/src/app/app/steps/[stepKey]/page.tsx
- * Purpose: Screen 1c, one onboarding step: what to do, the template download, the upload or answer form, and a side
- * column with "What happens next" and the WhatsApp help button. Sent-back, waiting and finished steps explain their
- * state instead of showing the form.
+ * Purpose: Screen 1c, one onboarding step in the short layout (SPEC D28): videos first, then "What to do" bullets with
+ * the template download, one-line callouts, the manual's text behind "Read the full section", then the upload or
+ * answer form (with the knowledge check, if any), and a side column with "What happens next" and the WhatsApp help
+ * button. Steps without guidance yet show their numbered instructions instead. Sent-back, waiting and finished steps
+ * explain their state instead of showing the form.
  *
  * Functions:
  * - StepPage({ params }): loads the step and renders it.
+ * - StepLinks({ step }): the template download and outside-link buttons.
+ * - hasStepLinks(step): true when the step has a template or outside link to show.
  * - StatusNotice({ step, supportName }): the banner for a sent-back, waiting or finished step.
  * - WhatHappensNext({ step, supportName }): the side card explaining what follows a submission.
  */
@@ -14,6 +18,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StepForm } from "@/components/broker/step-form";
+import { StepVideos } from "@/components/broker/step-videos";
+import { GuidedContent } from "@/components/guidance/guided-content";
 import { buttonClasses } from "@/components/ui/button";
 import { FileLinkButton, TemplateDownloadButton } from "@/components/ui/file-link";
 import { AlertIcon, ArrowLeftIcon, CheckIcon, ClockIcon, DownloadIcon, PlayIcon } from "@/components/ui/icons";
@@ -87,6 +93,32 @@ function WhatHappensNext({ step, supportName }: { step: StepDetailResponse; supp
   );
 }
 
+function hasStepLinks(step: StepDetailResponse): boolean {
+  return Boolean(step.config.templateLink || step.hasTemplateFile || step.config.links?.length);
+}
+
+function StepLinks({ step }: { step: StepDetailResponse }) {
+  if (!hasStepLinks(step)) return null;
+  return (
+    <div className="flex flex-wrap gap-3">
+      {step.config.templateLink ? (
+        <a href={step.config.templateLink.url} target="_blank" rel="noopener noreferrer" className={buttonClasses("brand-outline", "lg")}>
+          <DownloadIcon />
+          {step.config.templateLink.label}
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      ) : null}
+      {step.hasTemplateFile ? <TemplateDownloadButton stepKey={step.key} label={step.config.templateLabel ?? "Download the template"} /> : null}
+      {(step.config.links ?? []).map((link) => (
+        <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className={buttonClasses("brand-outline", "lg")}>
+          {link.label}
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export default async function StepPage({ params }: { params: Promise<{ stepKey: string }> }) {
   const { stepKey } = await params;
   const me: MeResponse = await requireMe();
@@ -117,39 +149,32 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
 
           <StatusNotice step={step} supportName={supportName} />
 
-          <section aria-labelledby="how-title" className="rounded-2xl border border-line bg-white px-6 py-7 sm:px-7">
-            <h2 id="how-title" className="text-xl font-bold">
-              How to do it
-            </h2>
-            <ol className="mt-5 space-y-4">
-              {instructions.map((line, index) => (
-                <li key={line} className="flex gap-4 text-lg leading-relaxed">
-                  <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-base font-bold text-brand">
-                    {index + 1}
-                  </span>
-                  <span className="pt-0.5">{line}</span>
-                </li>
-              ))}
-            </ol>
-            {step.config.templateLink || step.hasTemplateFile || step.config.links?.length ? (
-              <div className="mt-6 flex flex-wrap gap-3">
-                {step.config.templateLink ? (
-                  <a href={step.config.templateLink.url} target="_blank" rel="noopener noreferrer" className={buttonClasses("brand-outline", "lg")}>
-                    <DownloadIcon />
-                    {step.config.templateLink.label}
-                    <span className="sr-only">(opens in a new tab)</span>
-                  </a>
-                ) : null}
-                {step.hasTemplateFile ? <TemplateDownloadButton stepKey={step.key} label={step.config.templateLabel ?? "Download the template"} /> : null}
-                {(step.config.links ?? []).map((link) => (
-                  <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className={buttonClasses("brand-outline", "lg")}>
-                    {link.label}
-                    <span className="sr-only">(opens in a new tab)</span>
-                  </a>
+          <StepVideos stepKey={step.key} videos={step.videos} />
+
+          {step.guidance ? (
+            <GuidedContent todoItems={step.guidance.todoItems} callouts={step.guidance.callouts} fullTextMd={step.guidance.fullTextMd}>
+              {hasStepLinks(step) ? <StepLinks step={step} /> : null}
+            </GuidedContent>
+          ) : (
+            <section aria-labelledby="how-title" className="rounded-2xl border border-line bg-white px-6 py-7 sm:px-7">
+              <h2 id="how-title" className="text-xl font-bold">
+                How to do it
+              </h2>
+              <ol className="mt-5 space-y-4">
+                {instructions.map((line, index) => (
+                  <li key={line} className="flex gap-4 text-lg leading-relaxed">
+                    <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-base font-bold text-brand">
+                      {index + 1}
+                    </span>
+                    <span className="pt-0.5">{line}</span>
+                  </li>
                 ))}
+              </ol>
+              <div className="mt-6">
+                <StepLinks step={step} />
               </div>
-            ) : null}
-          </section>
+            </section>
+          )}
 
           {step.files.length > 0 && !step.canSubmit ? (
             <section aria-labelledby="sent-files" className="rounded-2xl border border-line bg-white px-6 py-6">
@@ -184,7 +209,7 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
         </div>
 
         <aside className="space-y-6" aria-label="Help with this step">
-          {step.videoUrl ? (
+          {step.videoUrl && step.videos.length === 0 ? (
             <a href={step.videoUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-line bg-white">
               <span className="grid h-[170px] place-items-center bg-navy">
                 <span className="grid size-16 place-items-center rounded-full bg-white text-navy">

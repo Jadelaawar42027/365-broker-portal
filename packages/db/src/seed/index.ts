@@ -1,6 +1,7 @@
 /**
  * File: packages/db/src/seed/index.ts
- * Purpose: Seeds a database with the 10 onboarding steps, the owner account, the training chapters from the manual
+ * Purpose: Seeds a database with the 10 onboarding steps (and their short guidance, video slots and knowledge check
+ * while a step has none yet), the owner account, the training chapters from the manual
  * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
  * users and chapters are left alone.
  *
@@ -27,6 +28,7 @@ import type { Database, Transaction } from "../client";
 import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } from "../schema";
 import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
 import { samplePdf, samplePng } from "./sample-files";
+import { seedStepGuidance } from "./step-content";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
 import { seedTraining } from "./training";
 
@@ -43,6 +45,7 @@ export type SeedOptions = {
 export type SeedSummary = {
   stepsInserted: number;
   stepsUpdated: number;
+  stepsGuided: number;
   owner: "created" | "existing" | "skipped";
   trainingChaptersInserted: number;
   sampleBrokers: { email: string; outcome: "created" | "existing" }[];
@@ -75,6 +78,7 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
     const summary: SeedSummary = {
       stepsInserted: 0,
       stepsUpdated: 0,
+      stepsGuided: 0,
       owner: "skipped",
       trainingChaptersInserted: 0,
       sampleBrokers: [],
@@ -83,6 +87,7 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
     const steps = await seedSteps(tx, options.refreshSteps ?? false);
     summary.stepsInserted = steps.inserted;
     summary.stepsUpdated = steps.updated;
+    summary.stepsGuided = await seedStepGuidance(tx);
 
     if (options.training) {
       summary.trainingChaptersInserted = (await seedTraining(tx, { publish: options.training.publish, now })).chaptersInserted;

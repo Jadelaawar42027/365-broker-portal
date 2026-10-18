@@ -22,8 +22,8 @@ describe("account tokens", () => {
 });
 
 describe("VOLUME_ONE_CHAPTERS", () => {
-  it("lists the seven Volume One chapters in manual order", () => {
-    expect(VOLUME_ONE_CHAPTERS.map((chapter) => chapter.code)).toEqual(["0", "01", "02", "03", "04", "05", "06"]);
-    expect(VOLUME_ONE_CHAPTERS[0]?.label).toBe("Part 0 · Start Here");
+  it("lists the one Volume One training chapter (the onboarding modules live in the steps)", () => {
+    expect(VOLUME_ONE_CHAPTERS.map((chapter) => chapter.code)).toEqual(["I"]);
+    expect(VOLUME_ONE_CHAPTERS[0]?.label).toBe("I · How you get paid & measured");
   });
 });

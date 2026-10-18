@@ -1,13 +1,15 @@
 /**
  * File: apps/web/src/lib/video-upload.ts
- * Purpose: Uploads a lesson video (MP4, up to 1 GB) from the browser straight to the bucket in parts: the API starts a
+ * Purpose: Uploads a lesson or onboarding-step video (MP4, up to 1 GB) from the browser straight to the bucket in parts: the API starts a
  * multipart upload and signs one URL per part, the browser PUTs each slice (three at a time) and collects the ETags,
  * then the API completes it. A failed upload is cancelled so no half-file is left behind.
  *
  * Functions:
  * - readVideoDuration(file): the video's length in whole seconds from its metadata, or undefined if unreadable.
  * - partRanges(size, partSize): the byte range of each part, numbered from 1.
- * - uploadLessonVideo(lessonId, file, onProgress): runs the whole upload; resolves when the video is attached.
+ * - uploadVideo(basePath, file, onProgress): runs the whole upload against basePath/uploads (start, complete, abort); resolves when the video is attached.
+ * - uploadLessonVideo(lessonId, file, onProgress): uploads a lesson's video.
+ * - uploadStepVideo(videoId, file, onProgress): uploads the video for one onboarding-step video slot.
  */
 import { ApiError, apiRequest } from "./api-client";
 
@@ -35,9 +37,9 @@ export function partRanges(size: number, partSize: number): { partNumber: number
   return Array.from({ length: count }, (_, index) => ({ partNumber: index + 1, start: index * partSize, end: Math.min(size, (index + 1) * partSize) }));
 }
 
-export async function uploadLessonVideo(lessonId: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
+export async function uploadVideo(basePath: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
   const durationSeconds = await readVideoDuration(file);
-  const start = await apiRequest<StartResponse>(`/v1/admin/training/lessons/${lessonId}/video/uploads`, {
+  const start = await apiRequest<StartResponse>(`${basePath}/uploads`, {
     method: "POST",
     body: { fileName: file.name, contentType: file.type, sizeBytes: file.size, durationSeconds },
   });
@@ -63,12 +65,20 @@ export async function uploadLessonVideo(lessonId: string, file: File, onProgress
 
   try {
     await Promise.all(Array.from({ length: Math.min(PARALLEL_PARTS, ranges.length) }, worker));
-    await apiRequest(`/v1/admin/training/lessons/${lessonId}/video/uploads/complete`, {
+    await apiRequest(`${basePath}/uploads/complete`, {
       method: "POST",
       body: { uploadId: start.uploadId, storageKey: start.storageKey, fileName: file.name, durationSeconds, parts: etags.sort((a, b) => a.partNumber - b.partNumber) },
     });
   } catch (caught) {
-    await apiRequest(`/v1/admin/training/lessons/${lessonId}/video/uploads/abort`, { method: "POST", body: { uploadId: start.uploadId, storageKey: start.storageKey } }).catch(() => null);
+    await apiRequest(`${basePath}/uploads/abort`, { method: "POST", body: { uploadId: start.uploadId, storageKey: start.storageKey } }).catch(() => null);
     throw caught;
   }
+}
+
+export function uploadLessonVideo(lessonId: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
+  return uploadVideo(`/v1/admin/training/lessons/${lessonId}/video`, file, onProgress);
+}
+
+export function uploadStepVideo(videoId: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
+  return uploadVideo(`/v1/admin/step-videos/${videoId}`, file, onProgress);
 }

@@ -16,7 +16,10 @@ import {
   STEP_STAGES,
   STEP_STATUSES,
   USER_ROLES,
+  VIDEO_PROVIDERS,
+  VIDEO_SOURCES,
 } from "./constants";
+import { guidanceViewSchema } from "./guidance";
 import { emailSchema, isoDateSchema, passwordSchema, stepConfigSchema } from "./schemas";
 
 const timestampSchema = z.string().describe("ISO 8601 timestamp");
@@ -128,9 +131,29 @@ export type FileView = z.infer<typeof fileViewSchema>;
 
 export const brokerStepConfigSchema = stepConfigSchema.omit({ reviewChecklist: true });
 
+export const stepVideoViewSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  source: z.enum(VIDEO_SOURCES).nullable(),
+  provider: z.enum(VIDEO_PROVIDERS).nullable(),
+  embedUrl: z.string().nullable(),
+  playUrl: z.string().nullable(),
+});
+export type StepVideoView = z.infer<typeof stepVideoViewSchema>;
+
+export const stepCheckQuestionViewSchema = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  options: z.array(z.object({ id: z.string(), label: z.string() })),
+});
+export type StepCheckQuestionView = z.infer<typeof stepCheckQuestionViewSchema>;
+
 export const stepDetailResponseSchema = stepSummarySchema.extend({
   intro: z.string(),
   instructionsMd: z.string(),
+  guidance: guidanceViewSchema.nullable(),
+  videos: z.array(stepVideoViewSchema),
+  checkQuestions: z.array(stepCheckQuestionViewSchema),
   videoUrl: z.string().nullable(),
   acceptedTypes: z.array(z.string()),
   maxSizeBytes: z.number().int(),
@@ -170,6 +193,7 @@ export const submittedFileSchema = z.object({
 export const submitStepRequestSchema = z.object({
   formData: z.record(z.string(), z.unknown()).optional(),
   files: z.array(submittedFileSchema).max(MAX_FILES_PER_SUBMISSION).optional(),
+  checkAnswers: z.record(z.string(), z.string()).optional().describe("Knowledge check: question id to chosen option id"),
 });
 export type SubmitStepRequest = z.infer<typeof submitStepRequestSchema>;
 
@@ -177,6 +201,10 @@ export const submitStepResponseSchema = z.object({
   status: z.enum(STEP_STATUSES),
   onboardingComplete: z.boolean(),
 });
+
+export const stepCheckRequestSchema = z.object({ questionId: z.uuid(), optionId: z.uuid() });
+export const stepCheckResponseSchema = z.object({ correct: z.boolean(), explanation: z.string() });
+export type StepCheckResponse = z.infer<typeof stepCheckResponseSchema>;
 
 export const downloadUrlResponseSchema = z.object({ url: z.string(), expiresAt: timestampSchema });
 export type DownloadUrlResponse = z.infer<typeof downloadUrlResponseSchema>;

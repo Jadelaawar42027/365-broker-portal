@@ -16,6 +16,7 @@ import {
   VIDEO_PROVIDERS,
   VIDEO_SOURCES,
 } from "./constants";
+import { calloutsSchema, guidanceCalloutSchema, todoItemsSchema } from "./guidance";
 
 const nullableTimestamp = z.string().nullable();
 const chapterStateSchema = z.enum(["passed", "in_progress", "available", "locked"]);
@@ -99,6 +100,8 @@ export const trainingLessonResponseSchema = z.object({
   title: z.string(),
   readMinutes: z.number().int(),
   bodyMd: z.string(),
+  todoItems: z.array(z.string()),
+  callouts: z.array(guidanceCalloutSchema),
   kind: lessonKindSchema,
   video: lessonVideoViewSchema.nullable(),
   videoPlaceholder: z.boolean(),
@@ -206,6 +209,8 @@ export const adminLessonSchema = z.object({
   position: z.number().int(),
   title: z.string(),
   bodyMd: z.string(),
+  todoItems: z.array(z.string()),
+  callouts: z.array(guidanceCalloutSchema),
   readMinutes: z.number().int(),
   adminNote: z.string().nullable(),
   videoPlaceholder: z.boolean(),
@@ -243,6 +248,8 @@ export type AdminChapterDetailResponse = z.infer<typeof adminChapterDetailRespon
 export const lessonFieldsSchema = z.object({
   title: z.string().trim().min(2).max(120),
   bodyMd: z.string().max(40000).optional(),
+  todoItems: todoItemsSchema.optional(),
+  callouts: calloutsSchema.optional(),
   readMinutes: z.number().int().min(1).max(60).optional(),
   adminNote: z.string().trim().max(1000).nullable().optional(),
   videoPlaceholder: z.boolean().optional(),

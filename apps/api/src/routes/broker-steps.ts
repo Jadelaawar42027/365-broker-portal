@@ -1,10 +1,13 @@
 /**
  * File: apps/api/src/routes/broker-steps.ts
- * Purpose: The routes a broker uses for their own onboarding (screens 1b and 1c): the checklist, one step's detail,
- * the template download, getting an upload target, and submitting a step. A broker can only ever reach their own steps.
+ * Purpose: The routes a broker uses for their own onboarding (screens 1b and 1c): the checklist, one step's detail
+ * (with its short guidance, video slots and knowledge-check questions, never their answers), the template download, a
+ * fresh play link for an uploaded step video, checking one knowledge-check answer, getting an upload target, and
+ * submitting a step (refused until every knowledge-check answer is correct, SPEC D28). A broker can only ever reach
+ * their own steps.
  *
  * Functions:
- * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, POST /v1/me/steps/:key/upload-url and POST /v1/me/steps/:key/submit.
+ * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url and POST /v1/me/steps/:key/submit.
  * - requireOwnStep(app, brokerId, key): loads the broker's own step by key or throws 404.
  * - notifyOnboardingComplete(app, log, brokerId): emails the broker and every admin that onboarding is complete.
  */
@@ -17,7 +20,10 @@ import {
   findSentBackSteps,
   formDataSchemaForStep,
   isOnboardingComplete,
+  isStepCheckPassed,
   myStepsResponseSchema,
+  stepCheckRequestSchema,
+  stepCheckResponseSchema,
   stepDetailResponseSchema,
   submitStepRequestSchema,
   submitStepResponseSchema,
@@ -45,10 +51,12 @@ import {
   toStepSummary,
   type VerifiedFile,
 } from "../services/steps";
+import { loadStepQuestions, loadStepVideos, STEP_VIDEO_URL_TTL_SECONDS, toBrokerCheckQuestion, toBrokerStepVideo, toGuidanceView } from "../services/step-content";
 import { adminEmails, todayFor, webLink } from "../services/support";
 import { assertUploadAllowed, createUploadTarget, verifySubmittedFiles } from "../services/uploads";
 
 const keyParams = z.object({ key: z.string().min(1).max(60) });
+const videoParams = keyParams.extend({ videoId: z.uuid() });
 const DOWNLOAD_TTL_SECONDS = 5 * 60;
 
 async function requireOwnStep(app: FastifyInstance, brokerId: string, key: string) {
@@ -129,10 +137,15 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       const next = findNextStep(rows);
       const files = latestVersionFiles(await loadFiles(app.deps.db, [row.brokerStepId]));
       const { reviewChecklist: _internal, ...config } = row.config;
+      const videos = await loadStepVideos(app.deps.db, row.stepId);
+      const questions = await loadStepQuestions(app.deps.db, row.stepId);
       return {
         ...toStepSummary(row, next?.key ?? null),
         intro: row.intro,
         instructionsMd: row.instructionsMd,
+        guidance: toGuidanceView(row),
+        videos: await Promise.all(videos.map((video) => toBrokerStepVideo(app.deps, video))),
+        checkQuestions: questions.map(toBrokerCheckQuestion),
         videoUrl: row.videoUrl,
         acceptedTypes: row.acceptedTypes,
         maxSizeBytes: row.maxSizeBytes,
@@ -166,6 +179,49 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       const fileName = row.templateFileKey.split("/").pop() ?? "template.pdf";
       const url = await app.deps.storage.presignGet({ key: row.templateFileKey, fileName, expiresInSeconds: DOWNLOAD_TTL_SECONDS });
       return { url, expiresAt: new Date(app.deps.now().getTime() + DOWNLOAD_TTL_SECONDS * 1000).toISOString() };
+    },
+  );
+
+  r.get(
+    "/v1/me/steps/:key/videos/:videoId/url",
+    {
+      preHandler: requireBroker,
+      schema: {
+        tags: ["broker", "files"],
+        summary: "A fresh 5-minute play link for one of the step's uploaded videos",
+        params: videoParams,
+        response: { 200: downloadUrlResponseSchema, 404: errorResponseSchema, ...brokerErrors },
+      },
+    },
+    async (request) => {
+      const actor = currentActor(request);
+      const row = await requireOwnStep(app, actor.brokerId!, request.params.key);
+      const video = (await loadStepVideos(app.deps.db, row.stepId)).find((candidate) => candidate.id === request.params.videoId);
+      if (!video || video.source !== "upload") throw notFound("That video doesn't exist.");
+      const { playUrl } = await toBrokerStepVideo(app.deps, video);
+      return { url: playUrl!, expiresAt: new Date(app.deps.now().getTime() + STEP_VIDEO_URL_TTL_SECONDS * 1000).toISOString() };
+    },
+  );
+
+  r.post(
+    "/v1/me/steps/:key/check",
+    {
+      preHandler: requireBroker,
+      schema: {
+        tags: ["broker"],
+        summary: "Check one knowledge-check answer; returns whether it is right and the explanation",
+        params: keyParams,
+        body: stepCheckRequestSchema,
+        response: { 200: stepCheckResponseSchema, 404: errorResponseSchema, ...brokerErrors },
+      },
+    },
+    async (request) => {
+      const actor = currentActor(request);
+      const row = await requireOwnStep(app, actor.brokerId!, request.params.key);
+      const question = (await loadStepQuestions(app.deps.db, row.stepId)).find((candidate) => candidate.id === request.body.questionId);
+      const option = question?.options.find((candidate) => candidate.id === request.body.optionId);
+      if (!question || !option) throw notFound("That question isn't part of this step.");
+      return { correct: option.isCorrect, explanation: question.explanation };
     },
   );
 
@@ -215,6 +271,10 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       const row = await requireOwnStep(app, actor.brokerId!, request.params.key);
       if (row.kind === "admin") {
         throw conflict("Your Sales Executive marks this step done after your one-on-one.", "admin_only_step");
+      }
+      const questions = await loadStepQuestions(app.deps.db, row.stepId);
+      if (questions.length > 0 && !isStepCheckPassed(questions, request.body.checkAnswers)) {
+        throw conflict("Answer the quick check correctly before you send this step.", "check_not_passed");
       }
       let formData: Record<string, unknown> | undefined;
       let verifiedFiles: VerifiedFile[] | undefined;

@@ -2,12 +2,12 @@
  * File: packages/db/src/schema/portal.ts
  * Purpose: The portal's own tables: brokers (with their two commission splits, the broker's percentage on in-house
  * leads and on self-generated deals), account tokens (invites and resets, SPEC D8), the onboarding step
- * template, each broker's progress rows, uploaded files (never overwritten) and the audit log.
+ * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten) and the audit log.
  *
  * Functions:
  * - none
  */
-import type { StepConfig } from "@bp/shared";
+import type { GuidanceCallout, StepConfig } from "@bp/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -110,6 +110,9 @@ export const onboardingSteps = pgTable("onboarding_steps", {
   acceptedTypes: text("accepted_types").array().notNull().default(sql`ARRAY[]::text[]`),
   maxSizeBytes: integer("max_size_bytes").notNull().default(10 * 1024 * 1024),
   config: jsonb("config").$type<StepConfig>().notNull().default({}),
+  todoItems: text("todo_items").array(),
+  callouts: jsonb("callouts").$type<GuidanceCallout[]>(),
+  fullTextMd: text("full_text_md"),
   active: boolean("active").notNull().default(true),
   createdAt,
   updatedAt,

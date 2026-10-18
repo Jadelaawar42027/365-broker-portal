@@ -12,9 +12,10 @@
  * - acceptInvite(page, email, password): opens the invite link from the outbox and creates the account.
  * - createSignedInBroker(browser, name): uses a separate admin session to invite a broker, then accepts the invite in a new context; returns that broker's page and email.
  * - testFile(name): a small PDF or PNG payload for setInputFiles.
- * - uploadStep(page, stepKey, fileName): opens a step, uploads one file and sends it.
+ * - passQuickCheck(page, answer): answers a step's knowledge check correctly and waits for "That's right."
+ * - uploadStep(page, stepKey, fileName, checkAnswer): opens a step, uploads one file, passes its knowledge check if one is given, and sends it.
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
- * - completeBrokerSteps(page): does all 10 steps a broker does themselves.
+ * - completeBrokerSteps(page): does all 10 steps a broker does themselves (passing step 8's deposit check).
  */
 import { expect, type Browser, type Page } from "@playwright/test";
 import fs from "node:fs";
@@ -102,10 +103,20 @@ export function testFile(name: string) {
   return { name, mimeType: isPng ? "image/png" : "application/pdf", buffer };
 }
 
-export async function uploadStep(page: Page, stepKey: string, fileName: string): Promise<void> {
+export const DEPOSIT_ANSWER = "The brokerage escrow account, by wire";
+
+export async function passQuickCheck(page: Page, answer: string): Promise<void> {
+  const check = page.getByRole("region", { name: "Quick check" });
+  await check.getByRole("radio", { name: answer }).check();
+  await check.getByRole("button", { name: "Check my answer" }).click();
+  await expect(check.getByText("That's right.")).toBeVisible();
+}
+
+export async function uploadStep(page: Page, stepKey: string, fileName: string, checkAnswer?: string): Promise<void> {
   await page.goto(`/app/steps/${stepKey}`);
   await page.getByLabel("Choose files to upload").setInputFiles(testFile(fileName));
   await expect(page.getByText(/Uploaded ·/)).toBeVisible();
+  if (checkAnswer) await passQuickCheck(page, checkAnswer);
   await page.getByRole("button", { name: /Send to Shelly for approval/ }).click();
   await page.waitForURL("**/app");
 }
@@ -125,7 +136,7 @@ export async function completeBrokerSteps(page: Page): Promise<void> {
   await uploadStep(page, "w9", "w9.pdf");
   await answerStep(page, "license_situation", (p) => p.getByLabel(/I hold a Florida yacht & ship license/).check());
   await uploadStep(page, "dbpr_filing", "dbpr-confirmation.pdf");
-  await uploadStep(page, "license_bond", "license-and-bond.pdf");
+  await uploadStep(page, "license_bond", "license-and-bond.pdf", DEPOSIT_ANSWER);
   await answerStep(page, "email_signature", (p) => p.getByLabel(/activated my 365 email/).check());
   await answerStep(page, "platform_logins", async (p) => {
     await p.getByLabel(/BoatWizard/).check();

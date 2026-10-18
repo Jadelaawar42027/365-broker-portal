@@ -173,7 +173,7 @@ export default async function TrainingPage() {
             ))}
           </ol>
         ) : (
-          <p className="rounded-2xl border border-line bg-white px-6 py-6 text-lg text-muted">The first chapters are being written. We&apos;ll email you when Part 0 is ready.</p>
+          <p className="rounded-2xl border border-line bg-white px-6 py-6 text-lg text-muted">The first chapters are being written. We&apos;ll email you when the first chapter is ready.</p>
         )}
       </section>
 

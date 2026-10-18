@@ -1,8 +1,9 @@
 /**
  * File: packages/db/test/training-seed.int.test.ts
  * Purpose: Integration tests for the training seed on real Postgres containers: production seeds Volume One as drafts
- * and Volume Two as coming soon, development seeds Volume One live, lessons and questions arrive with their options,
- * and running the seed again never adds duplicates or overwrites an admin's edits.
+ * and Volume Two as coming soon, development seeds Volume One live, the one Volume One chapter (How you get paid &
+ * measured, 80% pass mark) arrives with its short-layout lessons and questions with their options, and running the
+ * seed again never adds duplicates or overwrites an admin's edits.
  *
  * Functions:
  * - chapterRows(db): every chapter's code, volume, status and title, by position.
@@ -54,21 +55,22 @@ describe("training seed", () => {
     expect(lessonCount!.value).toBe(expectedLessons);
     expect(questionCount!.value).toBe(expectedQuestions);
     expect(correctCount!.value).toBe(expectedQuestions);
-    const [placeholder] = await production.db.select().from(lessons).where(eq(lessons.title, "GoHighLevel CRM walkthrough"));
-    expect(placeholder!.videoPlaceholder).toBe(true);
-    const flagged = await production.db.select({ note: questions.adminNote }).from(questions);
-    expect(flagged.some((row) => /verify before publishing/i.test(row.note ?? ""))).toBe(true);
+    const guided = await production.db.select({ todoItems: lessons.todoItems, callouts: lessons.callouts, adminNote: lessons.adminNote }).from(lessons);
+    for (const row of guided) expect(row.todoItems?.length).toBeGreaterThanOrEqual(3);
+    expect(guided.some((row) => /verify before publishing/i.test(row.adminNote ?? ""))).toBe(true);
+    const [chapter] = await production.db.select().from(chapters).where(eq(chapters.code, "I"));
+    expect(chapter).toMatchObject({ title: "How you get paid & measured", passMark: 80, position: 0, volume: 1 });
     const readMinutes = await production.db.select({ value: lessons.readMinutes }).from(lessons);
     for (const row of readMinutes) expect(row.value).toBeGreaterThanOrEqual(2);
   });
 
   it("leaves existing chapters alone when run again", async () => {
-    await production.db.update(chapters).set({ title: "Start Here (edited by Shelly)" }).where(eq(chapters.code, "0"));
+    await production.db.update(chapters).set({ title: "Paid & measured (edited by Shelly)" }).where(eq(chapters.code, "I"));
     const summary = await seedDatabase(production.db, { training: { publish: true }, now: NOW });
     expect(summary.trainingChaptersInserted).toBe(0);
     const rows = await chapterRows(production.db);
     expect(rows).toHaveLength(TRAINING_SEED_CHAPTERS.length);
-    expect(rows[0]!.title).toBe("Start Here (edited by Shelly)");
+    expect(rows[0]!.title).toBe("Paid & measured (edited by Shelly)");
     expect(rows.filter((row) => row.volume === 1).every((row) => row.status === "draft")).toBe(true);
     const [lessonCount] = await production.db.select({ value: count() }).from(lessons);
     expect(lessonCount!.value).toBe(TRAINING_SEED_CHAPTERS.reduce((sum, chapter) => sum + chapter.lessons.length, 0));

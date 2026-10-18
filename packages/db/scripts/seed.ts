@@ -32,7 +32,7 @@ function readOwner(env: NodeJS.ProcessEnv) {
 }
 
 function printSummary(summary: SeedSummary, samplePassword: string | null): void {
-  console.log(`Onboarding steps: ${summary.stepsInserted} added, ${summary.stepsUpdated} refreshed.`);
+  console.log(`Onboarding steps: ${summary.stepsInserted} added, ${summary.stepsUpdated} refreshed, ${summary.stepsGuided} given their guidance.`);
   console.log(`Owner account: ${summary.owner}.`);
   console.log(`Training chapters added: ${summary.trainingChaptersInserted}.`);
   for (const sample of summary.sampleBrokers) {

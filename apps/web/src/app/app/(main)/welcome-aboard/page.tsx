@@ -2,7 +2,8 @@
  * File: apps/web/src/app/app/(main)/welcome-aboard/page.tsx
  * Purpose: Screen 1d, "You're officially a 365 broker": shown once when every step is approved, with the broker's
  * level, commission splits (in-house leads and self-generated deals) and onboarding date, a "Start training" button once chapters are published (a disabled
- * "Training coming soon" before that, SPEC D6) and the first-90-days plan from the manual. Brokers who aren't active yet are sent back to their checklist.
+ * "Training coming soon" before that, SPEC D6), the short Part 0 welcome to the 365 Standard (SPEC D28) and the
+ * first-90-days plan from the manual. Brokers who aren't active yet are sent back to their checklist.
  *
  * Functions:
  * - WelcomeAboardPage(): renders the screen and records that it was seen.
@@ -11,9 +12,10 @@ import type { TrainingHomeResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MarkWelcomeSeen } from "@/components/broker/mark-welcome-seen";
+import { GuidedContent } from "@/components/guidance/guided-content";
 import { LinkButton } from "@/components/ui/button";
 import { ArrowRightIcon, CheckIcon, LockIcon } from "@/components/ui/icons";
-import { FIRST_90_DAYS } from "@/lib/content";
+import { FIRST_90_DAYS, WELCOME_STANDARD } from "@/lib/content";
 import { formatDate } from "@/lib/format";
 import { requireMe, serverGet } from "@/lib/server-api";
 
@@ -43,8 +45,8 @@ export default async function WelcomeAboardPage() {
         <h1 className="mt-7 text-[40px] leading-[1.1] font-extrabold tracking-tight sm:text-[48px]">You&apos;re officially a 365 broker.</h1>
         <p className="mx-auto mt-5 max-w-[36rem] text-xl leading-relaxed text-[#dfe6f1]">
           {trainingReady
-            ? "All your onboarding steps are approved. Training is open — start with Part 0."
-            : "All your onboarding steps are approved. Training opens soon — we\u2019ll email you when Part 0 is ready."}
+            ? "All your onboarding steps are approved. Training is open — start with How you get paid & measured."
+            : "All your onboarding steps are approved. Training opens soon — we\u2019ll email you when the first chapter is ready."}
         </p>
         <ul className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center" aria-label="Your details">
           {facts.map((fact) => (
@@ -68,6 +70,16 @@ export default async function WelcomeAboardPage() {
             Training coming soon
           </button>
         )}
+      </section>
+
+      <section aria-labelledby="standard-title" className="mt-12 space-y-4">
+        <div>
+          <h2 id="standard-title" className="text-[28px] font-extrabold tracking-tight">
+            The 365 Standard
+          </h2>
+          <p className="mt-2 max-w-[44rem] text-xl leading-relaxed text-muted">{WELCOME_STANDARD.lede}</p>
+        </div>
+        <GuidedContent todoItems={WELCOME_STANDARD.todoItems} callouts={WELCOME_STANDARD.callouts} fullTextMd={WELCOME_STANDARD.fullTextMd} />
       </section>
 
       <section aria-labelledby="ninety-days" className="mt-12">

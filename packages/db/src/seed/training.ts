@@ -3,6 +3,7 @@
  * Purpose: Seeds the training chapters from the manual (training-content.ts). Additive only: a chapter whose code
  * already exists is left exactly as it is, so admin edits and broker progress are never touched. Volume One chapters
  * start as drafts (production) or live (development, so the screens can be tried); Volume Two parts are "coming soon".
+ * Lessons carry their What to do bullets and callouts (SPEC D28).
  *
  * Functions:
  * - seedTraining(tx, options): inserts every missing chapter with its lessons, questions and options; returns how many chapters were added.
@@ -31,6 +32,7 @@ async function insertChapter(tx: Transaction, chapter: TrainingSeedChapter, posi
       summary: chapter.summary,
       position,
       scheduleLabel: chapter.scheduleLabel ?? null,
+      ...(chapter.passMark ? { passMark: chapter.passMark } : {}),
       status,
       publishedAt: status === "live" ? now : null,
     })
@@ -41,9 +43,11 @@ async function insertChapter(tx: Transaction, chapter: TrainingSeedChapter, posi
       .insert(lessons)
       .values({
         chapterId: row!.id,
-        position: index,
+        position: index + 1,
         title: lesson.title,
         bodyMd: lesson.bodyMd,
+        todoItems: lesson.todoItems ?? null,
+        callouts: lesson.callouts ?? null,
         readMinutes: lesson.videoPlaceholder ? MIN_READ_MINUTES : lessonReadMinutes(lesson.bodyMd),
         adminNote: lesson.adminNote ?? null,
         videoPlaceholder: lesson.videoPlaceholder ?? false,
@@ -57,7 +61,7 @@ async function insertChapter(tx: Transaction, chapter: TrainingSeedChapter, posi
       .values({
         chapterId: row!.id,
         lessonId: lessonIds[question.lesson] ?? null,
-        position: index,
+        position: index + 1,
         prompt: question.prompt,
         explanation: question.explanation,
         adminNote: question.adminNote ?? null,

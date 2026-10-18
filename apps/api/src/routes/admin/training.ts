@@ -261,6 +261,8 @@ export function registerAdminTrainingRoutes(app: FastifyInstance): void {
           position: lesson.position,
           title: lesson.title,
           bodyMd: lesson.bodyMd,
+          todoItems: lesson.todoItems ?? [],
+          callouts: lesson.callouts ?? [],
           readMinutes: lesson.readMinutes,
           adminNote: lesson.adminNote,
           videoPlaceholder: lesson.videoPlaceholder,

@@ -1,7 +1,9 @@
 /**
  * File: apps/web/src/app/app/training/lessons/[id]/page.tsx
  * Purpose: Screen 2b, one lesson: a focused header (All chapters, chapter name), the chapter's lesson list with the
- * quiz at the bottom, and the lesson card with its video, text, callouts and the buttons to move on.
+ * quiz at the bottom, and the lesson card with its video, then either the short layout (What to do bullets, one-line
+ * callouts, the manual's text behind "Read the full section", SPEC D28) or, for lessons without bullets, the full text,
+ * and the buttons to move on.
  *
  * Functions:
  * - LessonPage({ params }): loads the lesson and renders the screen.
@@ -11,6 +13,7 @@ import type { TrainingLessonResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { GuidedContent } from "@/components/guidance/guided-content";
 import { LessonBody } from "@/components/training/lesson-body";
 import { LessonView } from "@/components/training/lesson-view";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, LockIcon } from "@/components/ui/icons";
@@ -87,7 +90,11 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
             </h1>
           </div>
           <LessonView lesson={lesson}>
-            <LessonBody markdown={lesson.bodyMd} />
+            {lesson.todoItems.length ? (
+              <GuidedContent todoItems={lesson.todoItems} callouts={lesson.callouts} fullTextMd={lesson.bodyMd} inCard />
+            ) : (
+              <LessonBody markdown={lesson.bodyMd} />
+            )}
           </LessonView>
         </article>
       </main>

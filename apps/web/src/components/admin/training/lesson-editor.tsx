@@ -1,6 +1,7 @@
 /**
  * File: apps/web/src/components/admin/training/lesson-editor.tsx
- * Purpose: The lesson editor on screen 3e: title, read time, the lesson text with buttons that insert the manual's
+ * Purpose: The lesson editor on screen 3e: title, read time, the What to do bullets and one-line callouts of the short
+ * layout (SPEC D28), the lesson text (the full section) with buttons that insert the manual's
  * callouts (WATCH, NEVER, HOUSE RULE, EDGE, FIELD NOTE) and tables, a live preview exactly as brokers see it, an
  * admin-only note, the "waiting for a video" flag, saving and deleting.
  *
@@ -18,6 +19,7 @@ import { LessonBody } from "@/components/training/lesson-body";
 import { Button } from "@/components/ui/button";
 import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest } from "@/lib/api-client";
+import { GuidanceFields, readGuidanceFields } from "../guidance-fields";
 import { useAction } from "./use-action";
 
 const TABLE_SNIPPET = "| | Column A | Column B |\n|---|---|---|\n| Row | Value | Value |";
@@ -49,12 +51,14 @@ export function LessonEditor({ chapterId, chapterLive, lesson }: { chapterId: st
     const form = new FormData(event.currentTarget);
     const minutes = Number(form.get("readMinutes"));
     const note = String(form.get("adminNote") ?? "").trim();
+    const guidance = readGuidanceFields(form);
     const done = await run(() =>
       apiRequest(`/v1/admin/training/lessons/${lesson.id}`, {
         method: "PATCH",
         body: {
           title: String(form.get("title") ?? "").trim(),
           bodyMd: body,
+          ...guidance,
           readMinutes: minutes > 0 ? minutes : estimate,
           adminNote: note || null,
           videoPlaceholder: form.get("videoPlaceholder") === "on",
@@ -86,9 +90,11 @@ export function LessonEditor({ chapterId, chapterLive, lesson }: { chapterId: st
         </div>
       </div>
 
+      <GuidanceFields idPrefix="lesson" todoItems={lesson.todoItems} callouts={lesson.callouts} />
+
       <div className="grid gap-5 2xl:grid-cols-2">
         <div className="min-w-0">
-          <FieldLabel htmlFor="lesson-body">Lesson text</FieldLabel>
+          <FieldLabel htmlFor="lesson-body">{lesson.todoItems.length ? "Full section · the manual's original text" : "Lesson text"}</FieldLabel>
           <div role="toolbar" aria-label="Insert" className="mb-2 flex flex-wrap gap-2">
             {CALLOUT_KINDS.map((kind) => (
               <button key={kind} type="button" onClick={() => insert(`> [!${kind}]\n> `)} className="min-h-11 rounded-lg border border-line bg-white px-3 text-[14px] font-bold tracking-wide hover:bg-page">
@@ -111,7 +117,7 @@ export function LessonEditor({ chapterId, chapterLive, lesson }: { chapterId: st
             aria-describedby="lesson-body-help"
           />
           <p id="lesson-body-help" className="mt-2 text-[15px] text-muted">
-            Blank line between paragraphs. <strong>**bold**</strong>, <em>*italic*</em>, “## Heading”, “- list”. Callouts start with “&gt; [!WATCH]” and every line of them with “&gt; ”. About {estimate} min to read.
+            With What to do bullets, brokers see this behind “Read the full section”; without them, it is the whole lesson. Blank line between paragraphs. <strong>**bold**</strong>, <em>*italic*</em>, “## Heading”, “- list”. Callouts start with “&gt; [!WATCH]” and every line of them with “&gt; ”. About {estimate} min to read.
           </p>
         </div>
         <div className="min-w-0">

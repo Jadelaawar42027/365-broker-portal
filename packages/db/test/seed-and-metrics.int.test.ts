@@ -145,6 +145,7 @@ describe("seed", () => {
     expect(again).toEqual({
       stepsInserted: 0,
       stepsUpdated: 0,
+      stepsGuided: 0,
       owner: "existing",
       trainingChaptersInserted: 0,
       sampleBrokers: [

@@ -1,6 +1,7 @@
 /**
  * File: packages/db/src/schema/training.ts
- * Purpose: Training tables (phase G): chapters (Volume One parts and modules, Volume Two as coming-soon), lessons, an
+ * Purpose: Training tables (phase G): chapters (Volume One parts and modules, Volume Two as coming-soon), lessons (with
+ * optional What to do bullets and callouts above the full text, SPEC D28), an
  * optional video per lesson (uploaded to the bucket or embedded from YouTube, Loom or Vimeo), each broker's lesson
  * progress and watched seconds, the question bank with options, and quiz attempts with their answers. All additive.
  *
@@ -8,7 +9,7 @@
  * - none
  */
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import {
   CHAPTER_STATUSES,
   DEFAULT_PASS_MARK,
@@ -18,6 +19,7 @@ import {
   RETAKE_POLICIES,
   VIDEO_PROVIDERS,
   VIDEO_SOURCES,
+  type GuidanceCallout,
 } from "@bp/shared";
 import { users } from "./auth";
 import { brokers } from "./portal";
@@ -70,6 +72,8 @@ export const lessons = pgTable(
     position: integer("position").notNull(),
     title: text("title").notNull(),
     bodyMd: text("body_md").notNull().default(""),
+    todoItems: text("todo_items").array(),
+    callouts: jsonb("callouts").$type<GuidanceCallout[]>(),
     readMinutes: integer("read_minutes").notNull().default(2),
     adminNote: text("admin_note"),
     videoPlaceholder: boolean("video_placeholder").notNull().default(false),

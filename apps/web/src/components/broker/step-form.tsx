@@ -2,10 +2,12 @@
  * File: apps/web/src/components/broker/step-form.tsx
  * Purpose: The interactive part of a step page (screen 1c). Upload steps get the drop zone, "Choose a file",
  * "Take a photo", the uploaded-file cards and "Send to Shelly for approval"; other steps get the matching answer
- * (bio text, a choice, a confirmation or a checklist). Submitting returns the broker to their checklist.
+ * (bio text, a choice, a confirmation or a checklist). When the step has a knowledge check (SPEC D28), the send
+ * button stays disabled until every check answer is right, and those answers go with the submission. Submitting
+ * returns the broker to their checklist.
  *
  * Functions:
- * - StepForm({ step, supportName }): renders the right form for the step kind and sends it.
+ * - StepForm({ step, supportName }): renders the right form for the step kind, the knowledge check if any, and sends it.
  * - UploadArea({ step, files, setFiles }): the drop zone and file cards; uploads each picked file straight away.
  * - AnswerFields({ step, answer, setAnswer }): the text, choice, confirm or checklist inputs.
  * - initialAnswer(step): the starting answer, pre-filled from a previous submission.
@@ -20,6 +22,7 @@ import { FormMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
 import { CheckIcon, UploadIcon } from "@/components/ui/icons";
 import { apiRequest, ApiError, uploadToTarget } from "@/lib/api-client";
+import { StepCheck } from "./step-check";
 import { checkFileBeforeUpload, describeAcceptedTypes } from "@/lib/steps";
 
 type PickedFile = {
@@ -60,6 +63,8 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
   const [answer, setAnswer] = useState<Answer>(() => initialAnswer(step));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checkAnswers, setCheckAnswers] = useState<Record<string, string>>({});
+  const checkPassed = step.checkQuestions.every((question) => checkAnswers[question.id]);
 
   const uploaded = files.filter((file) => file.state === "uploaded");
   const uploading = files.some((file) => file.state === "uploading");
@@ -82,8 +87,8 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
         method: "POST",
         body:
           step.kind === "upload"
-            ? { files: uploaded.map((file) => ({ storageKey: file.storageKey!, fileName: file.name })) }
-            : { formData: buildFormData(step, answer) },
+            ? { files: uploaded.map((file) => ({ storageKey: file.storageKey!, fileName: file.name })), ...(step.checkQuestions.length ? { checkAnswers } : {}) }
+            : { formData: buildFormData(step, answer), ...(step.checkQuestions.length ? { checkAnswers } : {}) },
       });
       router.push("/app");
       router.refresh();
@@ -102,8 +107,16 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
       ) : (
         <AnswerFields step={step} answer={answer} setAnswer={setAnswer} />
       )}
+      {step.checkQuestions.length ? (
+        <StepCheck
+          stepKey={step.key}
+          questions={step.checkQuestions}
+          answers={checkAnswers}
+          onCorrect={(questionId, optionId) => setCheckAnswers((current) => ({ ...current, [questionId]: optionId }))}
+        />
+      ) : null}
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
-      <Button size="xl" className="w-full" disabled={!ready || busy} onClick={send}>
+      <Button size="xl" className="w-full" disabled={!ready || !checkPassed || busy} onClick={send}>
         {busy ? "Sending…" : label}
       </Button>
     </div>
