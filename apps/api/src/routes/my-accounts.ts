@@ -69,6 +69,7 @@ export function registerMyAccountRoutes(app: FastifyInstance): void {
       const state = await loadMyGoogleState(app, actor.brokerId!);
       reply.header("cache-control", "no-store");
       return {
+        googleConfigured: Boolean(app.deps.integrations.google),
         corporateEmail: state.ready ? state.broker.corporateEmail : null,
         googleReady: state.ready,
         revealsLeft: state.revealsLeft,

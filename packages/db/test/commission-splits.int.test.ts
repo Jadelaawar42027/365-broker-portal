@@ -64,7 +64,7 @@ describe("commission splits", () => {
 describe("migration 0005: retire step 11", () => {
   it("marks the old commission step inactive, keeps its rows, and leaves it out of the totals", async () => {
     const [before] = await testDb.db.select().from(brokerMetrics).where(eq(brokerMetrics.brokerId, brokerId));
-    expect(before?.stepsTotal).toBe(11);
+    expect(before?.stepsTotal).toBe(12);
 
     await runRetireMigration();
 
@@ -76,7 +76,7 @@ describe("migration 0005: retire step 11", () => {
       .where(and(eq(brokerSteps.brokerId, brokerId), eq(brokerSteps.stepId, step!.id)));
     expect(kept).toHaveLength(1);
     const [after] = await testDb.db.select().from(brokerMetrics).where(eq(brokerMetrics.brokerId, brokerId));
-    expect(after?.stepsTotal).toBe(10);
+    expect(after?.stepsTotal).toBe(11);
     const audits = await testDb.db.select().from(auditLog).where(eq(auditLog.entityId, step!.id));
     expect(audits).toMatchObject([{ action: "step.retired", actorUserId: null, before: { active: true }, after: { active: false } }]);
   });
@@ -87,11 +87,11 @@ describe("migration 0005: retire step 11", () => {
     expect(await testDb.db.select().from(auditLog).where(eq(auditLog.entityId, step!.id))).toHaveLength(1);
   });
 
-  it("gives brokers created afterwards only the 10 active steps", async () => {
+  it("gives brokers created afterwards only the 11 active steps (step 0 included)", async () => {
     const created = await testDb.db.transaction((tx) =>
       createBroker(tx, { name: "After Retire", email: "after@example.com", level: "senior", joinedAt: "2026-10-17", inHouseSplit: 50, selfGeneratedSplit: 70 }),
     );
     const rows = await testDb.db.select().from(brokerSteps).where(eq(brokerSteps.brokerId, created.brokerId));
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(11);
   });
 });

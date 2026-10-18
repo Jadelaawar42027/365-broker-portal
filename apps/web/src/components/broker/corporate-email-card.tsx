@@ -3,7 +3,8 @@
  * Purpose: The "Your 365 email" card on step 9 (phase H2). When the Workspace account is ready it shows the address and
  * "Reveal my temporary password", which resets the Google password at that moment and shows it once, with Copy and
  * "Open Gmail" (Google asks for a new password at first sign-in). Up to 3 reveals a day. When it isn't ready it says
- * the email is being set up and the support contact will send the login details. The password lives only in this
+ * the email is being set up and the support contact will send the login details. Until Google Workspace provisioning
+ * is configured the card isn't shown at all, so brokers who already have a 365 email aren't told it's being set up. The password lives only in this
  * component's memory and disappears when the page is left.
  *
  * Functions:
@@ -25,6 +26,8 @@ export function CorporateEmailCard({ accounts, supportName }: { accounts: MyAcco
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!accounts.googleConfigured) return null;
 
   if (!accounts.googleReady || !accounts.corporateEmail) {
     return (

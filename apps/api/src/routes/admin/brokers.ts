@@ -6,7 +6,8 @@
  * and the broker's Google Workspace and GoHighLevel accounts are queued for creation), a fresh invite link
  * on demand, the full profile with files, persona and commission history, editing level/status/dates, changing the
  * commission split (a new history row; agreements not yet countersigned are voided so the broker signs again, and
- * signed ones return the Section 1.7 addendum warning, SPEC D31), the persona, resending an invite, sending a reset link and reminders.
+ * signed ones return the Section 1.7 addendum warning, SPEC D31), deleting a broker and everything about them for good
+ * (owner only, the broker's full name typed to confirm), the persona, resending an invite, sending a reset link and reminders.
  * Setting a broker to inactive deletes their sessions at once (SPEC D9), cancels open account set-up and queues suspending
  * their Google account and deactivating their GHL user; reactivating queues unsuspending them (phase H2). The CRM phone
  * is edited here too. The list carries each broker's account status for the icons on 3b. Every change writes audit_log.
@@ -23,6 +24,7 @@ import {
   brokerListQuerySchema,
   commissionChangeRequestSchema,
   commissionChangeResponseSchema,
+  canManageAdmins,
   CONTRACT_STEP_KEY,
   SPLIT_ADDENDUM_WARNING,
   inviteLinkResponseSchema,
@@ -33,6 +35,8 @@ import {
   brokerProfileResponseSchema,
   createBrokerRequestSchema,
   createBrokerResponseSchema,
+  deleteBrokerRequestSchema,
+  deleteBrokerResponseSchema,
   errorResponseSchema,
   findNextStep,
   okResponseSchema,
@@ -48,10 +52,11 @@ import { alias } from "drizzle-orm/pg-core";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { badRequest, conflict } from "../../errors";
+import { badRequest, conflict, forbidden } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { hasPasswordLogin, issueAccountToken } from "../../services/account-tokens";
 import { writeAudit } from "../../services/audit";
+import { deleteBrokerCompletely } from "../../services/broker-deletion";
 import { countBrokersByStatus, listBrokerMetrics, loadBrokerWithUser, toBrokerListRow } from "../../services/brokers";
 import { inviteEmail, passwordResetEmail, reminderEmail, resignNeededEmail } from "../../services/emails";
 import { sendSafely } from "../../services/mailer";
@@ -396,6 +401,28 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         return issued;
       });
       return { inviteUrl: webLink(env, `/invite/${token}`) };
+    },
+  );
+
+  r.delete(
+    "/v1/admin/brokers/:id",
+    {
+      schema: {
+        tags: ["admin"],
+        summary: "Delete a broker and everything stored about them, permanently (owner only; type their full name to confirm)",
+        params: idParams,
+        body: deleteBrokerRequestSchema,
+        response: { 200: deleteBrokerResponseSchema, 400: errorResponseSchema, 403: errorResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema },
+      },
+    },
+    async (request) => {
+      const actor = currentActor(request);
+      if (!canManageAdmins(actor.role)) throw forbidden("Only the owner can delete a broker.");
+      const result = await deleteBrokerCompletely(
+        { db: app.deps.db, storage: app.deps.storage, log: request.log },
+        { brokerId: request.params.id, confirmName: request.body.confirmName, actorUserId: actor.userId },
+      );
+      return { ok: true as const, ...result };
     },
   );
 

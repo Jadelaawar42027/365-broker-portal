@@ -16,7 +16,9 @@
  * - passQuickCheck(page, answer): answers a step's knowledge check correctly and waits for "That's right."
  * - uploadStep(page, stepKey, fileName, checkAnswer): opens a step, uploads one file, passes its knowledge check if one is given, and sends it.
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
- * - completeBrokerSteps(page): does all 10 steps a broker does themselves (passing step 8's deposit check).
+ * - signAgreements(page): opens and reads both agreements on step 2, checks the details, signs by typed name and waits for the signed state.
+ * - setUpCompanySignature(page): as the signed-in company signer, stores an authorized signature so new agreements are countersigned automatically.
+ * - completeBrokerSteps(page): does all 11 steps a broker does themselves (ticking step 0, signing the agreements, passing step 8's deposit check).
  */
 import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
@@ -87,7 +89,8 @@ export async function acceptInvite(page: Page, email: string, password = BROKER_
   await page.goto(link.pathname);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome aboard");
   await page.getByLabel("Choose a password").fill(password);
-  await expect(page.getByLabel("Mobile number")).toHaveCount(0);
+  await expect(page.getByLabel("Mobile number")).toHaveValue("(561) 555-0199");
+  await expect(page.getByLabel("Mobile number")).toHaveAttribute("readonly", "");
   await page.getByRole("button", { name: "Start my onboarding" }).click();
   await page.waitForURL("**/app");
 }
@@ -122,6 +125,9 @@ export async function passQuickCheck(page: Page, answer: string): Promise<void> 
   await expect(check.getByText("That's right.")).toBeVisible();
 }
 
+const SIGNATURE_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 export async function uploadStep(page: Page, stepKey: string, fileName: string, checkAnswer?: string): Promise<void> {
   await page.goto(`/app/steps/${stepKey}`);
   await page.getByLabel("Choose files to upload").setInputFiles(testFile(fileName));
@@ -138,9 +144,33 @@ export async function answerStep(page: Page, stepKey: string, fill: (page: Page)
   await page.waitForURL("**/app");
 }
 
+export async function signAgreements(page: Page): Promise<void> {
+  await page.goto("/app/steps/contract_nda");
+  for (let opened = 0; opened < 2; opened += 1) {
+    await page.getByRole("button", { name: "Open and read" }).first().click();
+    await expect(page.getByText("Opened", { exact: true })).toHaveCount(opened + 1, { timeout: 30_000 });
+    await page.getByRole("button", { name: "Hide the document" }).click();
+  }
+  await page.getByLabel("Mailing address").fill("100 Ocean Boulevard, Palm Beach, FL 33480");
+  await page.getByLabel(/My phone is/).check();
+  await page.getByLabel(/My email is/).check();
+  await page.getByRole("tab", { name: "Type" }).click();
+  await page.getByLabel(/I agree to sign electronically/).check();
+  await page.getByRole("button", { name: "Sign both agreements" }).click();
+  await expect(page.getByText(/Signed\. Waiting for 365 Yachts to countersign\.|We emailed you the signed copies/)).toBeVisible({ timeout: 30_000 });
+}
+
+export async function setUpCompanySignature(page: Page): Promise<void> {
+  const response = await page.request.put("/v1/admin/company-signature", {
+    data: { pngDataUrl: `data:image/png;base64,${SIGNATURE_PNG}`, authorize: true },
+  });
+  expect(response.status()).toBe(200);
+}
+
 export async function completeBrokerSteps(page: Page): Promise<void> {
+  await answerStep(page, "start_here", (p) => p.getByLabel("I've watched the walkthrough").check());
   await uploadStep(page, "photo_id", "photo-id.pdf");
-  await uploadStep(page, "contract_nda", "contract-signed.pdf");
+  await signAgreements(page);
   await answerStep(page, "bio", (p) => p.getByLabel("Your bio").fill("I grew up on the water in Palm Beach and have sold boats for ten years. ".repeat(6)));
   await uploadStep(page, "headshot", "headshot.png");
   await uploadStep(page, "w9", "w9.pdf");

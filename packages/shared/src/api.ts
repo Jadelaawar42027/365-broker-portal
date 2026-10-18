@@ -212,6 +212,8 @@ export const inviteInfoResponseSchema = z.object({
   firstName: z.string(),
   role: z.enum(USER_ROLES),
   hasPhone: z.boolean().describe("True when the admin already entered the personal phone, so the invite page doesn't ask for it"),
+  phone: z.string().nullable().describe("The personal phone the admin entered, shown read-only on the invite page"),
+  corporateEmail: z.string().nullable().describe("The broker's 365 email once Google Workspace created it; shown read-only and used to sign in"),
 });
 export type InviteInfoResponse = z.infer<typeof inviteInfoResponseSchema>;
 
@@ -428,6 +430,22 @@ export const updateBrokerRequestSchema = z
   })
   .refine((body) => Object.keys(body).length > 0, { message: "Send at least one field to change." });
 export type UpdateBrokerRequest = z.infer<typeof updateBrokerRequestSchema>;
+
+export const deleteBrokerRequestSchema = z.object({
+  confirmName: z.string().trim().min(1, "Type the broker's full name to confirm.").max(120),
+});
+
+export const deleteBrokerResponseSchema = z.object({
+  ok: z.literal(true),
+  stepsDeleted: z.number().int(),
+  fileRecordsDeleted: z.number().int(),
+  agreementsDeleted: z.number().int(),
+  auditRowsDeleted: z.number().int(),
+  storedFilesDeleted: z.number().int(),
+  storageError: z.string().nullable().describe("Set when the records are gone but some stored files couldn't be removed"),
+  externalAccounts: z.object({ google: z.string().nullable(), ghl: z.string().nullable() }).describe("Google Workspace and GHL ids left untouched"),
+});
+export type DeleteBrokerResponse = z.infer<typeof deleteBrokerResponseSchema>;
 
 export const personaRequestSchema = z.object({ markdown: z.string().max(20000) });
 

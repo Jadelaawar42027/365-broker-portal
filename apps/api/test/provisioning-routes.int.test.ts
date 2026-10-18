@@ -130,6 +130,16 @@ describe("account provisioning routes, both systems configured", () => {
     expect([back.google.status, back.ghl.status]).toEqual(["created", "created"]);
   });
 
+  it("shows the new 365 email and the admin's phone on the invite link, and signs the broker in with that email", async () => {
+    const response = await ctx.call("POST", "/v1/admin/brokers", { cookie: owner, body: { name: "Ivy Invite", phone: "+15615550188", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 } });
+    const token = new URL((response.json() as { inviteUrl: string }).inviteUrl).pathname.split("/").pop()!;
+    expect((await ctx.call("GET", `/v1/invites/${token}`)).json()).toMatchObject({ email: null, corporateEmail: null, phone: "+15615550188" });
+    await ctx.runProvisioning();
+    expect((await ctx.call("GET", `/v1/invites/${token}`)).json()).toMatchObject({ email: "ivy@365yachts.org", corporateEmail: "ivy@365yachts.org", phone: "+15615550188", hasPhone: true });
+    expect((await ctx.call("POST", `/v1/invites/${token}/accept`, { body: { name: "Ivy Invite", password: PASSWORD } })).statusCode).toBe(200);
+    expect(await ctx.login("ivy@365yachts.org", PASSWORD)).toContain("=");
+  });
+
   it("lists both integrations as configured and tests the connection", async () => {
     const status = (await ctx.call("GET", "/v1/admin/integrations", { cookie: owner })).json() as { systems: { system: string; configured: boolean }[] };
     expect(status.systems.map((system) => [system.system, system.configured])).toEqual([
@@ -144,7 +154,7 @@ describe("account provisioning routes, both systems configured", () => {
   it("reveals a fresh temporary password to the broker, 3 times a day, audited without the password", async () => {
     const linked = await linkedBroker("Rita Reveal", "rita.personal@example.com");
     const cookie = await ctx.login(linked.corporate, PASSWORD);
-    expect((await ctx.call("GET", "/v1/me/accounts", { cookie })).json()).toEqual({ corporateEmail: linked.corporate, googleReady: true, revealsLeft: 3, gmailUrl: "https://mail.google.com/" });
+    expect((await ctx.call("GET", "/v1/me/accounts", { cookie })).json()).toEqual({ googleConfigured: true, corporateEmail: linked.corporate, googleReady: true, revealsLeft: 3, gmailUrl: "https://mail.google.com/" });
     const first = await ctx.call("POST", "/v1/me/accounts/google/reveal-password", { cookie, body: {} });
     expect(first.statusCode).toBe(200);
     expect(first.headers["cache-control"]).toBe("no-store");
@@ -224,6 +234,6 @@ describe("account provisioning routes, nothing configured", () => {
     expect((await ctx.call("POST", "/v1/admin/integrations/ghl/test", { cookie: owner, body: {} })).json()).toMatchObject({ ok: false, message: expect.stringMatching(/^Not configured/) });
     expect((await ctx.call("PATCH", `/v1/admin/brokers/${created.brokerId}`, { cookie: owner, body: { status: "inactive", leftAt: "2026-10-18" } })).statusCode).toBe(200);
     expect(await ctx.runProvisioning()).toBe(0);
-    expect((await ctx.call("GET", "/v1/me/accounts", { cookie: (await ctx.createBroker({ name: "Fresh One", email: "fresh@example.com" })).cookie })).json()).toMatchObject({ googleReady: false });
+    expect((await ctx.call("GET", "/v1/me/accounts", { cookie: (await ctx.createBroker({ name: "Fresh One", email: "fresh@example.com" })).cookie })).json()).toMatchObject({ googleConfigured: false, googleReady: false });
   });
 });

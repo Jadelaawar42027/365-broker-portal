@@ -38,6 +38,7 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["POST", `/v1/admin/brokers/${brokerId}/invite-link`],
     ["GET", `/v1/admin/brokers/${brokerId}`],
     ["PATCH", `/v1/admin/brokers/${brokerId}`, { level: "senior" }],
+    ["DELETE", `/v1/admin/brokers/${brokerId}`, { confirmName: "Not the broker's name" }],
     ["PUT", `/v1/admin/brokers/${brokerId}/persona`, { markdown: "hacked" }],
     ["POST", `/v1/admin/brokers/${brokerId}/resend-invite`],
     ["POST", `/v1/admin/brokers/${brokerId}/reset-password`],

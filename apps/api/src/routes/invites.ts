@@ -4,6 +4,8 @@
  * the name and password (and the phone, only if the admin didn't enter one; otherwise the phone on file is kept),
  * moves a broker from invited to onboarding, uses up the link and signs the user in.
  * A broker invited without an email (SPEC D29) gives their own email when accepting; it becomes their sign-in email.
+ * Once Google Workspace has created the broker's 365 email (phase H2), the link shows it and the phone the admin entered,
+ * both read-only, and the 365 email is the sign-in email.
  *
  * Functions:
  * - registerInviteRoutes(app): mounts GET /v1/invites/:token and POST /v1/invites/:token/accept.
@@ -44,7 +46,16 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     },
     async (request) => {
       const invite = await findUsableToken(app.deps.db, request.params.token, "invite", app.deps.now());
-      return { email: visibleEmail(invite.email), name: invite.name, firstName: firstName(invite.name), role: invite.role, hasPhone: Boolean(invite.phone) };
+      const corporateEmail = invite.googleUserId ? invite.corporateEmail : null;
+      return {
+        email: corporateEmail ?? visibleEmail(invite.email),
+        name: invite.name,
+        firstName: firstName(invite.name),
+        role: invite.role,
+        hasPhone: Boolean(invite.phone),
+        phone: invite.phone,
+        corporateEmail,
+      };
     },
   );
 
@@ -63,12 +74,14 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       const { db, auth } = app.deps;
       const now = app.deps.now();
       const invite = await findUsableToken(db, request.params.token, "invite", now);
-      const needsEmail = isPlaceholderEmail(invite.email);
+      const provisionedEmail = invite.googleUserId ? invite.corporateEmail : null;
+      const needsEmail = isPlaceholderEmail(invite.email) && !provisionedEmail;
       if (needsEmail && !request.body.email) throw badRequest("Enter the email you'll sign in with.", "email_required");
-      const signInEmail = needsEmail ? request.body.email! : invite.email;
+      const signInEmail = needsEmail ? request.body.email! : isPlaceholderEmail(invite.email) && provisionedEmail ? provisionedEmail : invite.email;
+      const emailChanges = signInEmail !== invite.email;
       const phone = request.body.phone ?? invite.phone;
       if (!phone) throw badRequest("Enter your mobile number.", "phone_required");
-      if (needsEmail) {
+      if (emailChanges) {
         const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, signInEmail));
         if (taken) throw conflict("Someone already uses this email. Try another, or ask us for help.", "email_taken");
       }
@@ -76,7 +89,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
         await consumeAccountToken(tx, invite.tokenId, now);
         await tx
           .update(users)
-          .set({ name: request.body.name, phone, emailVerified: true, ...(needsEmail ? { email: signInEmail } : {}) })
+          .set({ name: request.body.name, phone, emailVerified: true, ...(emailChanges ? { email: signInEmail } : {}) })
           .where(eq(users.id, invite.userId));
         await setUserPassword(tx, invite.userId, request.body.password);
         const started = await tx
@@ -89,7 +102,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
           action: "user.invite_accepted",
           entityType: "user",
           entityId: invite.userId,
-          ...(needsEmail ? { after: { email: signInEmail } } : {}),
+          ...(emailChanges ? { after: { email: signInEmail } } : {}),
         });
         if (started[0]) {
           await writeAudit(tx, {

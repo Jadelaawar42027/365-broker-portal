@@ -3,7 +3,8 @@
  * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us, both commission splits (SPEC D29) and onboarding
  * progress, training progress and average best quiz score (from the broker_training_metrics view), the CRM phone and
  * small Google / GHL account status marks (phase H2), with search
- * (including persona text), status and level filters, CSV export and the invite button.
+ * (including persona text), status and level filters, CSV export and the invite button. After a broker is deleted it
+ * confirms which one.
  *
  * Functions:
  * - BrokersPage({ searchParams }): loads the filtered list and renders the table.
@@ -17,6 +18,7 @@ import Link from "next/link";
 import { AccountStatusMarks } from "@/components/admin/account-status";
 import { BrokerFilters, ExportCsvButton } from "@/components/admin/broker-filters";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
+import { FormMessage } from "@/components/auth/form-message";
 import { Avatar, ProgressBar } from "@/components/ui/misc";
 import { Pill, type PillTone } from "@/components/ui/pill";
 import { formatDate, formatPhone } from "@/lib/format";
@@ -65,6 +67,13 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
           <InviteBrokerButton />
         </div>
       </div>
+
+      {params.deleted ? (
+        <FormMessage tone={params.storage ? "error" : "success"}>
+          {params.deleted} was deleted, with everything stored about them.
+          {params.storage ? " Some stored files couldn't be removed from the bucket; try again later or remove them by hand." : ""}
+        </FormMessage>
+      ) : null}
 
       <BrokerFilters search={search} status={status} level={level} />
 

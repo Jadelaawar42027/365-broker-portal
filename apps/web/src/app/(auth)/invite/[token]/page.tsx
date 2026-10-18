@@ -61,7 +61,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       cardTitle="Create your account"
       cardSubtitle="You only do this once."
     >
-      <InviteForm token={token} email={invite.data.email} name={invite.data.name} hasPhone={invite.data.hasPhone} />
+      <InviteForm token={token} email={invite.data.email} corporateEmail={invite.data.corporateEmail} phone={invite.data.phone} name={invite.data.name} />
     </AuthShell>
   );
 }

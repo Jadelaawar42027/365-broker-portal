@@ -18,11 +18,14 @@
  * - presignUploadPart(input): presigned PUT URL for one part of a multipart upload.
  * - completeMultipartUpload(input): joins the uploaded parts (with their ETags) into the final object.
  * - abortMultipartUpload(input): cancels a multipart upload and discards its parts.
+ * - deletePrefix(prefix): deletes every object whose key starts with prefix (a folder ending in "/"); returns how many were deleted.
  */
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
   UploadPartCommand,
   HeadObjectCommand,
   NoSuchKey,
@@ -53,6 +56,7 @@ export interface FileStorage {
   headObject(key: string): Promise<StoredObjectInfo | null>;
   getObject(key: string): Promise<Uint8Array | null>;
   setCors(origins: string[]): Promise<void>;
+  deletePrefix(prefix: string): Promise<number>;
   createMultipartUpload(input: { key: string; contentType: string }): Promise<string>;
   presignUploadPart(input: { key: string; uploadId: string; partNumber: number; expiresInSeconds: number }): Promise<string>;
   completeMultipartUpload(input: { key: string; uploadId: string; parts: { partNumber: number; etag: string }[] }): Promise<void>;
@@ -125,6 +129,21 @@ export function createS3Storage(config: StorageConfig): FileStorage {
         if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404) return null;
         throw error;
       }
+    },
+    async deletePrefix(prefix) {
+      if (!prefix || !prefix.endsWith("/") || prefix === "/") throw new Error("Refusing to delete without a folder prefix.");
+      let deleted = 0;
+      let continuationToken: string | undefined;
+      do {
+        const page = await client.send(new ListObjectsV2Command({ Bucket, Prefix: prefix, ContinuationToken: continuationToken }));
+        for (const object of page.Contents ?? []) {
+          if (!object.Key?.startsWith(prefix)) continue;
+          await client.send(new DeleteObjectCommand({ Bucket, Key: object.Key }));
+          deleted += 1;
+        }
+        continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (continuationToken);
+      return deleted;
     },
     async createMultipartUpload({ key, contentType }) {
       const result = await client.send(new CreateMultipartUploadCommand({ Bucket, Key: key, ContentType: contentType }));

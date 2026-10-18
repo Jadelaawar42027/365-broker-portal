@@ -1,11 +1,12 @@
 /**
  * File: apps/web/src/components/auth/invite-form.tsx
  * Purpose: The "Create your account" form on screen 1a. Sends the password (and the mobile number, only when the admin
- * didn't already enter one) with the invite token,
+ * didn't already enter one) with the invite token. When Google Workspace has created the broker's 365 email it is shown
+ * grayed out and can't be edited (they sign in with it); the phone the admin entered is shown the same way,
  * then takes the new broker to their checklist (or an admin to the admin overview).
  *
  * Functions:
- * - InviteForm({ token, email, name, hasPhone }): renders the form and handles submission; when the invite has no email (SPEC D29), asks for the email the broker will sign in with.
+ * - InviteForm({ token, email, corporateEmail, phone, name }): renders the form and handles submission; when the invite has no email (SPEC D29), asks for the email the broker will sign in with.
  */
 "use client";
 
@@ -15,10 +16,23 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { FieldLabel, inputClasses } from "@/components/ui/misc";
+import { formatPhone } from "@/lib/format";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { FormMessage } from "./form-message";
 
-export function InviteForm({ token, email, name, hasPhone }: { token: string; email: string | null; name: string; hasPhone: boolean }) {
+export function InviteForm({
+  token,
+  email,
+  corporateEmail,
+  phone,
+  name,
+}: {
+  token: string;
+  email: string | null;
+  corporateEmail: string | null;
+  phone: string | null;
+  name: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +48,7 @@ export function InviteForm({ token, email, name, hasPhone }: { token: string; em
         body: {
           name,
           password: String(form.get("password")),
-          ...(hasPhone ? {} : { phone: String(form.get("phone")) }),
+          ...(phone ? {} : { phone: String(form.get("phone")) }),
           ...(email ? {} : { email: String(form.get("email") ?? "").trim() }),
         },
       });
@@ -49,12 +63,28 @@ export function InviteForm({ token, email, name, hasPhone }: { token: string; em
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate={false}>
       <div>
-        <FieldLabel htmlFor="email">{email ? "Email" : "Your email (you'll sign in with it)"}</FieldLabel>
-        {email ? (
-          <input id="email" name="email" type="email" spellCheck={false} value={email} readOnly autoComplete="username" className={inputClasses()} />
+        <FieldLabel htmlFor="email">{corporateEmail ? "Your 365 email" : email ? "Email" : "Your email (you'll sign in with it)"}</FieldLabel>
+        {corporateEmail || email ? (
+          <input
+            id="email"
+            name="email"
+            type="email"
+            spellCheck={false}
+            value={corporateEmail ?? email ?? ""}
+            readOnly
+            aria-readonly="true"
+            aria-describedby={corporateEmail ? "email-hint" : undefined}
+            autoComplete="username"
+            className={`${inputClasses()} cursor-not-allowed`}
+          />
         ) : (
           <input id="email" name="email" type="email" required spellCheck={false} autoComplete="email" className={inputClasses()} />
         )}
+        {corporateEmail ? (
+          <p id="email-hint" className="mt-2 text-[15px] text-muted">
+            Created for you by 365 Yachts. You&apos;ll sign in to the portal with it.
+          </p>
+        ) : null}
       </div>
       <div>
         <FieldLabel htmlFor="password">Choose a password</FieldLabel>
@@ -69,15 +99,26 @@ export function InviteForm({ token, email, name, hasPhone }: { token: string; em
           className={inputClasses()}
         />
       </div>
-      {hasPhone ? null : (
-        <div>
-          <FieldLabel htmlFor="phone">Mobile number</FieldLabel>
+      <div>
+        <FieldLabel htmlFor="phone">Mobile number</FieldLabel>
+        {phone ? (
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            value={formatPhone(phone)}
+            readOnly
+            aria-readonly="true"
+            aria-describedby="phone-hint"
+            className={`${inputClasses()} cursor-not-allowed tabular-nums`}
+          />
+        ) : (
           <input id="phone" name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="(561) 000-0000" aria-describedby="phone-hint" className={inputClasses()} />
-          <p id="phone-hint" className="mt-2 text-[15px] text-muted">
-            We email you when a step is waiting, and call if something is urgent.
-          </p>
-        </div>
-      )}
+        )}
+        <p id="phone-hint" className="mt-2 text-[15px] text-muted">
+          {phone ? "The number 365 Yachts has for you. Message us if it's wrong." : "We email you when a step is waiting, and call if something is urgent."}
+        </p>
+      </div>
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
       <Button type="submit" size="xl" className="w-full" disabled={busy}>
         {busy ? "Creating your account…" : "Start my onboarding"}

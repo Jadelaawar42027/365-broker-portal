@@ -31,10 +31,14 @@ afterAll(async () => {
 });
 
 describe("step guidance seed", () => {
-  it("gives all 10 steps their bullets, callouts and full text", async () => {
-    expect(firstGuided).toBe(10);
+  it("gives all 11 steps their bullets, and every step after step 0 its full text", async () => {
+    expect(firstGuided).toBe(11);
     const rows = await testDb.db.select().from(onboardingSteps).orderBy(asc(onboardingSteps.position));
-    for (const row of rows) {
+    const [startHere, ...manualSteps] = rows;
+    expect(startHere!.key).toBe("start_here");
+    expect(startHere!.todoItems).toHaveLength(5);
+    expect(startHere!.fullTextMd ?? "").toBe("");
+    for (const row of manualSteps) {
       expect(row.todoItems?.length, row.key).toBeGreaterThanOrEqual(3);
       expect(row.fullTextMd?.length, row.key).toBeGreaterThan(20);
     }
@@ -69,7 +73,7 @@ describe("step guidance seed", () => {
     expect(w9!.todoItems).toEqual(["Edited by Shelly"]);
     const [videos] = await testDb.db.select({ value: count() }).from(stepVideos);
     const [questions] = await testDb.db.select({ value: count() }).from(stepQuestions);
-    expect(videos!.value).toBe(4);
+    expect(videos!.value).toBe(5);
     expect(questions!.value).toBe(1);
   });
 

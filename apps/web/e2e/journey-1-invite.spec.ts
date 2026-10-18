@@ -24,8 +24,8 @@ test("admin invites a broker who creates their account", async ({ page, browser 
   const broker = await brokerContext.newPage();
   await acceptInvite(broker, email);
   await expect(broker.getByRole("heading", { level: 1 })).toContainText("Nina");
-  await expect(broker.getByText("YOUR NEXT STEP · STEP 1")).toBeVisible();
-  await expect(broker.getByText("You've sent in 0 of 10 steps")).toBeVisible();
+  await expect(broker.getByText("YOUR NEXT STEP · STEP 0")).toBeVisible();
+  await expect(broker.getByText("You've sent in 0 of 11 steps")).toBeVisible();
 
   const link = new URL(await latestLink(email, "invite"));
   await broker.goto(link.pathname);
@@ -58,7 +58,7 @@ test("admin invites a broker without an email, sends the link by hand, and chang
   await expect(broker.getByRole("heading", { level: 1 })).toContainText("Welcome aboard");
   await broker.getByLabel("Your email (you'll sign in with it)").fill(email);
   await broker.getByLabel("Choose a password").fill(BROKER_PASSWORD);
-  await expect(broker.getByLabel("Mobile number")).toHaveCount(0);
+  await expect(broker.getByLabel("Mobile number")).toHaveValue("(561) 555-0199");
   await broker.getByRole("button", { name: "Start my onboarding" }).click();
   await broker.waitForURL("**/app");
   await brokerContext.close();

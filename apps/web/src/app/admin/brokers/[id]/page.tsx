@@ -5,7 +5,8 @@
  * (status, every version, countersign, void and re-issue, signed-outside uploads, SPEC D31),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
  * uploader, the Accounts panel (365 email, Google Workspace and GoHighLevel status, CRM phone, phase H2), the Persona
- * panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
+ * panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score. The owner also sees
+ * "Delete this broker" at the bottom, which removes the broker and everything about them for good.
  *
  * Functions:
  * - BrokerProfilePage({ params, searchParams }): loads the profile and renders the page.
@@ -29,6 +30,7 @@ import { notFound } from "next/navigation";
 import { AccountsPanel } from "@/components/admin/accounts-panel";
 import { AccountActions, BrokerControls } from "@/components/admin/broker-controls";
 import { CommissionEditor } from "@/components/admin/commission-editor";
+import { DeleteBrokerSection } from "@/components/admin/delete-broker";
 import { ContractsPanel } from "@/components/admin/contracts-panel";
 import { PersonaPanel } from "@/components/admin/persona-panel";
 import { StepActions } from "@/components/admin/step-actions";
@@ -40,7 +42,7 @@ import { ArrowLeftIcon } from "@/components/ui/icons";
 import { Avatar } from "@/components/ui/misc";
 import { Pill } from "@/components/ui/pill";
 import { formatDate, formatPhone, formatShortDate } from "@/lib/format";
-import { serverGet } from "@/lib/server-api";
+import { requireMe, serverGet } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Broker profile · 365 Yachts admin" };
 
@@ -80,6 +82,7 @@ export default async function BrokerProfilePage({
     serverGet<BrokerAccountsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/accounts`),
   ]);
   if (!data) notFound();
+  const me = await requireMe();
   const { broker, metrics, steps } = data;
   const today = todayInTimeZone();
   const files = steps.flatMap((step) => step.files.map((file) => ({ ...file, step })));
@@ -209,6 +212,9 @@ export default async function BrokerProfilePage({
           {training ? <TrainingPanel brokerId={broker.id} training={training} /> : null}
         </div>
       </div>
+      {me.user.role === "owner" ? (
+        <DeleteBrokerSection brokerId={broker.id} brokerName={broker.name} hasExternalAccounts={Boolean(accounts?.systems.some((view) => view.accountId))} />
+      ) : null}
     </div>
   );
 }

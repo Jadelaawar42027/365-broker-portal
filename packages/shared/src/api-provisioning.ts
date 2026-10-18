@@ -70,6 +70,7 @@ export const integrationTestResponseSchema = z.object({ ok: z.boolean(), message
 export type IntegrationTestResponse = z.infer<typeof integrationTestResponseSchema>;
 
 export const myAccountsResponseSchema = z.object({
+  googleConfigured: z.boolean().describe("False until Google Workspace provisioning is set up; step 9 then shows no 365 email card"),
   corporateEmail: z.string().nullable(),
   googleReady: z.boolean().describe("True when Google is configured and the broker's Workspace account exists and is active"),
   revealsLeft: z.number().int(),

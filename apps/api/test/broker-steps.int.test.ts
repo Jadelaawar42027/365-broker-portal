@@ -28,15 +28,15 @@ beforeAll(async () => {
 afterAll(() => ctx?.close());
 
 describe("GET /v1/me/steps", () => {
-  it("lists all 10 steps with step 1 as the next step", async () => {
+  it("lists all 11 steps with step 0 (Start here) as the next step", async () => {
     const response = await ctx.call("GET", "/v1/me/steps", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.steps).toHaveLength(10);
-    expect(body.progress).toEqual({ total: 10, approved: 0, sent: 0 });
-    expect(body.nextStepKey).toBe("photo_id");
-    expect(body.steps[0]).toMatchObject({ key: "photo_id", stageTitle: "Paperwork", label: "Do this next", tone: "info", isNext: true });
-    expect(body.steps[1]).toMatchObject({ label: "Coming up", isNext: false });
+    expect(body.steps).toHaveLength(11);
+    expect(body.progress).toEqual({ total: 11, approved: 0, sent: 0 });
+    expect(body.nextStepKey).toBe("start_here");
+    expect(body.steps[0]).toMatchObject({ key: "start_here", stageTitle: "Start here", label: "Do this next", tone: "info", isNext: true });
+    expect(body.steps[1]).toMatchObject({ key: "photo_id", stageTitle: "Paperwork", label: "Coming up", isNext: false });
     expect(body.sentBack).toEqual([]);
   });
 });
@@ -46,7 +46,7 @@ describe("GET /v1/me/steps/:key", () => {
     const response = await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body).toMatchObject({ key: "w9", position: 5, totalSteps: 10, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
+    expect(body).toMatchObject({ key: "w9", position: 5, totalSteps: 11, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
     expect(body.config.templateLink.url).toMatch(/irs\.gov/);
     expect(body.config.reviewChecklist).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("Tax ID filled in");

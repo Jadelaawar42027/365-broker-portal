@@ -42,6 +42,11 @@ function memoryStorage(): FileStorage {
     putObject: async ({ key, body }) => void stored.set(key, body),
     headObject: async (key) => (stored.has(key) ? { sizeBytes: stored.get(key)!.byteLength, contentType: null } : null),
     setCors: async () => {},
+    deletePrefix: async (prefix) => {
+      const keys = [...stored.keys()].filter((key) => key.startsWith(prefix));
+      for (const key of keys) stored.delete(key);
+      return keys.length;
+    },
     createMultipartUpload: async () => "unused",
     presignUploadPart: async () => "unused",
     completeMultipartUpload: async () => {},
@@ -116,7 +121,7 @@ describe("runImport", () => {
     const { input } = loadImportFolder(dir, UPLOAD_KEYS);
     const summary = await runImport(testDb.db, memoryStorage(), input!, { dryRun: true });
     expect(summary).toMatchObject({ created: ["jane@example.com", "john@example.com", "alex@example.com"], filesUploaded: 2, personasSet: 1 });
-    expect(summary.stepsApproved).toBe(10 + 2 + 10);
+    expect(summary.stepsApproved).toBe(11 + 2 + 11);
     expect(await testDb.db.select().from(users).where(eq(users.email, "jane@example.com"))).toHaveLength(0);
     expect(stored.size).toBe(0);
   });
@@ -128,7 +133,7 @@ describe("runImport", () => {
     expect(summary.withoutLogin).toEqual(["jane@example.com", "john@example.com"]);
 
     const jane = await stepsFor("jane@example.com");
-    expect(jane).toHaveLength(10);
+    expect(jane).toHaveLength(11);
     expect(jane.every((step) => step.status === "approved" && step.note === "imported")).toBe(true);
     const [janeBroker] = await testDb.db
       .select()
@@ -152,7 +157,7 @@ describe("runImport", () => {
     expect((await stepsFor("alex@example.com")).every((step) => step.status === "approved")).toBe(true);
     const audit = await testDb.db.select({ action: auditLog.action }).from(auditLog);
     expect(audit.filter((row) => row.action === "broker.imported")).toHaveLength(3);
-    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(22);
+    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(11 + 2 + 11);
   });
 
   it("is idempotent: a second run changes nothing", async () => {

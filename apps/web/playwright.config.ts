@@ -38,6 +38,7 @@ const E2E_ENV: Record<string, string> = {
   SUPPORT_WHATSAPP_NUMBER: "15614459241",
   SEED_OWNER_NAME: "Shelly Melcher",
   SEED_OWNER_EMAIL: "owner@e2e.test",
+  COMPANY_SIGNER_EMAIL: "owner@e2e.test",
   SEED_OWNER_PASSWORD: "e2e-owner-password",
   SEED_SAMPLE_PASSWORD: "sample-broker-pass",
   NEXT_DIST_DIR: ".next-e2e",

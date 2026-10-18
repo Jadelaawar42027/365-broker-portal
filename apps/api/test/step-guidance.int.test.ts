@@ -111,9 +111,10 @@ describe("the knowledge check", () => {
 });
 
 describe("the admin step editor", () => {
-  it("lists the 10 steps with their guidance, video slots and checks", async () => {
+  it("lists the 11 steps with their guidance, video slots and checks", async () => {
     const body = (await ctx.call("GET", "/v1/admin/steps", { cookie: owner })).json();
-    expect(body.steps).toHaveLength(10);
+    expect(body.steps).toHaveLength(11);
+    expect(body.steps[0]).toMatchObject({ key: "start_here", emptyVideoSlots: 1, checkQuestionCount: 0 });
     expect(body.steps.find((step: { key: string }) => step.key === "platform_logins")).toMatchObject({ videoCount: 1, emptyVideoSlots: 2, checkQuestionCount: 0 });
     expect(body.steps.find((step: { key: string }) => step.key === "license_bond")).toMatchObject({ checkQuestionCount: 1 });
     const detail = (await ctx.call("GET", "/v1/admin/steps/license_bond", { cookie: owner })).json();

@@ -17,7 +17,7 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   test.setTimeout(180_000);
   await signIn(page, OWNER.email, OWNER.password);
   await page.goto("/admin/steps");
-  await expect(page).toHaveURL(/\/admin\/steps\/photo_id$/);
+  await expect(page).toHaveURL(/\/admin\/steps\/start_here$/);
   const steps = page.getByRole("navigation", { name: "Onboarding steps" });
   await steps.getByRole("link", { name: /BoatWizard, YachtCloser, GoHighLevel/ }).click();
   await expect(page.getByRole("heading", { name: "Log in to BoatWizard, YachtCloser and GoHighLevel" })).toBeVisible();
@@ -75,6 +75,6 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(send).toBeEnabled();
   await send.click();
   await brokerPage.waitForURL("**/app");
-  await expect(brokerPage.getByText("You've sent in 1 of 10 steps")).toBeVisible();
+  await expect(brokerPage.getByText("You've sent in 1 of 11 steps")).toBeVisible();
   await broker.context.close();
 });

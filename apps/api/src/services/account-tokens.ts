@@ -6,12 +6,12 @@
  * Functions:
  * - tokenLifetimeMs(purpose): 7 days for invites, 24 hours for resets.
  * - issueAccountToken(tx, input): revokes older tokens, stores a new hash and returns the plain token.
- * - findUsableToken(db, token, purpose, now): returns the token row with its user (name, email, phone, role), or throws 404/410 with a clear message.
+ * - findUsableToken(db, token, purpose, now): returns the token row with its user (name, email, phone, role) and, for a broker, their 365 email and Google account id; or throws 404/410 with a clear message.
  * - consumeAccountToken(tx, tokenId, now): marks the token used; throws 410 if another request used it first.
  * - setUserPassword(tx, userId, password): stores the hashed password on the user's credential account, creating it if needed.
  * - hasPasswordLogin(db, userId): true if the user already has a credential account (has signed up).
  */
-import { accountTokens, accounts, users, type DbOrTx } from "@bp/db";
+import { accountTokens, accounts, brokers, users, type DbOrTx } from "@bp/db";
 import { INVITE_TTL_DAYS, PASSWORD_RESET_TTL_HOURS, type TokenPurpose } from "@bp/shared";
 import { createAccountToken, hashToken } from "@bp/shared/node";
 import { hashPassword } from "better-auth/crypto";
@@ -59,9 +59,12 @@ export async function findUsableToken(db: DbOrTx, token: string, purpose: TokenP
       email: users.email,
       phone: users.phone,
       role: users.role,
+      corporateEmail: brokers.corporateEmail,
+      googleUserId: brokers.googleUserId,
     })
     .from(accountTokens)
     .innerJoin(users, eq(users.id, accountTokens.userId))
+    .leftJoin(brokers, eq(brokers.userId, users.id))
     .where(and(eq(accountTokens.tokenHash, hashToken(token)), eq(accountTokens.purpose, purpose)));
   if (!row) throw notFound("This link is not valid. Ask 365 Yachts to send you a new one.");
   if (row.usedAt) throw new HttpError(410, "link_used", "This link has already been used.");

@@ -75,7 +75,7 @@ describe("inviting a broker", () => {
   it("shows who the invite is for", async () => {
     const response = await ctx.call("GET", `/v1/invites/${token}`);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ email: "daniel.reyes@example.com", name: "Daniel Reyes", firstName: "Daniel", role: "broker", hasPhone: true });
+    expect(response.json()).toEqual({ email: "daniel.reyes@example.com", name: "Daniel Reyes", firstName: "Daniel", role: "broker", hasPhone: true, phone: "+15615550123", corporateEmail: null });
   });
 
   it("rejects a weak password or a bad phone number", async () => {

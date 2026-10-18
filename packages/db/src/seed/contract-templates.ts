@@ -8,6 +8,7 @@
  * Functions:
  * - findContractTemplatesDir(override): the folder holding the templates, from an explicit path, CONTRACT_TEMPLATES_DIR, or by walking up from the working directory and this file; null when not found.
  * - sha256(bytes): the hex SHA-256 of some bytes.
+ * - canonicalJson(value): JSON text with object keys sorted, so the same field map compares equal however Postgres stored it.
  * - seedContractTemplates(tx, dir): stores any new or changed template as a new active version; returns the keys that got a new version.
  */
 import { createHash } from "node:crypto";
@@ -26,6 +27,15 @@ const TEMPLATE_FILES: Record<ContractTemplateKey, { pdf: string; fields: string;
 
 export function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined);
+    return `{${entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 export function findContractTemplatesDir(override?: string | null): string | null {
@@ -53,7 +63,7 @@ export async function seedContractTemplates(tx: Transaction, dir: string): Promi
     const fontFile = files.fontFile ? readFileSync(path.join(dir, files.fontFile)) : null;
     const pdfSha256 = sha256(pdf);
     const [latest] = await tx.select().from(contractTemplates).where(eq(contractTemplates.key, key)).orderBy(desc(contractTemplates.version)).limit(1);
-    if (latest && latest.pdfSha256 === pdfSha256 && JSON.stringify(latest.fields) === JSON.stringify(fields)) continue;
+    if (latest && latest.pdfSha256 === pdfSha256 && canonicalJson(latest.fields) === canonicalJson(fields)) continue;
     const version = (latest?.version ?? 0) + 1;
     const [inserted] = await tx
       .insert(contractTemplates)
