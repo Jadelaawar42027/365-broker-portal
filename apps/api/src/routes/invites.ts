@@ -1,7 +1,8 @@
 /**
  * File: apps/api/src/routes/invites.ts
  * Purpose: Public routes behind the invite link (screen 1a). Opening the link shows who it is for; accepting it sets
- * the name, phone and password, moves a broker from invited to onboarding, uses up the link and signs the user in.
+ * the name and password (and the phone, only if the admin didn't enter one; otherwise the phone on file is kept),
+ * moves a broker from invited to onboarding, uses up the link and signs the user in.
  * A broker invited without an email (SPEC D29) gives their own email when accepting; it becomes their sign-in email.
  *
  * Functions:
@@ -43,7 +44,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
     },
     async (request) => {
       const invite = await findUsableToken(app.deps.db, request.params.token, "invite", app.deps.now());
-      return { email: visibleEmail(invite.email), name: invite.name, firstName: firstName(invite.name), role: invite.role };
+      return { email: visibleEmail(invite.email), name: invite.name, firstName: firstName(invite.name), role: invite.role, hasPhone: Boolean(invite.phone) };
     },
   );
 
@@ -65,6 +66,8 @@ export function registerInviteRoutes(app: FastifyInstance): void {
       const needsEmail = isPlaceholderEmail(invite.email);
       if (needsEmail && !request.body.email) throw badRequest("Enter the email you'll sign in with.", "email_required");
       const signInEmail = needsEmail ? request.body.email! : invite.email;
+      const phone = request.body.phone ?? invite.phone;
+      if (!phone) throw badRequest("Enter your mobile number.", "phone_required");
       if (needsEmail) {
         const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, signInEmail));
         if (taken) throw conflict("Someone already uses this email. Try another, or ask us for help.", "email_taken");
@@ -73,7 +76,7 @@ export function registerInviteRoutes(app: FastifyInstance): void {
         await consumeAccountToken(tx, invite.tokenId, now);
         await tx
           .update(users)
-          .set({ name: request.body.name, phone: request.body.phone, emailVerified: true, ...(needsEmail ? { email: signInEmail } : {}) })
+          .set({ name: request.body.name, phone, emailVerified: true, ...(needsEmail ? { email: signInEmail } : {}) })
           .where(eq(users.id, invite.userId));
         await setUserPassword(tx, invite.userId, request.body.password);
         const started = await tx

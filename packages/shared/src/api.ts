@@ -210,13 +210,14 @@ export const inviteInfoResponseSchema = z.object({
   name: z.string(),
   firstName: z.string(),
   role: z.enum(USER_ROLES),
+  hasPhone: z.boolean().describe("True when the admin already entered the personal phone, so the invite page doesn't ask for it"),
 });
 export type InviteInfoResponse = z.infer<typeof inviteInfoResponseSchema>;
 
 export const acceptInviteRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   password: passwordSchema,
-  phone: phoneSchema,
+  phone: phoneSchema.optional().describe("Only needed when the admin didn't enter a phone; otherwise the one on file is kept"),
   email: emailSchema.optional().describe("Required when the invite has no email yet; becomes the sign-in email"),
 });
 export type AcceptInviteRequest = z.infer<typeof acceptInviteRequestSchema>;

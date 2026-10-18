@@ -84,7 +84,7 @@ export async function acceptInvite(page: Page, email: string, password = BROKER_
   await page.goto(link.pathname);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome aboard");
   await page.getByLabel("Choose a password").fill(password);
-  await page.getByLabel("Mobile number").fill("(561) 555-0199");
+  await expect(page.getByLabel("Mobile number")).toHaveCount(0);
   await page.getByRole("button", { name: "Start my onboarding" }).click();
   await page.waitForURL("**/app");
 }

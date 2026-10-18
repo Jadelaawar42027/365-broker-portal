@@ -57,7 +57,7 @@ test("admin invites a broker without an email, sends the link by hand, and chang
   await expect(broker.getByRole("heading", { level: 1 })).toContainText("Welcome aboard");
   await broker.getByLabel("Your email (you'll sign in with it)").fill(email);
   await broker.getByLabel("Choose a password").fill(BROKER_PASSWORD);
-  await broker.getByLabel("Mobile number").fill("(561) 555-0199");
+  await expect(broker.getByLabel("Mobile number")).toHaveCount(0);
   await broker.getByRole("button", { name: "Start my onboarding" }).click();
   await broker.waitForURL("**/app");
   await brokerContext.close();

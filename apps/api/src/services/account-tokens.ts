@@ -6,7 +6,7 @@
  * Functions:
  * - tokenLifetimeMs(purpose): 7 days for invites, 24 hours for resets.
  * - issueAccountToken(tx, input): revokes older tokens, stores a new hash and returns the plain token.
- * - findUsableToken(db, token, purpose, now): returns the token row with its user, or throws 404/410 with a clear message.
+ * - findUsableToken(db, token, purpose, now): returns the token row with its user (name, email, phone, role), or throws 404/410 with a clear message.
  * - consumeAccountToken(tx, tokenId, now): marks the token used; throws 410 if another request used it first.
  * - setUserPassword(tx, userId, password): stores the hashed password on the user's credential account, creating it if needed.
  * - hasPasswordLogin(db, userId): true if the user already has a credential account (has signed up).
@@ -57,6 +57,7 @@ export async function findUsableToken(db: DbOrTx, token: string, purpose: TokenP
       userId: users.id,
       name: users.name,
       email: users.email,
+      phone: users.phone,
       role: users.role,
     })
     .from(accountTokens)

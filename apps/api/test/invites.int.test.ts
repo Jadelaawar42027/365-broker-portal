@@ -1,7 +1,7 @@
 /**
  * File: apps/api/test/invites.int.test.ts
  * Purpose: Integration tests for inviting brokers and admins: the invite email, opening and accepting the link,
- * single use, expiry, resending, duplicate emails, the two required commission splits (SPEC D27), and the owner-only admin invite (SPEC D7, D8).
+ * keeping the phone the admin entered (the invite page doesn't ask again), single use, expiry, resending, duplicate emails, the two required commission splits (SPEC D27), and the owner-only admin invite (SPEC D7, D8).
  *
  * Functions:
  * - none
@@ -75,7 +75,7 @@ describe("inviting a broker", () => {
   it("shows who the invite is for", async () => {
     const response = await ctx.call("GET", `/v1/invites/${token}`);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ email: "daniel.reyes@example.com", name: "Daniel Reyes", firstName: "Daniel", role: "broker" });
+    expect(response.json()).toEqual({ email: "daniel.reyes@example.com", name: "Daniel Reyes", firstName: "Daniel", role: "broker", hasPhone: true });
   });
 
   it("rejects a weak password or a bad phone number", async () => {
@@ -100,6 +100,20 @@ describe("inviting a broker", () => {
     const again = await ctx.call("POST", `/v1/invites/${token}/accept`, { body: acceptBody });
     expect(again.statusCode).toBe(410);
     expect(again.json().error).toBe("link_used");
+  });
+
+  it("keeps the phone the admin entered, so the broker isn't asked for it again", async () => {
+    const created = await ctx.call("POST", "/v1/admin/brokers", {
+      cookie: owner,
+      body: { name: "Phone Kept", phone: "+1 561 555 0177", email: "phone.kept@example.com", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 },
+    });
+    expect(created.statusCode).toBe(201);
+    const phoneToken = ctx.linkToken(ctx.emailsTo("phone.kept@example.com")[0]!, "invite");
+    expect((await ctx.call("GET", `/v1/invites/${phoneToken}`)).json()).toMatchObject({ hasPhone: true });
+    const accepted = await ctx.call("POST", `/v1/invites/${phoneToken}/accept`, { body: { name: "Phone Kept", password: "phone-kept-password-1" } });
+    expect(accepted.statusCode).toBe(200);
+    const [user] = await ctx.db.select({ phone: users.phone }).from(users).where(eq(users.email, "phone.kept@example.com"));
+    expect(user!.phone).toBe("+15615550177");
   });
 
   it("rejects unknown tokens with 404", async () => {

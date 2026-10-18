@@ -1,10 +1,11 @@
 /**
  * File: apps/web/src/components/auth/invite-form.tsx
- * Purpose: The "Create your account" form on screen 1a. Sends the password and mobile number with the invite token,
+ * Purpose: The "Create your account" form on screen 1a. Sends the password (and the mobile number, only when the admin
+ * didn't already enter one) with the invite token,
  * then takes the new broker to their checklist (or an admin to the admin overview).
  *
  * Functions:
- * - InviteForm({ token, email, name }): renders the form and handles submission; when the invite has no email (SPEC D29), asks for the email the broker will sign in with.
+ * - InviteForm({ token, email, name, hasPhone }): renders the form and handles submission; when the invite has no email (SPEC D29), asks for the email the broker will sign in with.
  */
 "use client";
 
@@ -17,7 +18,7 @@ import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { FormMessage } from "./form-message";
 
-export function InviteForm({ token, email, name }: { token: string; email: string | null; name: string }) {
+export function InviteForm({ token, email, name, hasPhone }: { token: string; email: string | null; name: string; hasPhone: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export function InviteForm({ token, email, name }: { token: string; email: strin
         body: {
           name,
           password: String(form.get("password")),
-          phone: String(form.get("phone")),
+          ...(hasPhone ? {} : { phone: String(form.get("phone")) }),
           ...(email ? {} : { email: String(form.get("email") ?? "").trim() }),
         },
       });
@@ -68,13 +69,15 @@ export function InviteForm({ token, email, name }: { token: string; email: strin
           className={inputClasses()}
         />
       </div>
-      <div>
-        <FieldLabel htmlFor="phone">Mobile number</FieldLabel>
-        <input id="phone" name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="(561) 000-0000" aria-describedby="phone-hint" className={inputClasses()} />
-        <p id="phone-hint" className="mt-2 text-[15px] text-muted">
-          We email you when a step is waiting, and call if something is urgent.
-        </p>
-      </div>
+      {hasPhone ? null : (
+        <div>
+          <FieldLabel htmlFor="phone">Mobile number</FieldLabel>
+          <input id="phone" name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="(561) 000-0000" aria-describedby="phone-hint" className={inputClasses()} />
+          <p id="phone-hint" className="mt-2 text-[15px] text-muted">
+            We email you when a step is waiting, and call if something is urgent.
+          </p>
+        </div>
+      )}
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
       <Button type="submit" size="xl" className="w-full" disabled={busy}>
         {busy ? "Creating your account…" : "Start my onboarding"}
