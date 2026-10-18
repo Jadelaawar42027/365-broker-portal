@@ -29,6 +29,7 @@ Keep these working at all times and update this list if they change.
 
 - `pnpm dev` - run web + api locally (needs `docker compose up -d` first)
 - `pnpm test` - unit + integration tests
+- `pnpm test:unit` - unit tests only (no Docker: skips every `*.int.test.ts`)
 - `pnpm test:e2e` - Playwright end-to-end tests (needs `docker compose up -d`; resets and uses its own `broker_portal_e2e` database and ports 3100/4100)
 - `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
 - `pnpm build` - production build of web + api

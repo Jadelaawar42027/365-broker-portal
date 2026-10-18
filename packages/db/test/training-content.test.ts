@@ -89,8 +89,9 @@ describe("onboarding step guidance", () => {
       expect(guidance.todoItems.length, key).toBeLessThanOrEqual(5);
       expect(countWords(guidance.todoItems), key).toBeLessThanOrEqual(60);
       expect([...guidance.todoItems, ...guidance.callouts.map((callout) => callout.text)].join(" "), key).not.toMatch(/\$\d/);
-      expect(parseLessonMarkdown(guidance.fullTextMd).length, key).toBeGreaterThan(0);
+      if (key !== "start_here") expect(parseLessonMarkdown(guidance.fullTextMd).length, key).toBeGreaterThan(0);
     }
+    expect(Object.entries(STEP_GUIDANCE).filter(([, guidance]) => !guidance.fullTextMd).map(([key]) => key)).toEqual(["start_here"]);
   });
 
   it("keeps every NEVER and WATCH from Modules 01 and 02 as one-line callouts", () => {

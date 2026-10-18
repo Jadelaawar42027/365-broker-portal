@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
     "admin:invite": "tsx scripts/admin-invite.ts",
     "storage:cors": "tsx scripts/storage-cors.ts",
     "release": "node dist/release.js"

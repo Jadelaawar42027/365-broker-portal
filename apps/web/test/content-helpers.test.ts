@@ -33,7 +33,7 @@ describe("step helpers", () => {
     expect(checkFileBeforeUpload({ name: "big.pdf", type: "application/pdf", size: 12 * 1024 * 1024 }, rules)).toBe('"big.pdf" is 12 MB. The limit is 10 MB.');
   });
 
-  it("groups steps by stage in order", () => {
+  it("groups steps by stage in order, keeping each stage's fixed number", () => {
     const groups = groupByStage([
       { key: "a", stage: "paperwork", stageTitle: "Paperwork" },
       { key: "b", stage: "paperwork", stageTitle: "Paperwork" },
@@ -41,7 +41,7 @@ describe("step helpers", () => {
     ]);
     expect(groups.map((group) => [group.number, group.stageTitle, group.steps.length])).toEqual([
       [1, "Paperwork", 2],
-      [2, "Your tools", 1],
+      [3, "Your tools", 1],
     ]);
   });
 });

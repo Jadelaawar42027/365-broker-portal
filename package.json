@@ -11,6 +11,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:unit": "turbo run test:unit --concurrency=1",
     "test:e2e": "pnpm --filter @bp/web test:e2e",
     "db:generate": "pnpm --filter @bp/db db:generate",
     "db:migrate": "pnpm --filter @bp/db db:migrate",
