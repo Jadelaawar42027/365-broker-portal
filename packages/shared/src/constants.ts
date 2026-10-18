@@ -22,10 +22,11 @@ export type StepStatus = (typeof STEP_STATUSES)[number];
 export const STEP_KINDS = ["upload", "text", "choice", "confirm", "checklist", "admin"] as const;
 export type StepKind = (typeof STEP_KINDS)[number];
 
-export const STEP_STAGES = ["paperwork", "florida_license", "your_tools"] as const;
+export const STEP_STAGES = ["start_here", "paperwork", "florida_license", "your_tools"] as const;
 export type StepStage = (typeof STEP_STAGES)[number];
 
 export const STAGE_TITLES: Record<StepStage, string> = {
+  start_here: "Start here",
   paperwork: "Paperwork",
   florida_license: "Your Florida license",
   your_tools: "Your tools",

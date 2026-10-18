@@ -8,6 +8,7 @@
  * Functions:
  * - seedDatabase(db, options): runs the whole seed in one transaction (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
  * - seedSteps(tx, refresh): inserts missing onboarding steps (or overwrites them when refresh is true); returns inserted and updated counts.
+ * - addMissingBrokerSteps(tx): gives every existing broker a todo row for any active step they don't have yet (e.g. step 0 "Start here", SPEC D30); returns how many rows were added.
  * - addPasswordLogin(tx, userId, password): creates the Better Auth credential account holding the hashed password.
  * - ensureOwner(tx, owner): creates the owner user and login if the email is new; returns the owner id and whether it was created.
  * - loadStepIds(tx): returns a map from step key to onboarding step id.
@@ -22,7 +23,7 @@
 import { addDays, buildStorageKey, INVITE_TTL_DAYS, todayInTimeZone, type StepStatus } from "@bp/shared";
 import { createAccountToken, type FileStorage } from "@bp/shared/node";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createBroker } from "../brokers";
 import type { Database, Transaction } from "../client";
 import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } from "../schema";
@@ -47,6 +48,7 @@ export type SeedSummary = {
   stepsInserted: number;
   stepsUpdated: number;
   stepsGuided: number;
+  brokerStepsAdded: number;
   owner: "created" | "existing" | "skipped";
   trainingChaptersInserted: number;
   trainingDraftsDeleted?: string[];
@@ -81,6 +83,7 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
       stepsInserted: 0,
       stepsUpdated: 0,
       stepsGuided: 0,
+      brokerStepsAdded: 0,
       owner: "skipped",
       trainingChaptersInserted: 0,
       sampleBrokers: [],
@@ -90,6 +93,7 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
     summary.stepsInserted = steps.inserted;
     summary.stepsUpdated = steps.updated;
     summary.stepsGuided = await seedStepGuidance(tx);
+    summary.brokerStepsAdded = await addMissingBrokerSteps(tx);
 
     if (options.removeRetiredTrainingDrafts) {
       summary.trainingDraftsDeleted = await removeRetiredTrainingDrafts(tx, now);
@@ -146,6 +150,19 @@ async function seedSteps(tx: Transaction, refresh: boolean) {
     else updated += 1;
   }
   return { inserted, updated };
+}
+
+async function addMissingBrokerSteps(tx: Transaction): Promise<number> {
+  const added = await tx.execute(sql`
+    INSERT INTO broker_steps (broker_id, step_id)
+    SELECT b.id, s.id
+    FROM brokers b
+    CROSS JOIN onboarding_steps s
+    WHERE s.active
+      AND NOT EXISTS (SELECT 1 FROM broker_steps bs WHERE bs.broker_id = b.id AND bs.step_id = s.id)
+    RETURNING id
+  `);
+  return added.length;
 }
 
 async function addPasswordLogin(tx: Transaction, userId: string, password: string): Promise<void> {
@@ -313,7 +330,7 @@ async function seedKevin(tx: Transaction, context: SampleContext) {
     platform_logins: { checked: ["boatwizard", "yachtcloser", "gohighlevel"] },
   };
   for (const seed of ONBOARDING_STEP_SEEDS) {
-    const day = addDays(joinedAt, Math.min(9, Math.floor((seed.position - 1) * 0.9)));
+    const day = addDays(joinedAt, Math.max(0, Math.min(9, Math.floor((seed.position - 1) * 0.9))));
     await setStepState(tx, brokerId, context.stepIds.get(seed.key)!, {
       status: "approved",
       submittedAt: seed.kind === "admin" ? null : at(day, 14),

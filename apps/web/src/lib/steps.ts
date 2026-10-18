@@ -7,9 +7,9 @@
  * - parseInstructionSteps(markdown): returns the text of each "1. …" line, or the non-empty lines if none are numbered.
  * - describeAcceptedTypes(types): "PDF, JPG or PNG" style wording for a list of MIME types.
  * - checkFileBeforeUpload(file, rules): returns an error message for a wrong type, empty or oversized file, or null.
- * - groupByStage(steps): returns [{ stage, stageTitle, number, steps }] in the order the stages first appear.
+ * - groupByStage(steps): returns [{ stage, stageTitle, number, steps }] in the order the stages first appear; the number is the stage's place in STEP_STAGES, so "Start here" is 0 and "Paperwork" is 1.
  */
-import { formatFileSize } from "@bp/shared";
+import { formatFileSize, STEP_STAGES } from "@bp/shared";
 
 const TYPE_NAMES: Record<string, string> = {
   "application/pdf": "PDF",
@@ -48,7 +48,8 @@ export function groupByStage<T extends { stage: string; stageTitle: string }>(st
   for (const step of steps) {
     let group = groups.find((candidate) => candidate.stage === step.stage);
     if (!group) {
-      group = { stage: step.stage, stageTitle: step.stageTitle, number: groups.length + 1, steps: [] };
+      const index = (STEP_STAGES as readonly string[]).indexOf(step.stage);
+      group = { stage: step.stage, stageTitle: step.stageTitle, number: index === -1 ? groups.length + 1 : index, steps: [] };
       groups.push(group);
     }
     group.steps.push(step);

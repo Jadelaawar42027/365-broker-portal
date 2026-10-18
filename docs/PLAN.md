@@ -105,6 +105,12 @@ brokerPortal/
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
 
+## Step 0 · Start here (D30, Oct 18, 2026)
+
+- [x] New "Start here" stage (0) with step `start_here`: walkthrough video slot, five bullets, "I've watched the walkthrough" tick
+- [x] Existing brokers get the new step on the next seed or deploy; stages numbered from 0 on the checklist and the invite welcome
+- Not run or committed yet. Fill the video in Admin → Onboarding steps → Start here after deploy.
+
 ## Phase H1: Commission structure (D29)
 
 Started Oct 18, 2026. Built without running tests (Rule 3); tests are written for "run tests". Migrations additive only. Step 11 stays retired (Aj: excluded from H1).

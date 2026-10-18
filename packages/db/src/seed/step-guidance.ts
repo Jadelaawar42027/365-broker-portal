@@ -4,6 +4,7 @@
  * 365 Broker Onboarding Manual: 3 to 5 plain "What to do" bullets, one-line NEVER / WATCH / HOUSE RULE callouts, the
  * manual's original text for the "Read the full section" panel, empty video slots, and the optional knowledge check.
  * Bond and fee figures stay in the full text only, next to the manual's WATCH that they change.
+ * Step 0 "Start here" (SPEC D30) has no manual text: just bullets and the slot for Shelly's portal walkthrough video.
  *
  * Functions:
  * - none
@@ -55,6 +56,18 @@ const PLATFORM_TABLE = `## Platform credentials you will receive
 | GoHighLevel CRM | Leads, pipeline, follow-up tasks, campaigns. | Load your first 100 contacts |`;
 
 export const STEP_GUIDANCE: Readonly<Record<string, StepGuidanceSeed>> = {
+  start_here: {
+    todoItems: [
+      "Watch the walkthrough video above.",
+      "Your checklist always shows the next step to do.",
+      "Open a step, follow What to do, then send it in.",
+      "Stuck? Tap Message Shelly on WhatsApp on any step.",
+      "Tick the box below once you've watched it.",
+    ],
+    callouts: [],
+    fullTextMd: "",
+    videoSlots: ["How to use the 365 portal"],
+  },
   photo_id: {
     todoItems: [
       "Use your driver's license or passport.",

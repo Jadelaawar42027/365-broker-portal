@@ -1,6 +1,6 @@
 /**
  * File: packages/db/src/seed/steps.ts
- * Purpose: The 10 onboarding steps from docs/SPEC.md, with copy taken from the mockups and the 365 Broker
+ * Purpose: The onboarding steps from docs/SPEC.md: step 0 "Start here" (a portal walkthrough video, SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
  * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
  * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27).
  *
@@ -29,6 +29,24 @@ const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const IMAGE_TYPES = ["image/jpeg", "image/png"];
 
 export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
+  {
+    key: "start_here",
+    position: 0,
+    stage: "start_here",
+    title: "Start here: how the 365 portal works",
+    shortTitle: "Start here: portal walkthrough",
+    summary: "Watch a short walkthrough of the portal before you begin. Takes about 10 minutes.",
+    intro: "Shelly shows you around the portal: your checklist, sending each step, getting help, and what happens after.",
+    kind: "confirm",
+    needsApproval: false,
+    instructionsMd: [
+      "1. Watch the walkthrough video.",
+      "2. Tick the box to say you've watched it.",
+    ].join("\n"),
+    acceptedTypes: [],
+    maxSizeBytes: MAX_UPLOAD_BYTES,
+    config: { minutes: 10, confirmLabel: "I've watched the walkthrough" },
+  },
   {
     key: "photo_id",
     position: 1,

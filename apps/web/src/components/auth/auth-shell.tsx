@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/components/auth/auth-shell.tsx
  * Purpose: The split layout of screen 1a, reused by sign-in, invite and reset pages: a navy welcome panel with the
- * three onboarding stages and the WhatsApp help button, and a white card holding the form. Stacks on phones.
+ * onboarding stages (numbered from 0, Start here) and the WhatsApp help button, and a white card holding the form. Stacks on phones.
  *
  * Functions:
  * - AuthShell({ eyebrow, heading, intro, showStages, support, supportTopic, brokerName, cardTitle, cardSubtitle, children }): renders the page.
@@ -45,7 +45,7 @@ export function AuthShell({
           <ol className="mt-11 space-y-6">
             {ONBOARDING_STAGES.map((stage, index) => (
               <li key={stage.title} className="flex gap-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#c9d3e3] text-base font-bold">{index + 1}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#c9d3e3] text-base font-bold">{index}</span>
                 <span>
                   <span className="block text-lg font-bold">{stage.title}</span>
                   <span className="block text-base text-[#c9d3e3]">{stage.body}</span>

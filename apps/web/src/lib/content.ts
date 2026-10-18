@@ -19,6 +19,7 @@ export const FIRST_90_DAYS = [
 ] as const;
 
 export const ONBOARDING_STAGES = [
+  { title: "Start here", body: "A short video on how the portal works" },
   { title: "Paperwork", body: "ID, contract & NDA, W-9, bio and headshot" },
   { title: "Your Florida license", body: "File with DBPR or transfer your license to 365" },
   { title: "Your tools", body: "365 email, BoatWizard, YachtCloser and GoHighLevel" },

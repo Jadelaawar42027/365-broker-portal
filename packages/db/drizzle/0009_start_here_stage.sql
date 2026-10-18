@@ -1,0 +1,1 @@
+ALTER TYPE "public"."step_stage" ADD VALUE 'start_here' BEFORE 'paperwork';
