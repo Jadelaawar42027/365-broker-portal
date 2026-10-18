@@ -2,15 +2,19 @@
  * File: apps/api/src/routes/admin/brokers.ts
  * Purpose: Admin routes for managing brokers (3b, 3c): the filtered list (with training progress from the
  * broker_training_metrics view), inviting a new broker (name, E.164 phone, optional email, level and both commission
- * splits; without an email the invite link is returned for the admin to send by hand, SPEC D29), a fresh invite link
+ * splits; the invite link is always returned so the admin can copy it or send it by WhatsApp, SPEC D29 and phase H2,
+ * and the broker's Google Workspace and GoHighLevel accounts are queued for creation), a fresh invite link
  * on demand, the full profile with files, persona and commission history, editing level/status/dates, changing the
  * commission split (a new history row; agreements not yet countersigned are voided so the broker signs again, and
  * signed ones return the Section 1.7 addendum warning, SPEC D31), the persona, resending an invite, sending a reset link and reminders.
- * Setting a broker to inactive deletes their sessions at once (SPEC D9). Every change writes audit_log.
+ * Setting a broker to inactive deletes their sessions at once (SPEC D9), cancels open account set-up and queues suspending
+ * their Google account and deactivating their GHL user; reactivating queues unsuspending them (phase H2). The CRM phone
+ * is edited here too. The list carries each broker's account status for the icons on 3b. Every change writes audit_log.
  *
  * Functions:
  * - registerAdminBrokerRoutes(app): mounts the /v1/admin/brokers routes.
  * - pickChanges(before, body): returns only the fields whose value actually changes.
+ * - accountSystems(broker): the systems (Google, GHL) where the broker has an account to suspend or unsuspend.
  * - toHistoryEntry(row): shapes a commission_history row for the profile.
  */
 import { randomBytes } from "node:crypto";
@@ -36,6 +40,7 @@ import {
   remindRequestSchema,
   stepStatusLabel,
   updateBrokerRequestSchema,
+  type ProvisioningSystem,
   type UpdateBrokerRequest,
 } from "@bp/shared";
 import { and, eq, inArray } from "drizzle-orm";
@@ -50,6 +55,8 @@ import { writeAudit } from "../../services/audit";
 import { countBrokersByStatus, listBrokerMetrics, loadBrokerWithUser, toBrokerListRow } from "../../services/brokers";
 import { inviteEmail, passwordResetEmail, reminderEmail, resignNeededEmail } from "../../services/emails";
 import { sendSafely } from "../../services/mailer";
+import { loadAccountSummaries } from "../../services/provisioning/status";
+import { cancelOpenTasks, enqueueForSystems } from "../../services/provisioning/tasks";
 import { loadBrokerSteps, loadFiles, toFileView, toIso } from "../../services/steps";
 import { supportContact, todayFor, webLink } from "../../services/support";
 
@@ -66,6 +73,13 @@ function toHistoryEntry(row: Awaited<ReturnType<typeof commissionHistoryFor>>[nu
     note: row.note,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function accountSystems(broker: { googleUserId: string | null; ghlUserId: string | null }): ProvisioningSystem[] {
+  const systems: ProvisioningSystem[] = [];
+  if (broker.googleUserId) systems.push("google");
+  if (broker.ghlUserId) systems.push("ghl");
+  return systems;
 }
 
 function pickChanges(before: Record<string, unknown>, body: UpdateBrokerRequest) {
@@ -92,12 +106,18 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     async (request) => {
       const rows = await listBrokerMetrics(app.deps.db, request.query);
       const training = await app.deps.db.select().from(brokerTrainingMetrics);
+      const accountRows = await app.deps.db
+        .select({ id: brokers.id, corporateEmail: brokers.corporateEmail, googleUserId: brokers.googleUserId, ghlUserId: brokers.ghlUserId })
+        .from(brokers);
+      const summaries = await loadAccountSummaries(app.deps.db, app.deps.integrations, accountRows);
       return {
         counts: await countBrokersByStatus(app.deps.db),
         brokers: rows.map((row) => {
           const metrics = training.find((item) => item.brokerId === row.brokerId);
           return {
             ...toBrokerListRow(row),
+            corporateEmail: accountRows.find((entry) => entry.id === row.brokerId)?.corporateEmail ?? null,
+            accounts: summaries.get(row.brokerId),
             training: metrics ? { chaptersPassed: metrics.chaptersPassed, chaptersTotal: metrics.chaptersTotal, avgBestScore: metrics.avgBestScore } : undefined,
           };
         }),
@@ -152,13 +172,15 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
             selfGeneratedSplit: request.body.selfGeneratedSplit,
           },
         });
+        await enqueueForSystems(tx, { brokerId: created.brokerId, action: "create", integrations: app.deps.integrations, createdBy: actor.userId, now });
         return { brokerId: created.brokerId, token: issued };
       });
+      app.deps.wakeProvisioning();
       const inviteUrl = webLink(env, `/invite/${token}`);
       if (request.body.email) {
         await sendSafely(mailer, request.log, [{ to: request.body.email, ...inviteEmail({ name: request.body.name, link: inviteUrl, support: supportContact(env) }) }]);
       }
-      return reply.status(201).send({ brokerId, inviteUrl: request.body.email ? null : inviteUrl });
+      return reply.status(201).send({ brokerId, inviteUrl, phone: request.body.phone });
     },
   );
 
@@ -198,6 +220,8 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           leftAt: broker.leftAt,
           inHouseSplit: commission.inHousePct,
           selfGeneratedSplit: commission.selfGeneratedPct,
+          corporateEmail: broker.corporateEmail,
+          crmPhone: broker.crmPhone,
           hasLogin: await hasPasswordLogin(db, user.id),
         },
         metrics: {
@@ -271,9 +295,15 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
       await db.transaction(async (tx) => {
         await tx.update(brokers).set(changes).where(eq(brokers.id, broker.id));
         let sessionsRevoked = 0;
+        let provisioning: Awaited<ReturnType<typeof enqueueForSystems>> | null = null;
         if (changes.status === "inactive") {
           const revoked = await tx.delete(sessions).where(eq(sessions.userId, broker.userId)).returning({ id: sessions.id });
           sessionsRevoked = revoked.length;
+          await cancelOpenTasks(tx, { brokerId: broker.id, actions: ["create", "link", "unsuspend"], reason: "Cancelled: the broker was set to inactive." });
+          provisioning = await enqueueForSystems(tx, { brokerId: broker.id, action: "suspend", integrations: app.deps.integrations, createdBy: actor.userId, now: app.deps.now(), systems: accountSystems(broker) });
+        } else if (changes.status && broker.status === "inactive") {
+          await cancelOpenTasks(tx, { brokerId: broker.id, actions: ["suspend"], reason: "Cancelled: the broker was reactivated." });
+          provisioning = await enqueueForSystems(tx, { brokerId: broker.id, action: "unsuspend", integrations: app.deps.integrations, createdBy: actor.userId, now: app.deps.now(), systems: accountSystems(broker) });
         }
         const before = Object.fromEntries(Object.keys(changes).map((key) => [key, broker[key as keyof typeof broker]]));
         await writeAudit(tx, {
@@ -282,9 +312,10 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           entityType: "broker",
           entityId: broker.id,
           before,
-          after: changes.status === "inactive" ? { ...changes, sessionsRevoked } : changes,
+          after: changes.status === "inactive" ? { ...changes, sessionsRevoked, provisioning } : provisioning ? { ...changes, provisioning } : changes,
         });
       });
+      app.deps.wakeProvisioning();
       return { ok: true as const };
     },
   );

@@ -22,14 +22,18 @@ import { registerFileRoutes } from "./routes/files";
 import { registerHealthRoutes } from "./routes/health";
 import { registerInviteRoutes } from "./routes/invites";
 import { registerMeRoutes } from "./routes/me";
+import { registerMyAccountRoutes } from "./routes/my-accounts";
 import { registerPasswordResetRoutes } from "./routes/password-reset";
 import { registerTrainingRoutes } from "./routes/training";
 import { createMailer, type Mailer } from "./services/mailer";
+import { createIntegrations, type Integrations } from "./services/provisioning/integrations";
 
-export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now"> & {
+export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now" | "integrations" | "wakeProvisioning"> & {
   auth?: Auth;
   mailer?: Mailer;
   now?: () => Date;
+  integrations?: Integrations;
+  wakeProvisioning?: () => void;
 };
 
 export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
@@ -47,6 +51,8 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
     auth: input.auth ?? createAuth({ db: input.db, env }),
     mailer: input.mailer ?? createMailer(env, app.log),
     now: input.now ?? (() => new Date()),
+    integrations: input.integrations ?? createIntegrations(env),
+    wakeProvisioning: input.wakeProvisioning ?? (() => undefined),
   });
 
   registerErrorHandler(app);
@@ -59,6 +65,7 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
   registerInviteRoutes(app);
   registerPasswordResetRoutes(app);
   registerMeRoutes(app);
+  registerMyAccountRoutes(app);
   registerBrokerStepRoutes(app);
   registerContractRoutes(app);
   registerTrainingRoutes(app);

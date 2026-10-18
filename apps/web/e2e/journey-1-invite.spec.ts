@@ -45,7 +45,8 @@ test("admin invites a broker without an email, sends the link by hand, and chang
   await fillInviteForm(dialog, "Omar Haddad", null);
   await dialog.getByRole("button", { name: "Send invite" }).click();
   const invited = page.getByRole("dialog", { name: "Omar Haddad is invited" });
-  await expect(invited.getByText("There's no email, so send them this link yourself.")).toBeVisible();
+  await expect(invited.getByText("Send them this link by WhatsApp or copy it.")).toBeVisible();
+  await expect(invited.getByRole("link", { name: /Send via WhatsApp/ })).toHaveAttribute("href", /^https:\/\/wa\.me\/15615550199\?text=/);
   const link = new URL(await invited.getByLabel("Invite link").inputValue());
   await invited.getByRole("link", { name: "Open their profile" }).click();
   await expect(page.getByText("No email yet")).toBeVisible();

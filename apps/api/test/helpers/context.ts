@@ -5,7 +5,7 @@
  * read the emails that were sent.
  *
  * Functions:
- * - createTestContext(options): starts everything and returns the context object.
+ * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none) and returns the context object.
  * - call(method, url, options): sends a request through app.inject with the portal's Origin header; returns the response.
  * - login(email, password): signs in through Better Auth and returns the session cookie.
  * - createBroker(input): creates a broker (and, unless invited, a password login) directly in the database; returns ids, email and a signed-in cookie.
@@ -15,6 +15,7 @@
  * - emailsTo(address): returns every email sent to an address so far.
  * - linkToken(email, kind): pulls the invite or reset token out of an email's link.
  * - setNow(date): moves the API's clock.
+ * - runProvisioning(runOptions): runs due provisioning tasks now (what the worker loop does, up to runOptions.limit) and returns how many ran.
  * - close(): closes the app and stops the Postgres container.
  */
 import { accounts, brokerSteps, createBroker as createBrokerRows, onboardingSteps, seedDatabase } from "@bp/db";
@@ -26,6 +27,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import { inject } from "vitest";
 import { buildApp } from "../../src/app";
 import { loadApiEnv } from "../../src/env";
+import { readIntegrationConfig } from "../../src/services/provisioning/config";
+import type { Integrations } from "../../src/services/provisioning/integrations";
+import { processDueTasks } from "../../src/services/provisioning/worker";
 import type { EmailMessage, Mailer } from "../../src/services/mailer";
 
 export const WEB_ORIGIN = "http://localhost:3000";
@@ -34,7 +38,7 @@ export const PASSWORD = "broker-password-123";
 
 type CallOptions = { cookie?: string; body?: unknown; headers?: Record<string, string>; rawBody?: Buffer };
 
-export async function createTestContext(options: { uploadMode?: "direct" | "proxy"; supportNumber?: string } = {}) {
+export async function createTestContext(options: { uploadMode?: "direct" | "proxy"; supportNumber?: string; integrations?: Integrations } = {}) {
   const database = await startTestDatabase();
   await seedDatabase(database.db, { owner: OWNER });
   const s3 = inject("s3");
@@ -63,7 +67,8 @@ export async function createTestContext(options: { uploadMode?: "direct" | "prox
   const sent: EmailMessage[] = [];
   const mailer: Mailer = { send: async (message) => void sent.push(message) };
   let nowValue: Date | null = null;
-  const app = await buildApp({ env, db: database.db, storage, mailer, now: () => nowValue ?? new Date() });
+  const integrations: Integrations = options.integrations ?? { config: readIntegrationConfig(env), google: null, ghl: null };
+  const app = await buildApp({ env, db: database.db, storage, mailer, now: () => nowValue ?? new Date(), integrations });
 
   async function call(method: string, url: string, callOptions: CallOptions = {}) {
     const headers: Record<string, string> = { origin: WEB_ORIGIN, ...callOptions.headers };
@@ -182,6 +187,7 @@ export async function createTestContext(options: { uploadMode?: "direct" | "prox
     setNow: (date: Date | null) => {
       nowValue = date;
     },
+    runProvisioning: (runOptions: { limit?: number } = {}) => processDueTasks({ db: database.db, integrations, now: () => nowValue ?? new Date() }, runOptions),
     close: async () => {
       await app.close();
       await database.stop();

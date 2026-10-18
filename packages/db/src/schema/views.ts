@@ -2,7 +2,7 @@
  * File: packages/db/src/schema/views.ts
  * Purpose: Typed read access to the broker_metrics and broker_training_metrics SQL views. The views are created by the
  * hand-written migrations drizzle/0001_broker_metrics_view.sql (redefined by 0008 with the current commission split
- * at the end, SPEC D29) and drizzle/0003_broker_training_metrics_view.sql, so they are declared here as existing.
+ * at the end, SPEC D29, and by 0013 with crm_phone after them, phase H2) and drizzle/0003_broker_training_metrics_view.sql, so they are declared here as existing.
  *
  * Functions:
  * - none
@@ -28,6 +28,7 @@ export const brokerMetrics = pgView("broker_metrics", {
   lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
   inHousePct: integer("in_house_pct"),
   selfGeneratedPct: integer("self_generated_pct"),
+  crmPhone: text("crm_phone"),
 }).existing();
 
 export const brokerTrainingMetrics = pgView("broker_training_metrics", {

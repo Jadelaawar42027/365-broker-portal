@@ -1,6 +1,7 @@
 /**
  * File: apps/api/src/deps.ts
- * Purpose: The dependencies every route needs (config, database, storage, mailer, auth, clock), and the Fastify
+ * Purpose: The dependencies every route needs (config, database, storage, mailer, auth, clock, the Google and GoHighLevel
+ * clients for account provisioning, and a way to wake the provisioning worker), and the Fastify
  * type additions that expose them as app.deps and the signed-in user as request.actor.
  *
  * Functions:
@@ -12,6 +13,7 @@ import type { FileStorage } from "@bp/shared/node";
 import type { Auth } from "./auth";
 import type { ApiEnv } from "./env";
 import type { Mailer } from "./services/mailer";
+import type { Integrations } from "./services/provisioning/integrations";
 
 export type AppDeps = {
   env: ApiEnv;
@@ -20,6 +22,8 @@ export type AppDeps = {
   mailer: Mailer;
   auth: Auth;
   now: () => Date;
+  integrations: Integrations;
+  wakeProvisioning: () => void;
 };
 
 export type RequestActor = {

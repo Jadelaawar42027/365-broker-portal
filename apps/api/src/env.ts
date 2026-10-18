@@ -2,6 +2,8 @@
  * File: apps/api/src/env.ts
  * Purpose: Validates the API's environment variables with Zod and gives the rest of the code a typed config.
  * Required secrets have no defaults, so a misconfigured deploy fails at start-up instead of at the first request.
+ * The Google Workspace and GoHighLevel variables (phase H2) are optional here; services/provisioning/config.ts checks
+ * them and treats a system with missing or malformed values as not configured instead of refusing to start.
  *
  * Functions:
  * - loadApiEnv(source): parses source (defaults to process.env) and returns the typed config; throws listing every invalid variable.
@@ -38,6 +40,14 @@ const apiEnvSchema = z
     SUPPORT_CONTACT_NAME: z.string().trim().min(1).default("Shelly"),
     SUPPORT_WHATSAPP_NUMBER: optionalString,
     EMAIL_OUTBOX_DIR: optionalString,
+    GOOGLE_SERVICE_ACCOUNT_JSON: optionalString,
+    GOOGLE_ADMIN_SUBJECT: optionalString,
+    GOOGLE_DOMAIN: optionalString,
+    GOOGLE_ORG_UNIT: optionalString,
+    GHL_AGENCY_TOKEN: optionalString,
+    GHL_COMPANY_ID: optionalString,
+    GHL_LOCATION_ID: optionalString,
+    PROVISIONING_WORKER: z.enum(["on", "off"]).default("on"),
     COMPANY_SIGNER_EMAIL: z
       .string()
       .trim()

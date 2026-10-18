@@ -3,14 +3,18 @@
  * Purpose: Imports existing brokers (docs/SPEC.md "Import existing brokers"): reads the import folder, then upserts
  * each broker by email, sets personas, uploads their paperwork and marks onboarded brokers' steps approved with the
  * note "imported". Never deletes anything, runs in one transaction, writes audit_log rows, and is safe to run again.
- * A dry run does the same work and rolls it back, so its summary is exact.
+ * A dry run does the same work and rolls it back, so its summary is exact. Optional corporate_email and crm_phone columns
+ * set the broker's 365 email and CRM phone (an email on GOOGLE_DOMAIN counts as the corporate one), and with link the
+ * importer queues "link" provisioning tasks so the api's worker looks the accounts up in Google and GoHighLevel and stores
+ * their ids (phase H2). Existing brokers are matched by login email or corporate email.
  *
  * Functions:
  * - contentTypeFor(fileName): the MIME type for a .pdf, .jpg/.jpeg or .png file, or null.
  * - matchStepKey(baseName, stepKeys): the upload step a file name belongs to ("w9" or "w9-page2" → "w9"), or null.
  * - loadImportFolder(dir, uploadStepKeys): reads brokers.csv, personas/{email}.md and files/{email}/{stepKey}.{ext}; returns the parsed input and any errors.
- * - runImport(db, storage, input, options): applies the import (or rehearses it with dryRun) and returns the summary.
+ * - runImport(db, storage, input, options): applies the import (or rehearses it with dryRun; link queues account linking; googleDomain marks emails on that domain as corporate) and returns the summary.
  * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them (a changed name, phone or split voids any contract documents not yet countersigned, SPEC D31); commission splits go into the commission history (a new broker's old commission_tier becomes the first row's note; changed splits add a row; blank cells leave the current splits alone).
+ * - applyAccountColumns(tx, context, row, brokerId): sets the corporate email and CRM phone from the row and, with link, queues the link tasks.
  * - approveForImport(tx, context, brokerStepId, before): marks one step approved as imported and records it in audit_log.
  * - audit(tx, entry): inserts an audit_log row with no actor (the importer).
  * - DryRunRollback.constructor(summary): the error used to roll back a dry run while keeping its summary.
@@ -20,12 +24,12 @@ import type { FileStorage } from "@bp/shared/node";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { createBroker } from "../brokers";
 import { addCommissionChange, currentCommission } from "../commission";
 import { voidOpenContracts } from "../contracts";
 import type { Database, Transaction } from "../client";
-import { accounts, auditLog, brokerSteps, brokers, files, onboardingSteps, sessions, users } from "../schema";
+import { accounts, auditLog, brokerSteps, brokers, files, onboardingSteps, provisioningTasks, sessions, users } from "../schema";
 import { parseBrokerCsv, type BrokerCsvRow } from "./csv";
 
 export type ImportFile = { stepKey: string; fileName: string; contentType: string; body: Uint8Array };
@@ -45,12 +49,16 @@ export type ImportSummary = {
   filesSkipped: number;
   stepsApproved: number;
   withoutLogin: string[];
+  accountsUpdated: number;
+  linksQueued: number;
   warnings: string[];
 };
 
 type ImportContext = {
   storage: FileStorage | null;
   dryRun: boolean;
+  link: boolean;
+  googleDomain: string | null;
   now: Date;
   summary: ImportSummary;
   input: ImportInput;
@@ -134,13 +142,59 @@ async function approveForImport(tx: Transaction, context: ImportContext, brokerS
   context.summary.stepsApproved += 1;
 }
 
+async function applyAccountColumns(tx: Transaction, context: ImportContext, row: BrokerCsvRow, brokerId: string) {
+  const domain = context.googleDomain?.toLowerCase() ?? null;
+  const corporate = row.corporateEmail ?? (domain && row.email.endsWith(`@${domain}`) ? row.email : null);
+  const [broker] = await tx.select().from(brokers).where(eq(brokers.id, brokerId));
+  const changes: { corporateEmail?: string; crmPhone?: string } = {};
+  if (corporate && broker!.corporateEmail !== corporate) {
+    const [taken] = await tx.select({ id: brokers.id }).from(brokers).where(and(eq(brokers.corporateEmail, corporate), ne(brokers.id, brokerId)));
+    if (taken) context.summary.warnings.push(`${row.email} (line ${row.line}): corporate email ${corporate} already belongs to another broker — left alone.`);
+    else if (broker!.googleUserId) context.summary.warnings.push(`${row.email} (line ${row.line}): already linked to Google as ${broker!.corporateEmail} — corporate email left alone.`);
+    else changes.corporateEmail = corporate;
+  }
+  if (row.crmPhone && broker!.crmPhone !== row.crmPhone) changes.crmPhone = row.crmPhone;
+  if (Object.keys(changes).length > 0) {
+    await tx.update(brokers).set(changes).where(eq(brokers.id, brokerId));
+    await audit(tx, {
+      action: "broker.accounts_imported",
+      entityType: "broker",
+      entityId: brokerId,
+      before: { corporateEmail: broker!.corporateEmail, crmPhone: broker!.crmPhone },
+      after: changes,
+    });
+    context.summary.accountsUpdated += 1;
+  }
+  const linkEmail = changes.corporateEmail ?? broker!.corporateEmail;
+  if (!context.link) return;
+  if (!linkEmail) {
+    context.summary.warnings.push(`${row.email} (line ${row.line}): no corporate email, so nothing to link.`);
+    return;
+  }
+  const systems = (["google", "ghl"] as const).filter((system) => !(system === "google" ? broker!.googleUserId : broker!.ghlUserId));
+  for (const system of systems) {
+    const queued = await tx
+      .insert(provisioningTasks)
+      .values({ brokerId, system, action: "link", nextAttemptAt: context.now })
+      .onConflictDoNothing()
+      .returning({ id: provisioningTasks.id });
+    if (queued.length > 0) {
+      await audit(tx, { action: "provisioning.queued", entityType: "broker", entityId: brokerId, after: { system, action: "link", taskId: queued[0]!.id, source: "import" } });
+      context.summary.linksQueued += 1;
+    }
+  }
+}
+
 async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsvRow) {
   const { summary, now } = context;
+  const matches = [eq(users.email, row.email), eq(brokers.corporateEmail, row.email)];
+  if (row.corporateEmail) matches.push(eq(users.email, row.corporateEmail), eq(brokers.corporateEmail, row.corporateEmail));
   const [existing] = await tx
     .select({ user: users, broker: brokers })
     .from(users)
     .leftJoin(brokers, eq(brokers.userId, users.id))
-    .where(eq(users.email, row.email));
+    .where(or(...matches))
+    .limit(1);
   if (existing && (existing.user.role !== "broker" || !existing.broker)) {
     summary.warnings.push(`${row.email} (line ${row.line}) is an admin account, not a broker — skipped.`);
     return;
@@ -270,6 +324,8 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     await tx.update(brokers).set({ welcomeSeenAt: now }).where(and(eq(brokers.id, brokerId), isNull(brokers.welcomeSeenAt)));
   }
 
+  await applyAccountColumns(tx, context, row, brokerId);
+
   const login = await tx
     .select({ id: accounts.id })
     .from(accounts)
@@ -281,7 +337,7 @@ export async function runImport(
   db: Database,
   storage: FileStorage | null,
   input: ImportInput,
-  options: { dryRun: boolean; now?: Date },
+  options: { dryRun: boolean; now?: Date; link?: boolean; googleDomain?: string | null },
 ): Promise<ImportSummary> {
   const summary: ImportSummary = {
     created: [],
@@ -292,13 +348,15 @@ export async function runImport(
     filesSkipped: 0,
     stepsApproved: 0,
     withoutLogin: [],
+    accountsUpdated: 0,
+    linksQueued: 0,
     warnings: [],
   };
   const emails = new Set(input.rows.map((row) => row.email));
   for (const email of [...input.personas.keys(), ...input.files.keys()]) {
     if (!emails.has(email)) summary.warnings.push(`${email} has a persona or files but no row in brokers.csv — skipped.`);
   }
-  const context: ImportContext = { storage, dryRun: options.dryRun, now: options.now ?? new Date(), summary, input };
+  const context: ImportContext = { storage, dryRun: options.dryRun, link: options.link ?? false, googleDomain: options.googleDomain ?? null, now: options.now ?? new Date(), summary, input };
   try {
     await db.transaction(async (tx) => {
       for (const row of input.rows) await importRow(tx, context, row);

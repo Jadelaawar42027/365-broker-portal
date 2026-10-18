@@ -1,10 +1,11 @@
 /**
  * File: packages/db/src/schema/portal.ts
  * Purpose: The portal's own tables: brokers (with the mailing address and Florida license number given when signing
- * the agreements, SPEC D31), their commission history (SPEC D29: one row per change of the two splits,
+ * the agreements, SPEC D31, and the accounts provisioned for them in phase H2: corporate email, CRM phone, Google Workspace and
+ * GoHighLevel user ids), their commission history (SPEC D29: one row per change of the two splits,
  * in-house leads % and self-generated deals %; the latest row is the current split; the older split columns on brokers
  * and commission_tier are kept but no longer used), account tokens (invites and resets, SPEC D8), the onboarding step
- * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten) and the audit log.
+ * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten), the audit log, and the provisioning tasks that create, suspend, unsuspend or link a broker's Google and GoHighLevel accounts (at most one open task per broker, system and action).
  *
  * Functions:
  * - none
@@ -22,12 +23,16 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import {
   brokerLevelEnum,
   brokerStatusEnum,
+  provisioningActionEnum,
+  provisioningSystemEnum,
+  provisioningTaskStatusEnum,
   stepKindEnum,
   stepStageEnum,
   stepStatusEnum,
@@ -56,6 +61,10 @@ export const brokers = pgTable(
     commissionTier: text("commission_tier"),
     mailingAddress: text("mailing_address"),
     floridaLicenseNo: text("florida_license_no"),
+    corporateEmail: text("corporate_email").unique(),
+    crmPhone: text("crm_phone"),
+    googleUserId: text("google_user_id"),
+    ghlUserId: text("ghl_user_id"),
     inHouseSplit: integer("in_house_split"),
     selfGeneratedSplit: integer("self_generated_split"),
     personaMd: text("persona_md"),
@@ -208,5 +217,32 @@ export const auditLog = pgTable(
   (table) => [
     index("audit_log_entity_idx").on(table.entityType, table.entityId),
     index("audit_log_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const provisioningTasks = pgTable(
+  "provisioning_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brokerId: uuid("broker_id")
+      .notNull()
+      .references(() => brokers.id, { onDelete: "cascade" }),
+    system: provisioningSystemEnum("system").notNull(),
+    action: provisioningActionEnum("action").notNull(),
+    status: provisioningTaskStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("provisioning_tasks_due_idx").on(table.status, table.nextAttemptAt),
+    index("provisioning_tasks_broker_idx").on(table.brokerId, table.system, table.createdAt),
+    uniqueIndex("provisioning_tasks_one_open_idx")
+      .on(table.brokerId, table.system, table.action)
+      .where(sql`${table.status} IN ('pending', 'running')`),
+    check("provisioning_tasks_attempts_range", sql`${table.attempts} >= 0`),
   ],
 );

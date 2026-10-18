@@ -4,7 +4,7 @@
  * brokers table search also matches persona text with a simple ILIKE (docs/SPEC.md).
  *
  * Functions:
- * - toBrokerListRow(row): shapes a broker_metrics row for API responses (placeholder emails become null; the current commission split comes from the view).
+ * - toBrokerListRow(row): shapes a broker_metrics row for API responses (placeholder emails become null; the current commission split and CRM phone come from the view).
  * - escapeLike(value): escapes %, _ and \ so user text is matched literally in ILIKE.
  * - listBrokerMetrics(db, filters): returns broker_metrics rows filtered by status, level and search, in table order.
  * - countBrokersByStatus(db): returns how many brokers are in each status, plus the total.
@@ -36,6 +36,7 @@ export function toBrokerListRow(row: MetricsRow): BrokerListRow {
     stepsTotal: row.stepsTotal,
     stepsWaitingReview: row.stepsWaitingReview,
     lastActivityAt: toIso(row.lastActivityAt),
+    crmPhone: row.crmPhone,
   };
 }
 

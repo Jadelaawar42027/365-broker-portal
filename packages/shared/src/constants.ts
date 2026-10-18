@@ -1,7 +1,7 @@
 /**
  * File: packages/shared/src/constants.ts
  * Purpose: The fixed value lists of the domain (roles, levels, statuses, step kinds, stages, and training: chapter
- * statuses, retake policies, video sources, quiz attempt statuses). The database enums, the Zod schemas and the UI all
+ * statuses, retake policies, video sources, quiz attempt statuses; account provisioning: systems, actions and task statuses). The database enums, the Zod schemas and the UI all
  * read these, so a value is defined exactly once.
  *
  * Functions:
@@ -68,3 +68,15 @@ export const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 export const VIDEO_PART_BYTES = 16 * 1024 * 1024;
 export const VIDEO_MIME_TYPE = "video/mp4";
 export const READ_WORDS_PER_MINUTE = 200;
+
+export const PROVISIONING_SYSTEMS = ["google", "ghl"] as const;
+export type ProvisioningSystem = (typeof PROVISIONING_SYSTEMS)[number];
+
+export const PROVISIONING_ACTIONS = ["create", "suspend", "unsuspend", "link"] as const;
+export type ProvisioningAction = (typeof PROVISIONING_ACTIONS)[number];
+
+export const PROVISIONING_TASK_STATUSES = ["pending", "running", "done", "failed"] as const;
+export type ProvisioningTaskStatus = (typeof PROVISIONING_TASK_STATUSES)[number];
+
+export const PROVISIONING_MAX_ATTEMPTS = 5;
+export const PASSWORD_REVEALS_PER_DAY = 3;

@@ -36,7 +36,8 @@ Keep these working at all times and update this list if they change.
 - `pnpm start` / `node scripts/start.mjs` - production start for one Railway service (picks api or web from `RAILWAY_SERVICE_NAME` or `BP_SERVICE`)
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`, `--no-training`; training chapters are added live in development and as drafts in production; sample brokers are never seeded when `NODE_ENV=production`)
 - `pnpm db:metrics-user` - create or reset the read-only `broker_metrics` login from `METRICS_READER_USER` / `METRICS_READER_PASSWORD`
-- `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/`
+- `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/` (`--link` also queues linking their Google and GHL accounts by corporate email)
+- `pnpm provision:verify` - real end-to-end check of Google Workspace and GoHighLevel provisioning with the live credentials (creates and deletes its own test users; run by Aj only)
 - `pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` - create an admin and print their invite link (owner task, SPEC D7)
 - `pnpm storage:cors` - allow the web origin to upload straight to the bucket (run once per bucket; SPEC D11)
 - `pnpm --filter @bp/api release` - production pre-deploy: migrations + idempotent seed (built by `pnpm build`; see docs/DEPLOY.md)

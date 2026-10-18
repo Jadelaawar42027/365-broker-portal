@@ -4,7 +4,8 @@
  * the two commission splits with their history and a "Change commission" form (SPEC D29), the agreements panel
  * (status, every version, countersign, void and re-issue, signed-outside uploads, SPEC D31),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
- * uploader, the Persona panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
+ * uploader, the Accounts panel (365 email, Google Workspace and GoHighLevel status, CRM phone, phase H2), the Persona
+ * panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
  *
  * Functions:
  * - BrokerProfilePage({ params, searchParams }): loads the profile and renders the page.
@@ -17,6 +18,7 @@ import {
   todayInTimeZone,
   type AdminContractsResponse,
   type AdminStepRow,
+  type BrokerAccountsResponse,
   type BrokerProfileResponse,
   type BrokerTrainingResponse,
   type CompanySignatureStatus,
@@ -24,6 +26,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AccountsPanel } from "@/components/admin/accounts-panel";
 import { AccountActions, BrokerControls } from "@/components/admin/broker-controls";
 import { CommissionEditor } from "@/components/admin/commission-editor";
 import { ContractsPanel } from "@/components/admin/contracts-panel";
@@ -69,11 +72,12 @@ export default async function BrokerProfilePage({
 }) {
   const { id } = await params;
   const { invited } = await searchParams;
-  const [{ data }, { data: training }, { data: contracts }, { data: signature }] = await Promise.all([
+  const [{ data }, { data: training }, { data: contracts }, { data: signature }, { data: accounts }] = await Promise.all([
     serverGet<BrokerProfileResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}`),
     serverGet<BrokerTrainingResponse>(`/v1/admin/training/brokers/${encodeURIComponent(id)}`),
     serverGet<AdminContractsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/contracts`),
     serverGet<CompanySignatureStatus>("/v1/admin/company-signature"),
+    serverGet<BrokerAccountsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/accounts`),
   ]);
   if (!data) notFound();
   const { broker, metrics, steps } = data;
@@ -103,7 +107,7 @@ export default async function BrokerProfilePage({
               </p>
             </div>
           </div>
-          <BrokerControls broker={broker} today={today} />
+          <BrokerControls broker={broker} today={today} hasAccounts={Boolean(accounts?.systems.some((view) => view.accountId))} />
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
           <StatTile label="Joined" value={formatDate(broker.joinedAt)} />
@@ -200,6 +204,7 @@ export default async function BrokerProfilePage({
         </div>
 
         <div className="space-y-5">
+          {accounts ? <AccountsPanel brokerId={broker.id} data={accounts} crmPhone={broker.crmPhone} inactive={broker.status === "inactive"} /> : null}
           <PersonaPanel brokerId={broker.id} brokerName={broker.name} persona={data.persona} />
           {training ? <TrainingPanel brokerId={broker.id} training={training} /> : null}
         </div>

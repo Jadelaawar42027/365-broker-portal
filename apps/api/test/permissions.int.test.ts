@@ -5,6 +5,7 @@
  * and persona notes never appear in any broker-facing response.
  *
  * Functions:
+ * - normalisePath(path): turns a tested URL into its OpenAPI path ({key}, {system}, no query string).
  * - adminRoutes(brokerId, brokerStepId, chapterId): every admin route with sample ids and valid bodies, so none can be missed.
  */
 import { files } from "@bp/db";
@@ -16,6 +17,14 @@ let owner: string;
 let brokerA: Awaited<ReturnType<TestContext["createBroker"]>>;
 let brokerB: Awaited<ReturnType<TestContext["createBroker"]>>;
 const SECRET_PERSONA = "Prefers veterans. SECRET-PERSONA-MARKER";
+
+function normalisePath(path: string): string {
+  return path
+    .split("?")[0]!
+    .replace(/\/w9(\/|$)/, "/{key}$1")
+    .replace("/contracts/broker_agreement/", "/contracts/{key}/")
+    .replace(/\/(accounts|integrations)\/google\//, "/$1/{system}/");
+}
 
 function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerStepId): [string, string, unknown?][] {
   const id = brokerStepId;
@@ -76,6 +85,21 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["POST", `/v1/admin/step-videos/${id}/uploads/abort`, { uploadId: "x", storageKey: "x" }],
     ["PATCH", `/v1/admin/step-questions/${id}`, { prompt: "Nope question?", explanation: "No.", options: [{ label: "A", isCorrect: true }, { label: "B", isCorrect: false }] }],
     ["DELETE", `/v1/admin/step-questions/${id}`],
+    ["GET", "/v1/admin/company-signature"],
+    ["PUT", "/v1/admin/company-signature", { pngDataUrl: "data:image/png;base64,iVBORw0KGgo=", authorize: true }],
+    ["PATCH", "/v1/admin/company-signature", { autoSign: false }],
+    ["GET", "/v1/admin/company-signature/image-url"],
+    ["GET", `/v1/admin/brokers/${brokerId}/contracts`],
+    ["POST", `/v1/admin/brokers/${brokerId}/contracts/countersign`, {}],
+    ["POST", `/v1/admin/brokers/${brokerId}/contracts/void`, { reason: "Nope, not allowed" }],
+    ["POST", `/v1/admin/brokers/${brokerId}/contracts/broker_agreement/outside`, { storageKey: "x", fileName: "a.pdf", signedOn: "2026-10-01" }],
+    ["GET", `/v1/admin/contracts/${id}/download-url?version=final`],
+    ["GET", `/v1/admin/brokers/${brokerId}/accounts`],
+    ["POST", `/v1/admin/brokers/${brokerId}/accounts/google/retry`, {}],
+    ["POST", `/v1/admin/brokers/${brokerId}/accounts/link`, {}],
+    ["PUT", `/v1/admin/brokers/${brokerId}/corporate-email`, { email: "hacked@365yachts.org" }],
+    ["GET", "/v1/admin/integrations"],
+    ["POST", "/v1/admin/integrations/google/test", {}],
   ];
 }
 
@@ -101,7 +125,7 @@ describe("admin routes", () => {
       .flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`))
       .sort();
     const tested = adminRoutes("{id}", "{id}", "{chapterId}")
-      .map(([method, path]) => `${method} ${path.replace(/\/w9(\/|$)/, "/{key}$1")}`)
+      .map(([method, path]) => `${method} ${normalisePath(path)}`)
       .sort();
     expect(tested).toEqual(documented);
   });

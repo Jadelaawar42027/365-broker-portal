@@ -105,6 +105,59 @@ brokerPortal/
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
 
+## Phase H2: Account provisioning
+
+Started Oct 18, 2026, built unattended. When an admin adds a broker, the platform creates their Google Workspace email and their GoHighLevel user. Migrations are additive only. Each numbered step was committed locally (`phase H2.N: …`). Nothing was pushed.
+
+### Summary (written when phase H2 finished, Oct 18, 2026)
+
+**Done:** all 14 steps.
+- Inviting a broker (name, personal phone, level, both splits) queues Google, then GHL. The api's worker creates `firstname@365yachts.org`, or `firstname.lastname@` when the first name is taken, then `firstname.lastname2@`, `3`, … (accents and punctuation stripped, middle names dropped) in `GOOGLE_ORG_UNIT`, with the personal phone as recovery phone and a random temporary password that must be changed at first sign-in. It then creates the GHL user in `GHL_LOCATION_ID` (role user) and stores both ids. The corporate email becomes the broker's portal login and their `broker_email` on agreements not yet signed.
+- Tasks live in `provisioning_tasks` and are claimed with `FOR UPDATE SKIP LOCKED`. Every create looks the user up by email first, and Google users carry the broker id, so retries never duplicate. Backoff is 30 s, 1, 2, 4 min (5 attempts); permanent errors fail at once, in plain words.
+- 3c has an Accounts panel (status, email or id, error, Retry or Set up, Link existing account, 365 email typed by hand, CRM phone). 3b has CRM phone and G / GHL status marks; the CSV export adds `corporate_email` and `crm_phone`; `broker_metrics` adds `crm_phone`.
+- Step 9 shows the 365 email and "Reveal my temporary password": it resets the Google password at that moment, shows it once with Copy and Open Gmail, 3 a day, audited without the password.
+- The invite dialog always shows the link with Copy and "Send via WhatsApp" (wa.me to the personal phone). Email invites still go out when there is an email.
+- Inactive suspends Google and deletes the GHL user (after a confirmation that says so); reactivating unsuspends Google and sets GHL up again.
+- `pnpm import:brokers -- --link` (plus optional `corporate_email` and `crm_phone` columns) queues link tasks. Re-imports match by login or corporate email.
+- At start-up the api logs one warning per system that isn't configured. The overview has an Integrations panel with "Test connection".
+- `pnpm provision:verify` is written and was **not run**.
+
+**Tests:** 16 new shared unit tests, 14 client unit tests, 9 worker and 11 route integration tests (incl. permissions), and 5 importer integration tests, all passing. `pnpm lint` and `pnpm typecheck` pass. The admin permissions list now also covers the H3 contract routes, so that test passes again.
+
+**Still failing, not caused by H2 (needs your call):** 13 db and 10 api tests, plus most e2e journeys, already failed at `e734b0a` before H2 started. They expect 10 steps with step 1 first, but step 0 (D30) made it 11 with "Start here" first, and H3 renamed step 2 and changed who approves it. I didn't rewrite them, because the right expectations are a decision about those features. Files: db `seed-and-metrics`, `commission-splits`, `import`, `step-guidance-seed`; api `admin-brokers`, `admin-reviews`, `broker-steps`, `step-guidance`. End-to-end: 10 of 14 journeys pass. The 4 that fail stop at those same older changes: journey 1 (after the H2 dialog, WhatsApp link and profile checks pass) expects "YOUR NEXT STEP · STEP 1"; journeys 2 and 6 wait for an upload field on step 2, which is now the signing flow; journey 8 expects the step editor to open on photo_id, not start_here.
+
+**Skipped or blocked:**
+- `.env.example`: this session's permission settings block reading it, so the new variables are listed below and in DEPLOY.md for you to add: `GOOGLE_SERVICE_ACCOUNT_JSON=`, `GOOGLE_ADMIN_SUBJECT=`, `GOOGLE_DOMAIN=365yachts.org`, `GOOGLE_ORG_UNIT=`, `GHL_AGENCY_TOKEN=`, `GHL_COMPANY_ID=`, `GHL_LOCATION_ID=`, `PROVISIONING_WORKER=on`.
+- visual-check / screenshots of the new panels: not run (CLAUDE.md: only when you say "check the screens"). They reuse the existing panel, pill and button styles.
+- Real Google and GHL calls: no credentials yet. The clients are unit-tested against the documented request shapes.
+
+**GHL token type and scopes (from the official v2 OpenAPI, DEPLOY.md section 8):** an **agency Private Integration token** (`Authorization: Bearer pit-…`, header `Version: 2021-07-28`). Scopes: **`users.readonly`, `users.write`, `locations.readonly`**. Agency level is needed because `POST /users/search/filter-by-email` accepts agency access only. GHL has no deactivate endpoint, so offboarding uses `DELETE /users/{id}`. The docs don't say whether GHL emails new users, and the API requires a password at creation.
+
+**Decisions to confirm** (each is written out under Decisions in docs/SPEC.md as "H2-assumed"): agency token · GHL deactivate = delete, reactivate = new user · GHL random password, broker uses Forgot password · idempotency via lookup, reserved address and the broker-id tag · address rules · corporate email typed by hand · login email switches to the 365 email · invite dialog always shows link and WhatsApp · retry policy and worker · nothing queued while not configured ("Set up" afterwards) · offboarding and reactivation · reveal limits and confirmation · import --link via the worker · new columns and panels.
+
+**How to turn it on:**
+1. Set up Google (DEPLOY.md section 9): enable the Admin SDK API, create a service account and JSON key, add domain-wide delegation for `https://www.googleapis.com/auth/admin.directory.user`.
+2. In GHL's agency view, create a Private Integration with the three scopes above.
+3. On Railway → api → Variables, add the variables from DEPLOY.md section 2 and redeploy. Migrations 0012 and 0013 run in pre-deploy.
+4. Admin overview → Integrations → **Test connection** for both.
+5. From your laptop: `railway run --service api -- pnpm provision:verify`. It prints PASS or FAIL per step, creates and deletes only its own `provisioning.check.<timestamp>@365yachts.org` users and broker row, and never touches anyone else.
+6. Existing brokers: type their 365 email under Accounts → **Link existing account**, or use `pnpm import:brokers -- --link`.
+
+- [x] 1. Broker fields (corporate_email, personal phone, crm_phone, google_user_id, ghl_user_id) and `provisioning_tasks`
+- [x] 2. Google Workspace client (Admin SDK Directory API, service account with domain-wide delegation)
+- [x] 3. GoHighLevel client (API v2, built from the official docs; findings in DEPLOY.md)
+- [x] 4. Tracked, idempotent tasks with backoff, processed by a worker loop in the api (FOR UPDATE SKIP LOCKED)
+- [x] 5. Accounts panel on the profile (3c) and status icons on the brokers table (3b)
+- [x] 6. Step 9: corporate email and "Reveal my temporary password"
+- [x] 7. Invite dialog: link plus "Send via WhatsApp"
+- [x] 8. crm_phone on the profile, brokers table, CSV export and broker_metrics
+- [x] 9. Offboarding: suspend on inactive, unsuspend on reactivation
+- [x] 10. Link existing accounts (profile button, manual corporate email, `import:brokers --link`)
+- [x] 11. Startup env validation and the Integrations panel with "Test connection"
+- [x] 12. Tests
+- [x] 13. `pnpm provision:verify` (written, not run)
+- [x] 14. DEPLOY.md variables and SPEC decisions
+
 ## Phase H3: Contract signing (D31)
 
 Started Oct 18, 2026. Step 2 becomes "Review and sign your agreements": the broker signs the Broker Independent Contractor & Commission Agreement and the Mutual NDA in one flow; both are filled from the broker's record and countersigned with Shelly's stored, authorized signature. Migrations additive only. Built without running tests (Rule 3).

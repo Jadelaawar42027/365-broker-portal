@@ -61,6 +61,14 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `SEED_OWNER_EMAIL` | your email | type it (first deploy) |
 | `SEED_OWNER_PASSWORD` | a long password | type it (first deploy). You can delete the three `SEED_OWNER_*` variables after the first successful deploy. |
 | `LOG_LEVEL` | `info` | type it |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | the whole JSON key file, pasted as one value | Google Cloud → IAM → Service accounts → your provisioning account → Keys → Add key → JSON (see section 9). Leave unset until ready: Google shows "Not configured" |
+| `GOOGLE_ADMIN_SUBJECT` | e.g. `aj@365yachts.org` | a Workspace **super admin** the service account acts as |
+| `GOOGLE_DOMAIN` | `365yachts.org` | type it |
+| `GOOGLE_ORG_UNIT` | e.g. `/Brokers` (optional) | Admin console → Directory → Organizational units. Empty puts new users in the top-level unit |
+| `GHL_AGENCY_TOKEN` | `pit-…` | GHL agency view → Settings → Private Integrations → create one with scopes `users.readonly`, `users.write`, `locations.readonly` (section 8). Leave unset until ready |
+| `GHL_COMPANY_ID` | your agency (company) id | GHL agency Settings → Company, or the `companyId` in any agency API answer |
+| `GHL_LOCATION_ID` | the 365 Yachts sub-account id | GHL sub-account → Settings → Business Profile (Location ID) |
+| `PROVISIONING_WORKER` | `on` (default) | type `off` only to stop this service running provisioning tasks |
 
 Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in production.
 
@@ -133,6 +141,47 @@ Step 2 has a "Download contract & NDA" button only once a template file exists.
 
 1. Upload the blank PDF to the bucket at `templates/contract-and-nda.pdf`, using the bucket's file browser or any S3 tool.
 2. In the Postgres **Data** tab, set `onboarding_steps.template_file_key` to `templates/contract-and-nda.pdf` on the row whose `key` is `contract_nda`.
+
+## 8. Account provisioning: what the GoHighLevel API v2 docs say
+
+Read on Oct 18, 2026 from the official OpenAPI files in [github.com/gohighlevel/api-v2-docs](https://github.com/gohighlevel/api-v2-docs) (`apps/users.json`, `apps/locations.json`, `docs/oauth/Scopes.md`), which the marketplace docs are generated from. The client in `apps/api/src/services/provisioning/ghl.ts` is built to exactly this.
+
+| What | The docs say | What the portal does |
+| --- | --- | --- |
+| Base URL and version | `https://services.leadconnectorhq.com`, header `Version: 2021-07-28` (the only allowed value on the users endpoints) | Sends both on every call |
+| Token type | `Authorization: Bearer …` with an Agency access token **or an agency Private Integration Token**. `POST /users/search/filter-by-email` accepts **Agency-Access only**; create, update, delete and search accept agency or sub-account tokens | Uses an **agency Private Integration Token** (`GHL_AGENCY_TOKEN`) |
+| Scopes | `users.readonly` (search, filter by email, get), `users.write` (create, update, delete), `locations.readonly` (`GET /locations/{locationId}`) | Needs exactly those three |
+| Search users by email | `POST /users/search/filter-by-email` with `companyId` (required), `emails` (comma-separated, required), `deleted`, `skip`, `limit`, `projection` | One address, `deleted: false`, exact match on the returned email |
+| Create user | `POST /users/` with required `companyId`, `firstName`, `lastName`, `email`, `password`, `type`, `role`, `locationIds`; optional `phone`, `permissions`, `scopes` | `type: "account"`, `role: "user"`, `locationIds: [GHL_LOCATION_ID]`, the corporate email, first and last name, the personal phone, and a random password that is never stored |
+| Update user | `PUT /users/{userId}`; "Email update is no longer supported due to security reasons" | Not used |
+| Deactivate or delete | There is **no deactivate or suspend endpoint**. `DELETE /users/{userId}` answers `{"succeded": true, "message": "Queued deleting user … Will take effect in a few minutes."}` | Offboarding deletes the GHL user. Reactivating creates a new GHL user (after looking the email up first) and stores the new id |
+| Invite email | The docs don't say whether GHL emails a new user, and the API requires a password at creation | The broker signs in to GHL with their 365 email and uses **Forgot password** the first time (step 10) |
+| Test connection | `GET /locations/{locationId}` (`locations.readonly`) | "Test connection" reads the location and shows its name |
+
+## 9. Turning on account provisioning
+
+Until the Google and GHL variables are set, the api logs one warning per system at start-up (`Google Workspace provisioning is not configured: Missing …`), the Integrations panel on the overview says **Not configured**, and nothing is sent anywhere. Adding the variables and redeploying turns each system on. No code change is needed.
+
+**Google Workspace (Admin SDK Directory API):**
+
+1. Google Cloud console, in a project owned by the 365 Yachts Workspace: **APIs & Services → Enable APIs → Admin SDK API**.
+2. **IAM & Admin → Service accounts → Create service account** (no roles needed). Open it → **Keys → Add key → JSON**, and paste the whole file into `GOOGLE_SERVICE_ACCOUNT_JSON`. Note its **Client ID** (a long number).
+3. Workspace Admin console → **Security → Access and data control → API controls → Manage domain-wide delegation → Add new**: the Client ID, scope `https://www.googleapis.com/auth/admin.directory.user`.
+4. `GOOGLE_ADMIN_SUBJECT` = a super admin's address, `GOOGLE_DOMAIN` = `365yachts.org`, optionally `GOOGLE_ORG_UNIT` = `/Brokers` (it must already exist).
+
+New brokers get `firstname@365yachts.org`; if that is taken, `firstname.lastname@365yachts.org`, then `firstname.lastname2@`, `3`, … (accents and punctuation stripped, middle names dropped), a random temporary password that must be changed at first sign-in, the org unit, and their personal phone as recovery phone. The password is never stored or logged; the broker sees a fresh one with **Reveal my temporary password** on step 9 (3 times a day).
+
+**GoHighLevel:** an agency Private Integration token with `users.readonly`, `users.write` and `locations.readonly`, plus `GHL_COMPANY_ID` and `GHL_LOCATION_ID`. Section 8 has what the API does.
+
+**Check it:** open the overview → Integrations → **Test connection** for each. Then run the end-to-end check from your laptop. It creates "Provisioning Check" with a unique `provisioning.check.<timestamp>@365yachts.org`, creates both users, confirms them, suspends both, deletes both and the broker row, and prints PASS or FAIL per step. It never touches another user.
+
+```bash
+railway run --service api -- pnpm provision:verify
+```
+
+**Existing brokers:** on each profile, type their 365 email under Accounts and click **Link existing account**; or put a `corporate_email` column (and optionally `crm_phone`) in `data/import/brokers.csv` and run `pnpm import:brokers -- --link` (with `GOOGLE_DOMAIN` set, an `email` on that domain counts as the corporate email). The api's worker looks each address up in both systems and stores the ids. It never creates users for a link.
+
+**Failures** show on the broker's Accounts panel in plain words (for example "Google: the service account isn't authorized. Check domain-wide delegation for the admin.directory.user scope."). Network trouble and rate limits retry after 30 s, 1, 2 and 4 minutes (5 attempts); bad credentials or refused input fail at once. Fix the cause, then click **Retry**.
 
 ## Troubleshooting
 

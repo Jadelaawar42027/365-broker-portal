@@ -8,9 +8,11 @@
  */
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../../plugins/auth-guard";
+import { registerAdminBrokerAccountRoutes } from "./accounts";
 import { registerAdminAccountRoutes } from "./admins";
 import { registerAdminBrokerRoutes } from "./brokers";
 import { registerAdminContractRoutes } from "./contracts";
+import { registerAdminIntegrationRoutes } from "./integrations";
 import { registerAdminOverviewRoutes } from "./overview";
 import { registerAdminReviewRoutes } from "./reviews";
 import { registerAdminStepRoutes } from "./steps";
@@ -28,5 +30,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     registerAdminTrainingRoutes(scope);
     registerAdminStepRoutes(scope);
     registerAdminContractRoutes(scope);
+    registerAdminBrokerAccountRoutes(scope);
+    registerAdminIntegrationRoutes(scope);
   });
 }

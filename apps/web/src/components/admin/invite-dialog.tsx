@@ -1,23 +1,23 @@
 /**
  * File: apps/web/src/components/admin/invite-dialog.tsx
  * Purpose: The "+ Invite a new broker" button and its dialog (SPEC D29): full name, personal phone in international
- * form, email (optional for now), level, and the two commission splits, both required. With an email the broker gets
- * the invite by email and the admin goes to the new profile; without one, the dialog shows the invite link with a Copy
- * button so the admin can send it by WhatsApp or text.
+ * form, email (optional), level, and the two commission splits, both required. After sending, the dialog always shows the
+ * invite link with Copy and "Send via WhatsApp" (a wa.me link to the personal phone with the link pre-filled, phase H2);
+ * with an email the broker also gets it by email. The broker's 365 email and GoHighLevel user are created in the background.
  *
  * Functions:
  * - InviteBrokerButton(): the button that opens the dialog.
  * - InviteDialog({ dialogRef }): the native <dialog> with the form, its submission and the link view.
- * - CopyLink({ url }): the invite link with a Copy button that confirms when copied.
+ * - CopyLink({ url, phone, brokerName }): the invite link with a Copy button that confirms when copied, and "Send via WhatsApp" when a phone is given.
  */
 "use client";
 
-import type { CreateBrokerResponse } from "@bp/shared";
+import { buildInviteWhatsAppLink, type CreateBrokerResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 import { FormMessage } from "@/components/auth/form-message";
-import { Button, LinkButton } from "@/components/ui/button";
-import { CloseIcon, PlusIcon } from "@/components/ui/icons";
+import { Button, buttonClasses, LinkButton } from "@/components/ui/button";
+import { CloseIcon, PlusIcon, WhatsAppIcon } from "@/components/ui/icons";
 import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { CommissionSplitFields, readSplits } from "./commission-split-fields";
@@ -35,8 +35,9 @@ export function InviteBrokerButton() {
   );
 }
 
-export function CopyLink({ url }: { url: string }) {
+export function CopyLink({ url, phone = null, brokerName = "" }: { url: string; phone?: string | null; brokerName?: string }) {
   const [copied, setCopied] = useState(false);
+  const whatsappUrl = phone ? buildInviteWhatsAppLink({ phone, brokerName, inviteUrl: url }) : null;
   return (
     <div className="space-y-2">
       <label htmlFor="invite-link" className="block text-[15px] font-bold">
@@ -58,6 +59,13 @@ export function CopyLink({ url }: { url: string }) {
       <p aria-live="polite" className="text-[15px] text-muted">
         {copied ? "Copied. Paste it into WhatsApp or a text to the broker." : "It works for 7 days and only once. Making a new link stops this one working."}
       </p>
+      {whatsappUrl ? (
+        <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses("whatsapp", "lg")}>
+          <WhatsAppIcon />
+          Send via WhatsApp
+          <span className="sr-only">(opens WhatsApp in a new tab)</span>
+        </a>
+      ) : null}
     </div>
   );
 }
@@ -67,7 +75,7 @@ function InviteDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | 
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [created, setCreated] = useState<{ brokerId: string; name: string; inviteUrl: string } | null>(null);
+  const [created, setCreated] = useState<{ brokerId: string; name: string; inviteUrl: string; phone: string | null; emailedTo: string | null } | null>(null);
 
   function close() {
     dialogRef.current?.close();
@@ -96,7 +104,7 @@ function InviteDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | 
         },
       });
       if (result.inviteUrl) {
-        setCreated({ brokerId: result.brokerId, name, inviteUrl: result.inviteUrl });
+        setCreated({ brokerId: result.brokerId, name, inviteUrl: result.inviteUrl, phone: result.phone, emailedTo: email || null });
         router.refresh();
       } else {
         dialogRef.current?.close();
@@ -121,7 +129,11 @@ function InviteDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | 
             {created ? `${created.name} is invited` : "Invite a new broker"}
           </h2>
           <p className="mt-1 text-base text-muted">
-            {created ? "There's no email, so send them this link yourself." : "With an email, they get the invite link by email. Without one, you get a link to send them."}
+            {created
+              ? created.emailedTo
+                ? `We emailed the link to ${created.emailedTo}. You can also send it by WhatsApp.`
+                : "Send them this link by WhatsApp or copy it."
+              : "You get an invite link to send by WhatsApp. With an email, they get it by email too."}
           </p>
         </div>
         <button type="button" aria-label="Close" onClick={close} className="grid size-11 shrink-0 place-items-center rounded-xl hover:bg-page">
@@ -130,12 +142,12 @@ function InviteDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | 
       </div>
       {created ? (
         <div className="space-y-6 p-7">
-          <CopyLink url={created.inviteUrl} />
+          <CopyLink url={created.inviteUrl} phone={created.phone} brokerName={created.name} />
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={close}>
               Close
             </Button>
-            <LinkButton href={`/admin/brokers/${created.brokerId}`} onClick={() => dialogRef.current?.close()}>
+            <LinkButton href={`/admin/brokers/${created.brokerId}${created.emailedTo ? "?invited=1" : ""}`} onClick={() => dialogRef.current?.close()}>
               Open their profile
             </LinkButton>
           </div>
@@ -168,7 +180,7 @@ function InviteDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | 
             <FieldLabel htmlFor="invite-email">Email (optional)</FieldLabel>
             <input id="invite-email" name="email" type="email" spellCheck={false} autoComplete="off" aria-describedby="invite-email-help" className={inputClasses()} />
             <p id="invite-email-help" className="mt-1.5 text-[15px] text-muted">
-              Leave it blank to send the invite link yourself. They&apos;ll enter their own email when they accept.
+              Optional. Leave it blank to send the link by WhatsApp only.
             </p>
           </div>
           <fieldset>

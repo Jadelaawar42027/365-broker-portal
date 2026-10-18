@@ -20,6 +20,7 @@ import {
   VIDEO_SOURCES,
 } from "./constants";
 import { commissionPctSchema } from "./commission";
+import { ACCOUNT_STATUSES } from "./provisioning";
 import { e164PhoneSchema } from "./contact";
 import { guidanceViewSchema } from "./guidance";
 import { emailSchema, isoDateSchema, passwordSchema, stepConfigSchema } from "./schemas";
@@ -287,6 +288,9 @@ export const brokerListRowSchema = z.object({
   stepsTotal: z.number().int(),
   stepsWaitingReview: z.number().int(),
   lastActivityAt: nullableTimestamp,
+  crmPhone: z.string().nullable(),
+  corporateEmail: z.string().nullable().optional(),
+  accounts: z.object({ google: z.enum(ACCOUNT_STATUSES), ghl: z.enum(ACCOUNT_STATUSES) }).optional(),
   training: z
     .object({ chaptersPassed: z.number().int(), chaptersTotal: z.number().int(), avgBestScore: z.number().int().nullable() })
     .optional(),
@@ -324,7 +328,8 @@ export type CreateBrokerRequest = z.infer<typeof createBrokerRequestSchema>;
 
 export const createBrokerResponseSchema = z.object({
   brokerId: z.string(),
-  inviteUrl: z.string().nullable().describe("The invite link to send by hand, when the broker was invited without an email"),
+  inviteUrl: z.string().nullable().describe("The invite link, shown in the dialog with Copy and Send via WhatsApp (also emailed when there is an email)"),
+  phone: z.string().nullable().describe("The personal phone the WhatsApp button sends to"),
 });
 export type CreateBrokerResponse = z.infer<typeof createBrokerResponseSchema>;
 
@@ -392,6 +397,8 @@ export const brokerProfileResponseSchema = z.object({
     leftAt: z.string().nullable(),
     inHouseSplit: z.number().int().nullable(),
     selfGeneratedSplit: z.number().int().nullable(),
+    corporateEmail: z.string().nullable(),
+    crmPhone: z.string().nullable(),
     hasLogin: z.boolean(),
   }),
   metrics: z.object({
@@ -417,6 +424,7 @@ export const updateBrokerRequestSchema = z
     status: z.enum(BROKER_STATUSES).optional(),
     joinedAt: isoDateSchema.optional(),
     leftAt: isoDateSchema.nullable().optional(),
+    crmPhone: e164PhoneSchema.nullable().optional().describe("The broker's CRM phone (E.164), entered by an admin"),
   })
   .refine((body) => Object.keys(body).length > 0, { message: "Send at least one field to change." });
 export type UpdateBrokerRequest = z.infer<typeof updateBrokerRequestSchema>;

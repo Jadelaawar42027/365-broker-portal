@@ -1,6 +1,7 @@
 /**
  * File: packages/db/scripts/import-brokers.ts
- * Purpose: `pnpm import:brokers [-- --dry-run] [-- --dir path]` entry point. Reads data/import/ (gitignored), checks
+ * Purpose: `pnpm import:brokers [-- --dry-run] [-- --link] [-- --dir path]` entry point. --link queues looking each
+ * broker's corporate email up in Google Workspace and GoHighLevel; the api's provisioning worker stores the ids it finds. Reads data/import/ (gitignored), checks
  * everything first, then imports existing brokers, personas and files (docs/SPEC.md). Stops without changing anything
  * if any row or file is invalid.
  *
@@ -32,6 +33,8 @@ function printSummary(summary: ImportSummary, dryRun: boolean): void {
   console.log(`Personas ${verb} set: ${summary.personasSet}`);
   console.log(`Files ${verb} uploaded: ${summary.filesUploaded} (already there: ${summary.filesSkipped})`);
   console.log(`Steps ${verb} marked approved as "imported": ${summary.stepsApproved}`);
+  console.log(`Corporate emails or CRM phones ${verb} set: ${summary.accountsUpdated}`);
+  if (summary.linksQueued > 0) console.log(`Account links ${verb} queued: ${summary.linksQueued} (the api links them within a minute; see each profile's Accounts panel)`);
   if (summary.withoutLogin.length > 0) {
     console.log(`\n${summary.withoutLogin.length} broker(s) can't sign in yet. Open each profile in /admin and click "Resend invite":`);
     for (const email of summary.withoutLogin) console.log(`  - ${email}`);
@@ -53,7 +56,7 @@ async function main(argv: string[]): Promise<void> {
   const storageConfig = readStorageConfig(process.env);
   const { db, close } = createDb(readDatabaseUrl(), { max: 1 });
   try {
-    const summary = await runImport(db, storageConfig ? createS3Storage(storageConfig) : null, input, { dryRun });
+    const summary = await runImport(db, storageConfig ? createS3Storage(storageConfig) : null, input, { dryRun, link: argv.includes("--link"), googleDomain: process.env.GOOGLE_DOMAIN?.trim() || null });
     printSummary(summary, dryRun);
   } finally {
     await close();

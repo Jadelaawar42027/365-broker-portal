@@ -21,6 +21,7 @@
     "db:metrics-user": "pnpm --filter @bp/db db:metrics-user",
     "admin:invite": "pnpm --filter @bp/api admin:invite",
     "storage:cors": "pnpm --filter @bp/api storage:cors",
+    "provision:verify": "pnpm --filter @bp/api provision:verify",
     "start": "node scripts/start.mjs"
   },
   "devDependencies": {

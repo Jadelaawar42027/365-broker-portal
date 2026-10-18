@@ -8,9 +8,9 @@
  * - parseCsv(text): returns the rows of a CSV file as arrays of cell strings.
  * - normaliseDate(value): accepts 2026-03-11 or 3/11/2026 and returns the ISO date, or null for an empty cell; throws on anything else.
  * - normaliseSplit(value): accepts a broker commission percentage like 60 or 60% and returns the number, or null for an empty cell; throws unless it is a whole number from 0 to 100.
- * - parseBrokerCsv(text): validates the header and every row (the in_house_split and self_generated_split columns are optional); returns the valid rows and a list of { line, message } errors.
+ * - parseBrokerCsv(text): validates the header and every row (in_house_split, self_generated_split, corporate_email and crm_phone are optional columns; crm_phone must be E.164); returns the valid rows and a list of { line, message } errors.
  */
-import { BROKER_LEVELS, BROKER_STATUSES, emailSchema, parseIsoDate, type BrokerLevel, type BrokerStatus } from "@bp/shared";
+import { BROKER_LEVELS, BROKER_STATUSES, e164PhoneSchema, emailSchema, parseIsoDate, type BrokerLevel, type BrokerStatus } from "@bp/shared";
 
 export const BROKER_CSV_COLUMNS = [
   "name",
@@ -26,7 +26,9 @@ export const BROKER_CSV_COLUMNS = [
 
 export const OPTIONAL_BROKER_CSV_COLUMNS = ["in_house_split", "self_generated_split"] as const;
 
-type BrokerCsvColumn = (typeof BROKER_CSV_COLUMNS)[number] | (typeof OPTIONAL_BROKER_CSV_COLUMNS)[number];
+export const OPTIONAL_ACCOUNT_CSV_COLUMNS = ["corporate_email", "crm_phone"] as const;
+
+type BrokerCsvColumn = (typeof BROKER_CSV_COLUMNS)[number] | (typeof OPTIONAL_BROKER_CSV_COLUMNS)[number] | (typeof OPTIONAL_ACCOUNT_CSV_COLUMNS)[number];
 
 export type BrokerCsvRow = {
   line: number;
@@ -41,6 +43,8 @@ export type BrokerCsvRow = {
   commissionTier: string | null;
   inHouseSplit: number | null;
   selfGeneratedSplit: number | null;
+  corporateEmail: string | null;
+  crmPhone: string | null;
 };
 
 export function parseCsv(text: string): string[][] {
@@ -141,6 +145,12 @@ export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { 
         problems.push(`${column} "${get(column)}" must be a whole number from 0 to 100`);
       }
     }
+    const corporateCell = get("corporate_email");
+    const corporate = corporateCell ? emailSchema.safeParse(corporateCell) : null;
+    if (corporate && !corporate.success) problems.push(`corporate_email "${corporateCell}" is not valid`);
+    const crmCell = get("crm_phone");
+    const crmPhone = crmCell ? e164PhoneSchema.safeParse(crmCell) : null;
+    if (crmPhone && !crmPhone.success) problems.push(`crm_phone "${crmCell}" must be in international form, like +15615550123`);
     if (email.success) {
       const previous = seen.get(email.data);
       if (previous) problems.push(`email repeats line ${previous}`);
@@ -163,6 +173,8 @@ export function parseBrokerCsv(text: string): { rows: BrokerCsvRow[]; errors: { 
       commissionTier: get("commission_tier") || null,
       inHouseSplit: splits.in_house_split ?? null,
       selfGeneratedSplit: splits.self_generated_split ?? null,
+      corporateEmail: corporate?.success ? corporate.data : null,
+      crmPhone: crmPhone?.success ? crmPhone.data : null,
     });
   });
   return { rows, errors };

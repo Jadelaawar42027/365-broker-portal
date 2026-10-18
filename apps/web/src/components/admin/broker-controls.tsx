@@ -2,12 +2,13 @@
  * File: apps/web/src/components/admin/broker-controls.tsx
  * Purpose: The editable parts of a broker's profile header (3c): level and status menus, and the account actions
  * (resend invite, send a password reset link, send a reminder). Setting a broker inactive asks for confirmation,
- * records today as the leaving date and signs them out everywhere (SPEC D9).
+ * records today as the leaving date and signs them out everywhere (SPEC D9); when the broker has a Google or GHL account it
+ * also says those will be suspended and deactivated (phase H2), and reactivating turns them back on.
  *
  * Functions:
- * - BrokerControls({ broker, today }): renders the menus and actions.
+ * - BrokerControls({ broker, today, hasAccounts }): renders the menus and actions; with provisioned accounts, the inactive confirmation says they will be suspended.
  * - AccountActions({ broker }): the buttons that fit the broker's current state, each confirming in place; a broker who hasn't signed up can be sent a fresh invite link by hand (always) or by email (when they have one, SPEC D29).
- * - makeInviteLink(): asks the API for a fresh invite link and shows it with a Copy button.
+ * - makeInviteLink(): asks the API for a fresh invite link and shows it with Copy and Send via WhatsApp.
  * - patch(body): sends the change to the API and refreshes the page.
  */
 "use client";
@@ -23,7 +24,7 @@ import { RemindButton } from "./remind-button";
 
 type Broker = BrokerProfileResponse["broker"];
 
-export function BrokerControls({ broker, today }: { broker: Broker; today: string }) {
+export function BrokerControls({ broker, today, hasAccounts = false }: { broker: Broker; today: string; hasAccounts?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,11 +67,12 @@ export function BrokerControls({ broker, today }: { broker: Broker; today: strin
               const status = event.target.value;
               if (status === "inactive") {
                 const confirmed = window.confirm(
-                  `Set ${broker.name} to inactive? They are signed out at once, can't log in, and today is recorded as their leaving date.`,
+                  `Set ${broker.name} to inactive? They are signed out at once, can't log in, and today is recorded as their leaving date.${hasAccounts ? "\n\nThis will suspend their Google account and deactivate their GHL user." : ""}`,
                 );
                 if (!confirmed) return;
                 void patch({ status, ...(broker.leftAt ? {} : { leftAt: today }) });
               } else {
+                if (broker.status === "inactive" && hasAccounts && !window.confirm(`Reactivate ${broker.name}? Their Google account is unsuspended and a GHL user is set up again.`)) return;
                 void patch({ status, ...(broker.status === "inactive" ? { leftAt: null } : {}) });
               }
             }}
@@ -137,7 +139,7 @@ export function AccountActions({ broker }: { broker: Broker }) {
       {message ? <FormMessage tone={message.tone}>{message.text}</FormMessage> : null}
       {inviteUrl ? (
         <div className="max-w-[640px] rounded-xl border border-line bg-white px-5 py-4">
-          <CopyLink url={inviteUrl} />
+          <CopyLink url={inviteUrl} phone={broker.phone} brokerName={broker.name} />
         </div>
       ) : null}
     </div>

@@ -5,7 +5,7 @@
  * answer form (with the knowledge check, if any), and a side column with "What happens next" and the WhatsApp help
  * button. Steps without guidance yet show their numbered instructions instead. Sent-back, waiting and finished steps
  * explain their state instead of showing the form. Step 2 shows the agreement signing flow instead of an upload form
- * (SPEC D31).
+ * (SPEC D31). Step 9 (365 email) shows the broker's corporate email and "Reveal my temporary password" (phase H2).
  *
  * Functions:
  * - StepPage({ params }): loads the step and renders it.
@@ -14,10 +14,11 @@
  * - StatusNotice({ step, supportName }): the banner for a sent-back, waiting or finished step.
  * - WhatHappensNext({ step, supportName }): the side card explaining what follows a submission.
  */
-import { CONTRACT_STEP_KEY, type MeResponse, type MyContractsResponse, type StepDetailResponse } from "@bp/shared";
+import { CONTRACT_STEP_KEY, type MeResponse, type MyAccountsResponse, type MyContractsResponse, type StepDetailResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CorporateEmailCard } from "@/components/broker/corporate-email-card";
 import { StepForm } from "@/components/broker/step-form";
 import { ContractSigning } from "@/components/contracts/contract-signing";
 import { StepVideos } from "@/components/broker/step-videos";
@@ -31,6 +32,8 @@ import { requireMe, serverGet } from "@/lib/server-api";
 import { parseInstructionSteps } from "@/lib/steps";
 
 export const metadata: Metadata = { title: "Onboarding step · 365 Yachts" };
+
+const EMAIL_STEP_KEY = "email_signature";
 
 function StatusNotice({ step, supportName }: { step: StepDetailResponse; supportName: string }) {
   if (step.status === "changes_requested") {
@@ -129,6 +132,7 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
   const supportName = me.support.name;
   const isContractStep = step.key === CONTRACT_STEP_KEY;
   const contracts = isContractStep ? (await serverGet<MyContractsResponse>("/v1/me/contracts")).data : null;
+  const accounts = step.key === EMAIL_STEP_KEY ? (await serverGet<MyAccountsResponse>("/v1/me/accounts")).data : null;
   const instructions = parseInstructionSteps(step.instructionsMd);
 
   return (
@@ -152,6 +156,8 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
           </div>
 
           <StatusNotice step={step} supportName={supportName} />
+
+          {accounts ? <CorporateEmailCard accounts={accounts} supportName={supportName} /> : null}
 
           <StepVideos stepKey={step.key} videos={step.videos} />
 

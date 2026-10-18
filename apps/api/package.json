@@ -13,6 +13,7 @@
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "admin:invite": "tsx scripts/admin-invite.ts",
     "storage:cors": "tsx scripts/storage-cors.ts",
+    "provision:verify": "tsx scripts/provision-verify.ts",
     "release": "node dist/release.js"
   },
   "dependencies": {

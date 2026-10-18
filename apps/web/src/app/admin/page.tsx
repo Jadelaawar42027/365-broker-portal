@@ -3,15 +3,17 @@
  * Purpose: Screen 3a, the admin overview: active and onboarding counts, average days to onboard, the average
  * first-attempt quiz score, submissions waiting for review, every broker who is onboarding with their progress, next step and a
  * "stuck" flag after 4 quiet days, and "Training — who needs a hand" (failed a chapter twice, or 7+ days idle). A banner
- * shows while the company signature for the agreements isn't set up (SPEC D31).
+ * shows while the company signature for the agreements isn't set up (SPEC D31). The Integrations panel at the bottom
+ * shows whether Google Workspace and GoHighLevel provisioning are configured, with "Test connection" (phase H2).
  *
  * Functions:
  * - OverviewPage(): loads the overview numbers and renders the screen.
  * - nextStepText(row): "Next: W-9 (sent, waiting on you)" style wording for an in-progress broker.
  */
-import type { CompanySignatureStatus, OverviewResponse, TrainingOverviewResponse } from "@bp/shared";
+import type { CompanySignatureStatus, IntegrationsResponse, OverviewResponse, TrainingOverviewResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { IntegrationsPanel } from "@/components/admin/integrations-panel";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
 import { RemindButton } from "@/components/admin/remind-button";
 import { StatCard } from "@/components/admin/stat-card";
@@ -31,10 +33,11 @@ function nextStepText(row: OverviewResponse["inProgress"][number]): string {
 }
 
 export default async function OverviewPage() {
-  const [{ data }, { data: training }, { data: signature }] = await Promise.all([
+  const [{ data }, { data: training }, { data: signature }, { data: integrations }] = await Promise.all([
     serverGet<OverviewResponse>("/v1/admin/overview"),
     serverGet<TrainingOverviewResponse>("/v1/admin/training/overview"),
     serverGet<CompanySignatureStatus>("/v1/admin/company-signature"),
+    serverGet<IntegrationsResponse>("/v1/admin/integrations"),
   ]);
   if (!data) throw new Error("Could not load the overview.");
   const now = new Date();
@@ -179,6 +182,7 @@ export default async function OverviewPage() {
           </ul>
         )}
       </section>
+      {integrations ? <IntegrationsPanel data={integrations} /> : null}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 /**
  * File: apps/web/src/app/admin/brokers/page.tsx
  * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us, both commission splits (SPEC D29) and onboarding
- * progress, training progress and average best quiz score (from the broker_training_metrics view), with search
+ * progress, training progress and average best quiz score (from the broker_training_metrics view), the CRM phone and
+ * small Google / GHL account status marks (phase H2), with search
  * (including persona text), status and level filters, CSV export and the invite button.
  *
  * Functions:
@@ -13,11 +14,12 @@
 import { formatTenure, todayInTimeZone, type BrokerListResponse, type BrokerStatus } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountStatusMarks } from "@/components/admin/account-status";
 import { BrokerFilters, ExportCsvButton } from "@/components/admin/broker-filters";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
 import { Avatar, ProgressBar } from "@/components/ui/misc";
 import { Pill, type PillTone } from "@/components/ui/pill";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatPhone } from "@/lib/format";
 import { serverGet } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Brokers · 365 Yachts admin" };
@@ -67,7 +69,7 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
       <BrokerFilters search={search} status={status} level={level} />
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-        <table className="w-full min-w-[860px] border-collapse text-left">
+        <table className="w-full min-w-[1080px] border-collapse text-left">
           <caption className="sr-only">Brokers</caption>
           <thead className="bg-[#f2f5fa] text-[15px] font-semibold text-muted">
             <tr>
@@ -82,12 +84,14 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
               <th scope="col" className="px-3 py-4">Onboarding</th>
               <th scope="col" className="px-3 py-4">Training</th>
               <th scope="col" className="px-3 py-4">Avg. quiz</th>
+              <th scope="col" className="px-3 py-4">CRM phone</th>
+              <th scope="col" className="px-3 py-4">Accounts</th>
             </tr>
           </thead>
           <tbody className="text-base">
             {data.brokers.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-lg text-muted">
+                <td colSpan={13} className="px-4 py-10 text-center text-lg text-muted">
                   No brokers match. Try another search or filter.
                 </td>
               </tr>
@@ -122,6 +126,10 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
                     </td>
                     <td className={`px-3 py-3 ${trainingStarted ? "" : "text-muted"}`}>{trainingStarted ? trainingLabel(row.training) : "—"}</td>
                     <td className="px-3 py-3 font-bold tabular-nums">{trainingStarted && row.training?.avgBestScore != null ? `${row.training.avgBestScore}%` : <span className="font-normal text-muted">—</span>}</td>
+                    <td className="px-3 py-3 whitespace-nowrap tabular-nums">{row.crmPhone ? formatPhone(row.crmPhone) : <span className="text-muted">—</span>}</td>
+                    <td className="px-3 py-3">
+                      <AccountStatusMarks accounts={row.accounts} />
+                    </td>
                   </tr>
                 );
               })

@@ -7,7 +7,8 @@
  * run again.
  *
  * Functions:
- * - runBackfill(): runs the SQL of migration 0008 again against the test database.
+ * - runBackfill(): runs migration 0008's backfill statement again against the test database (its view definition is
+ *   left out: 0013 has since added crm_phone to broker_metrics, and the older definition can't drop that column).
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -23,7 +24,8 @@ let testDb: Awaited<ReturnType<typeof startTestDatabase>>;
 let brokerId: string;
 
 async function runBackfill(): Promise<void> {
-  await testDb.sql.unsafe(readFileSync(BACKFILL, "utf8"));
+  const [backfill] = readFileSync(BACKFILL, "utf8").split("--> statement-breakpoint");
+  await testDb.sql.unsafe(backfill!);
 }
 
 beforeAll(async () => {

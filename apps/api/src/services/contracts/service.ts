@@ -9,7 +9,7 @@
  *
  * Functions:
  * - activeTemplates(db): the active template for each contract key.
- * - signingContext(db, brokerId): the broker's name, phone, email, address, license number and current splits.
+ * - signingContext(db, brokerId): the broker's name, phone, email (the corporate 365 email once there is one, phase H2), address, license number and current splits.
  * - documentValues(key, context, dates): the text values for one document.
  * - templateFile(row): a template row as the bytes, field map and font the PDF filler needs.
  * - documentsFor(db, brokerId): every contract document of a broker, newest first.
@@ -102,6 +102,7 @@ export async function signingContext(db: DbOrTx, brokerId: string) {
       name: users.name,
       phone: users.phone,
       email: users.email,
+      corporateEmail: brokers.corporateEmail,
       status: brokers.status,
       mailingAddress: brokers.mailingAddress,
       floridaLicenseNo: brokers.floridaLicenseNo,
@@ -111,7 +112,7 @@ export async function signingContext(db: DbOrTx, brokerId: string) {
     .where(eq(brokers.id, brokerId));
   if (!row) throw notFound("Broker not found.");
   const commission = await currentCommission(db, brokerId);
-  return { ...row, email: visibleEmail(row.email) ?? row.email, inHouseSplit: commission.inHousePct, selfGeneratedSplit: commission.selfGeneratedPct };
+  return { ...row, email: row.corporateEmail ?? visibleEmail(row.email) ?? row.email, inHouseSplit: commission.inHousePct, selfGeneratedSplit: commission.selfGeneratedPct };
 }
 
 export function documentValues(

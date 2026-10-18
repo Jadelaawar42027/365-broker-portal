@@ -34,7 +34,7 @@ describe("inviting a broker", () => {
     brokerId = response.json().brokerId;
     const [broker] = await ctx.db.select().from(brokers).where(eq(brokers.id, brokerId));
     expect(broker).toMatchObject({ status: "invited", level: "junior", joinedAt: "2026-10-13" });
-    expect(response.json().inviteUrl).toBeNull();
+    expect(response.json()).toMatchObject({ inviteUrl: expect.stringMatching(/^http:\/\/localhost:3000\/invite\/[A-Za-z0-9_-]+$/), phone: "+15615550123" });
     const [user] = await ctx.db.select().from(users).where(eq(users.id, broker!.userId));
     expect(user!.phone).toBe("+15615550123");
     const [history] = await ctx.db.select().from(commissionHistory).where(eq(commissionHistory.brokerId, brokerId));

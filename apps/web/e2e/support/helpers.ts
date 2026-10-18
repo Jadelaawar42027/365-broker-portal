@@ -75,6 +75,9 @@ export async function inviteBroker(page: Page, name: string, email: string): Pro
   const dialog = page.getByRole("dialog", { name: "Invite a new broker" });
   await fillInviteForm(dialog, name, email);
   await dialog.getByRole("button", { name: "Send invite" }).click();
+  const invited = page.getByRole("dialog", { name: `${name} is invited` });
+  await expect(invited.getByText(`We emailed the link to ${email}`)).toBeVisible();
+  await invited.getByRole("link", { name: "Open their profile" }).click();
   await expect(page.getByText(`Invite sent to ${email.toLowerCase()}`)).toBeVisible();
   return page.url().split("?")[0]!;
 }
