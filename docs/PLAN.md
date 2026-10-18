@@ -105,6 +105,21 @@ brokerPortal/
 - Phase C: SeaweedFS bucket CORS must be set so the browser's presigned PUT works locally, mirroring what DEPLOY.md asks for on Railway.
 - Phase F (DEPLOY.md): Next.js fixes rewrite destinations at build time, so `API_INTERNAL_URL` must be set on the Railway `web` service before its build, and changing it needs a redeploy.
 
+## Phase H3: Contract signing (D31)
+
+Started Oct 18, 2026. Step 2 becomes "Review and sign your agreements": the broker signs the Broker Independent Contractor & Commission Agreement and the Mutual NDA in one flow; both are filled from the broker's record and countersigned with Shelly's stored, authorized signature. Migrations additive only. Built without running tests (Rule 3).
+
+- [x] Versioned contract templates (PDF, field map, font) loaded from docs/templates/contracts by the seed and deploy
+- [x] PDF filling with pdf-lib + fontkit (Carlito for the agreement, Helvetica for the NDA), signature stamping, signature certificate page, SHA-256 hashes; every version in the private bucket
+- [x] Company signature on Shelly's admin profile (draw or upload, authorization tick with timestamp, IP and text, auto-sign on/off); overview banner while missing
+- [x] Broker flow: two cards with live pdf.js previews, address / license / phone / email form, e-sign consent, one signature pad (draw or type); both documents must be opened
+- [x] Auto countersign and auto-approve, or "Waiting for countersignature" and one-click countersign
+- [x] Emails with the final PDFs; documents on step 2 and the broker profile with every version; "Void and re-issue"
+- [x] Changes to split, name or phone before the company signature void the pending documents and reset step 2; Section 1.7 warning after
+- [x] Admins can upload copies signed outside the portal
+- [x] Lesson 2 bonus line fixed by a guarded data migration
+- Tests not written or run (Rule 3). The filled PDFs were checked by rendering both templates with sample values.
+
 ## Step 0 · Start here (D30, Oct 18, 2026)
 
 - [x] New "Start here" stage (0) with step `start_here`: walkthrough video slot, five bullets, "I've watched the walkthrough" tick

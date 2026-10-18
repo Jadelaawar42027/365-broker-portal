@@ -10,7 +10,7 @@
  * - matchStepKey(baseName, stepKeys): the upload step a file name belongs to ("w9" or "w9-page2" → "w9"), or null.
  * - loadImportFolder(dir, uploadStepKeys): reads brokers.csv, personas/{email}.md and files/{email}/{stepKey}.{ext}; returns the parsed input and any errors.
  * - runImport(db, storage, input, options): applies the import (or rehearses it with dryRun) and returns the summary.
- * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them; commission splits go into the commission history (a new broker's old commission_tier becomes the first row's note; changed splits add a row; blank cells leave the current splits alone).
+ * - importRow(tx, context, row): creates or updates one broker and everything that belongs to them (a changed name, phone or split voids any contract documents not yet countersigned, SPEC D31); commission splits go into the commission history (a new broker's old commission_tier becomes the first row's note; changed splits add a row; blank cells leave the current splits alone).
  * - approveForImport(tx, context, brokerStepId, before): marks one step approved as imported and records it in audit_log.
  * - audit(tx, entry): inserts an audit_log row with no actor (the importer).
  * - DryRunRollback.constructor(summary): the error used to roll back a dry run while keeping its summary.
@@ -23,6 +23,7 @@ import path from "node:path";
 import { and, eq, isNull } from "drizzle-orm";
 import { createBroker } from "../brokers";
 import { addCommissionChange, currentCommission } from "../commission";
+import { voidOpenContracts } from "../contracts";
 import type { Database, Transaction } from "../client";
 import { accounts, auditLog, brokerSteps, brokers, files, onboardingSteps, sessions, users } from "../schema";
 import { parseBrokerCsv, type BrokerCsvRow } from "./csv";
@@ -192,6 +193,9 @@ async function importRow(tx: Transaction, context: ImportContext, row: BrokerCsv
     };
     const commissionChanged = nextCommission.inHousePct !== current.inHousePct || nextCommission.selfGeneratedPct !== current.selfGeneratedPct;
     if (commissionChanged) await addCommissionChange(tx, { brokerId: broker.id, ...nextCommission, note: "Imported" });
+    if (commissionChanged || userChanges.name || userChanges.phone) {
+      await voidOpenContracts(tx, { brokerId: broker.id, reason: "Your details or commission split changed in an import", actorUserId: null, now });
+    }
     if (Object.keys(brokerChanges).length > 0 || personaChanged) {
       await tx
         .update(brokers)

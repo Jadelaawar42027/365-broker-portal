@@ -2,13 +2,14 @@
  * File: apps/web/src/app/admin/page.tsx
  * Purpose: Screen 3a, the admin overview: active and onboarding counts, average days to onboard, the average
  * first-attempt quiz score, submissions waiting for review, every broker who is onboarding with their progress, next step and a
- * "stuck" flag after 4 quiet days, and "Training — who needs a hand" (failed a chapter twice, or 7+ days idle).
+ * "stuck" flag after 4 quiet days, and "Training — who needs a hand" (failed a chapter twice, or 7+ days idle). A banner
+ * shows while the company signature for the agreements isn't set up (SPEC D31).
  *
  * Functions:
  * - OverviewPage(): loads the overview numbers and renders the screen.
  * - nextStepText(row): "Next: W-9 (sent, waiting on you)" style wording for an in-progress broker.
  */
-import type { OverviewResponse, TrainingOverviewResponse } from "@bp/shared";
+import type { CompanySignatureStatus, OverviewResponse, TrainingOverviewResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
@@ -30,9 +31,10 @@ function nextStepText(row: OverviewResponse["inProgress"][number]): string {
 }
 
 export default async function OverviewPage() {
-  const [{ data }, { data: training }] = await Promise.all([
+  const [{ data }, { data: training }, { data: signature }] = await Promise.all([
     serverGet<OverviewResponse>("/v1/admin/overview"),
     serverGet<TrainingOverviewResponse>("/v1/admin/training/overview"),
+    serverGet<CompanySignatureStatus>("/v1/admin/company-signature"),
   ]);
   if (!data) throw new Error("Could not load the overview.");
   const now = new Date();
@@ -46,6 +48,22 @@ export default async function OverviewPage() {
         </div>
         <InviteBrokerButton />
       </div>
+
+      {signature && !signature.configured ? (
+        <div role="status" className="flex flex-col gap-3 rounded-2xl border border-[#f1d39b] bg-[#fdf3e3] px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[17px] text-[#5b3a10]">
+            <strong className="font-bold">The company signature isn&apos;t set up.</strong>{" "}
+            {signature.signerEmail
+              ? `Until ${signature.signerName ?? "the company signer"} sets it up, every signed Broker Agreement and NDA waits for a manual countersignature.`
+              : "Set COMPANY_SIGNER_EMAIL on the API service to the person who signs for 365 Yachts."}
+          </p>
+          {signature.isSigner ? (
+            <Link href="/admin/account" className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-navy px-5 font-bold text-white">
+              Set up my signature
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Active brokers" value={String(data.counts.active)} detail={`${data.counts.junior} junior · ${data.counts.senior} senior`} />

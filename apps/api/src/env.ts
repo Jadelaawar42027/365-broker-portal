@@ -38,6 +38,13 @@ const apiEnvSchema = z
     SUPPORT_CONTACT_NAME: z.string().trim().min(1).default("Shelly"),
     SUPPORT_WHATSAPP_NUMBER: optionalString,
     EMAIL_OUTBOX_DIR: optionalString,
+    COMPANY_SIGNER_EMAIL: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .pipe(z.email("must be the email of the owner or admin who signs for 365 Yachts"))
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
   })
   .refine((env) => env.NODE_ENV !== "production" || env.WEB_ORIGIN.startsWith("https://"), {
     path: ["WEB_ORIGIN"],

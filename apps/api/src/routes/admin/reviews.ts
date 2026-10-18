@@ -2,15 +2,17 @@
  * File: apps/api/src/routes/admin/reviews.ts
  * Purpose: Reviewing a broker's submission (3d): the detail with files and checklist and its place in the queue,
  * approve, send back with a required note, and "mark done" (the admin override, SPEC D2). Approving the last step
- * activates the broker and notifies everyone.
+ * activates the broker and notifies everyone. Step 2's agreements (SPEC D31) can't be approved here while they wait
+ * for a countersignature, and sending step 2 back voids its open documents so the broker signs again.
  *
  * Functions:
  * - registerAdminReviewRoutes(app): mounts GET /v1/admin/broker-steps/:id and its approve, send-back and mark-done actions.
  * - requireBrokerStep(app, id): loads a broker step by id or throws 404.
  * - emailBroker(app, log, brokerStepId, build): emails the broker of a step with a message built from their name and the step.
  */
-import { brokers, users } from "@bp/db";
+import { brokers, contractDocuments, users, voidOpenContracts } from "@bp/db";
 import {
+  CONTRACT_STEP_KEY,
   errorResponseSchema,
   markDoneRequestSchema,
   reviewDetailResponseSchema,
@@ -18,11 +20,11 @@ import {
   STAGE_TITLES,
   stepActionResponseSchema,
 } from "@bp/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { notFound } from "../../errors";
+import { conflict, notFound } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { firstName, stepApprovedEmail, stepSentBackEmail } from "../../services/emails";
 import { sendSafely, type EmailMessage } from "../../services/mailer";
@@ -114,6 +116,14 @@ export function registerAdminReviewRoutes(app: FastifyInstance): void {
       const actor = currentActor(request);
       const row = await requireBrokerStep(app, request.params.id);
       const now = app.deps.now();
+      if (row.key === CONTRACT_STEP_KEY) {
+        const waiting = await app.deps.db
+          .select({ id: contractDocuments.id })
+          .from(contractDocuments)
+          .where(and(eq(contractDocuments.brokerId, row.brokerId), eq(contractDocuments.status, "broker_signed")))
+          .limit(1);
+        if (waiting.length) throw conflict("These agreements need a countersignature. Countersign them from the broker's profile instead.", "countersign_required");
+      }
       const result = await app.deps.db.transaction(async (tx) => {
         const change = await applyStepAction(tx, { row, action: "approve", actorUserId: actor.userId, now });
         const completed = await activateIfComplete(tx, { brokerId: row.brokerId, actorUserId: actor.userId, today: todayFor(now) });
@@ -142,9 +152,13 @@ export function registerAdminReviewRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const row = await requireBrokerStep(app, request.params.id);
-      const change = await app.deps.db.transaction((tx) =>
-        applyStepAction(tx, { row, action: "send_back", actorUserId: actor.userId, now: app.deps.now(), note: request.body.note }),
-      );
+      const change = await app.deps.db.transaction(async (tx) => {
+        const sent = await applyStepAction(tx, { row, action: "send_back", actorUserId: actor.userId, now: app.deps.now(), note: request.body.note });
+        if (row.key === CONTRACT_STEP_KEY) {
+          await voidOpenContracts(tx, { brokerId: row.brokerId, reason: request.body.note, actorUserId: actor.userId, now: app.deps.now(), resetStep: false });
+        }
+        return sent;
+      });
       const { env } = app.deps;
       await emailBroker(app, request.log, row.brokerId, (broker) =>
         stepSentBackEmail({

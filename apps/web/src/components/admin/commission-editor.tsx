@@ -2,16 +2,17 @@
  * File: apps/web/src/components/admin/commission-editor.tsx
  * Purpose: The commission panel on a broker's profile (3c, SPEC D29): the current split on in-house leads and on
  * self-generated deals (broker / house), a "Change commission" form that adds a history row (split, the date it starts
- * and an optional note; the API writes audit_log), and the full history, newest first.
+ * and an optional note; the API writes audit_log), and the full history, newest first. Once both agreements are signed
+ * it warns that split changes need a signed addendum (Section 1.7); unsigned agreements are voided by the change (SPEC D31).
  *
  * Functions:
- * - CommissionEditor({ brokerId, today, inHouseSplit, selfGeneratedSplit, history }): the panel.
+ * - CommissionEditor({ brokerId, today, inHouseSplit, selfGeneratedSplit, history, agreementsSigned }): the panel.
  * - SplitFact({ label, value }): one label and "60 / 40" pair.
  * - historyNumber(value): "40%" or "—".
  */
 "use client";
 
-import type { CommissionHistoryEntry } from "@bp/shared";
+import { SPLIT_ADDENDUM_WARNING, type CommissionChangeResponse, type CommissionHistoryEntry } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { FormMessage } from "@/components/auth/form-message";
@@ -40,17 +41,20 @@ export function CommissionEditor({
   inHouseSplit,
   selfGeneratedSplit,
   history,
+  agreementsSigned = false,
 }: {
   brokerId: string;
   today: string;
   inHouseSplit: number | null;
   selfGeneratedSplit: number | null;
   history: CommissionHistoryEntry[];
+  agreementsSigned?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,10 +63,11 @@ export function CommissionEditor({
     setBusy(true);
     setError(null);
     try {
-      await apiRequest(`/v1/admin/brokers/${brokerId}/commission`, {
+      const result = await apiRequest<CommissionChangeResponse>(`/v1/admin/brokers/${brokerId}/commission`, {
         method: "POST",
         body: { ...readSplits(form), effectiveFrom: String(form.get("effectiveFrom")), ...(note ? { note } : {}) },
       });
+      setNotice(result.warning ?? (result.agreementsVoided ? "The broker's unsigned agreements were voided; they'll sign the updated ones." : null));
       setEditing(false);
       router.refresh();
     } catch (caught) {
@@ -90,6 +95,7 @@ export function CommissionEditor({
 
       {editing ? (
         <form onSubmit={save} className="space-y-4 rounded-xl border border-line bg-white px-5 py-5">
+          {agreementsSigned ? <FormMessage tone="error">{SPLIT_ADDENDUM_WARNING}</FormMessage> : null}
           <CommissionSplitFields idPrefix="profile" inHouseSplit={inHouseSplit} selfGeneratedSplit={selfGeneratedSplit} />
           <div className="grid gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
             <div>
@@ -112,6 +118,8 @@ export function CommissionEditor({
           </div>
         </form>
       ) : null}
+
+      {notice ? <FormMessage tone="error">{notice}</FormMessage> : null}
 
       {history.length ? (
         <details className="group">

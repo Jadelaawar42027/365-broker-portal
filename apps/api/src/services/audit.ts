@@ -11,7 +11,7 @@ import { auditLog, type DbOrTx } from "@bp/db";
 export type AuditEntry = {
   actorUserId: string | null;
   action: string;
-  entityType: "broker" | "broker_step" | "onboarding_step" | "file" | "user" | "account_token" | "chapter" | "lesson" | "question" | "quiz_attempt";
+  entityType: "broker" | "broker_step" | "onboarding_step" | "file" | "user" | "account_token" | "chapter" | "lesson" | "question" | "quiz_attempt" | "contract_document" | "company_signature";
   entityId: string;
   before?: unknown;
   after?: unknown;

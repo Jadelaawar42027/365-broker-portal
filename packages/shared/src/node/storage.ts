@@ -12,6 +12,7 @@
  * - presignGet(input): presigned GET URL that names the file for download or inline preview.
  * - putObject(input): uploads bytes straight from the server.
  * - headObject(key): returns size and content type of a stored object, or null if it does not exist.
+ * - getObject(key): returns a stored object's bytes, or null if it does not exist (contract signatures, SPEC D31).
  * - setCors(origins): allows browsers on the given origins to PUT and GET objects (needed for direct uploads).
  * - createMultipartUpload(input): starts a multipart upload (large lesson videos) and returns its upload id.
  * - presignUploadPart(input): presigned PUT URL for one part of a multipart upload.
@@ -24,6 +25,7 @@ import {
   CreateMultipartUploadCommand,
   UploadPartCommand,
   HeadObjectCommand,
+  NoSuchKey,
   NotFound,
   PutBucketCorsCommand,
   PutObjectCommand,
@@ -49,6 +51,7 @@ export interface FileStorage {
   presignGet(input: { key: string; fileName: string; expiresInSeconds: number; inline?: boolean }): Promise<string>;
   putObject(input: { key: string; body: Uint8Array; contentType: string }): Promise<void>;
   headObject(key: string): Promise<StoredObjectInfo | null>;
+  getObject(key: string): Promise<Uint8Array | null>;
   setCors(origins: string[]): Promise<void>;
   createMultipartUpload(input: { key: string; contentType: string }): Promise<string>;
   presignUploadPart(input: { key: string; uploadId: string; partNumber: number; expiresInSeconds: number }): Promise<string>;
@@ -103,6 +106,15 @@ export function createS3Storage(config: StorageConfig): FileStorage {
     },
     async putObject({ key, body, contentType }) {
       await client.send(new PutObjectCommand({ Bucket, Key: key, Body: body, ContentType: contentType }));
+    },
+    async getObject(key) {
+      try {
+        const result = await client.send(new GetObjectCommand({ Bucket, Key: key }));
+        return result.Body ? await result.Body.transformToByteArray() : null;
+      } catch (error) {
+        if (error instanceof NoSuchKey) return null;
+        throw error;
+      }
     },
     async headObject(key) {
       try {

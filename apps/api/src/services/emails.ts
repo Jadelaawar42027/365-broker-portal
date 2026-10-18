@@ -14,6 +14,9 @@
  * - onboardingCompleteBrokerEmail(input): congratulates a broker on finishing onboarding.
  * - onboardingCompleteAdminEmail(input): tells admins a broker finished onboarding.
  * - reminderEmail(input): nudges a broker about their next step.
+ * - contractsSignedEmail(input): sends a broker their signed agreements (attached), or says they're waiting for the countersignature (SPEC D31).
+ * - countersignNeededEmail(input): tells the company signer a broker's agreements are waiting for her countersignature.
+ * - resignNeededEmail(input): tells a broker their agreements changed and must be signed again.
  */
 import { INVITE_TTL_DAYS, PASSWORD_RESET_TTL_HOURS } from "@bp/shared";
 
@@ -153,6 +156,60 @@ export function reminderEmail(input: {
       `Pick up where you left off: ${input.link}`,
       "",
       signOff(input.support),
+    ].join("\n"),
+  };
+}
+
+export function contractsSignedEmail(input: { brokerName: string; fullySigned: boolean; link: string }): Email {
+  return input.fullySigned
+    ? {
+        subject: "Your signed Broker Agreement and NDA",
+        text: [
+          `Hi ${firstName(input.brokerName)},`,
+          "",
+          "Your Broker Agreement and NDA are signed by you and by 365 Yachts. Both signed copies are attached, and you can download them any time from step 2 of your onboarding:",
+          input.link,
+          "",
+          "365 Yachts",
+        ].join("\n"),
+      }
+    : {
+        subject: "We received your signed agreements",
+        text: [
+          `Hi ${firstName(input.brokerName)},`,
+          "",
+          "Thanks for signing your Broker Agreement and NDA. Shelly will countersign them shortly, and we'll email you the fully signed copies.",
+          input.link,
+          "",
+          "365 Yachts",
+        ].join("\n"),
+      };
+}
+
+export function countersignNeededEmail(input: { brokerName: string; link: string }): Email {
+  return {
+    subject: `${input.brokerName} signed their agreements: countersignature needed`,
+    text: [
+      `${input.brokerName} signed the Broker Agreement and NDA. They're waiting for your countersignature (auto-signing is off or your company signature isn't set up).`,
+      "",
+      "Countersign both with one click:",
+      input.link,
+    ].join("\n"),
+  };
+}
+
+export function resignNeededEmail(input: { brokerName: string; reason: string; link: string }): Email {
+  return {
+    subject: "Please sign your agreements again",
+    text: [
+      `Hi ${firstName(input.brokerName)},`,
+      "",
+      `Your Broker Agreement and NDA need a new signature: ${input.reason}. The earlier documents were voided and kept on file.`,
+      "",
+      "Review and sign the updated documents here:",
+      input.link,
+      "",
+      "365 Yachts",
     ].join("\n"),
   };
 }

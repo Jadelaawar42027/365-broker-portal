@@ -80,10 +80,10 @@ export const STEP_GUIDANCE: Readonly<Record<string, StepGuidanceSeed>> = {
   },
   contract_nda: {
     todoItems: [
-      "Download the contract and the NDA below.",
-      "Read both in full.",
-      "Sign and date every place marked for you.",
-      "Upload the signed pages here, as a PDF scan or clear photos.",
+      "Open both documents below and read them in full.",
+      "Check your name, phone, email and commission splits.",
+      "Enter your mailing address and, if you have one, your Florida license number.",
+      "Sign once. Your signature goes on both, and you get signed copies by email.",
     ],
     callouts: [{ kind: "HOUSE RULE", text: "Your commission split is set in this contract. Nothing in the manual overrides your signed agreement." }],
     fullTextMd: `${DOCUMENTS_TO_SUBMIT}

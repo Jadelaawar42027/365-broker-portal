@@ -348,6 +348,13 @@ export const commissionChangeRequestSchema = z.object({
 });
 export type CommissionChangeRequest = z.infer<typeof commissionChangeRequestSchema>;
 
+export const commissionChangeResponseSchema = z.object({
+  ok: z.literal(true),
+  warning: z.string().nullable().describe("Set when signed agreements already exist (Section 1.7: split changes need a signed addendum)"),
+  agreementsVoided: z.boolean().describe("True when unsigned or half-signed agreements were voided and the broker must sign again"),
+});
+export type CommissionChangeResponse = z.infer<typeof commissionChangeResponseSchema>;
+
 export const adminStepRowSchema = z.object({
   brokerStepId: z.string(),
   key: z.string(),

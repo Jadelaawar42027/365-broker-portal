@@ -2,7 +2,8 @@
  * File: apps/web/src/components/admin/admin-nav.tsx
  * Purpose: The admin sidebar's links (Overview, Brokers, Reviews with the waiting count, Onboarding steps, Chapters &
  * quizzes) with the
- * current section highlighted, and the signed-in admin with "Sign out".
+ * current section highlighted, and the signed-in admin with a menu: "Your profile & signature" (the company
+ * signature, SPEC D31) and "Sign out".
  *
  * Functions:
  * - AdminNav({ waitingReviews }): the navigation list.
@@ -91,6 +92,9 @@ export function AdminUser({ name, role }: { name: string; role: string }) {
       </button>
       {open ? (
         <div role="menu" className="absolute bottom-full left-0 z-20 mb-2 w-48 rounded-xl border border-line bg-white p-1.5 shadow-lg">
+          <Link href="/admin/account" role="menuitem" className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-navy hover:bg-page">
+            Your profile &amp; signature
+          </Link>
           <button type="button" role="menuitem" onClick={signOut} className="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-base font-semibold text-navy hover:bg-page">
             Sign out
           </button>

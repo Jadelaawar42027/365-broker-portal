@@ -8,6 +8,7 @@
  * - placeholderEmail(nonce): a unique placeholder address for a broker invited without an email.
  * - isPlaceholderEmail(email): true for an address created by placeholderEmail.
  * - visibleEmail(email): the email to show on screens and in exports, or null for a placeholder.
+ * - formatPhoneForDocument(phone): a US number as "(561) 555-0123" (from E.164 or 10 digits); anything else as stored.
  */
 import { z } from "zod";
 
@@ -29,4 +30,11 @@ export function isPlaceholderEmail(email: string | null | undefined): boolean {
 
 export function visibleEmail(email: string | null | undefined): string | null {
   return email && !isPlaceholderEmail(email) ? email : null;
+}
+
+export function formatPhoneForDocument(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  const us = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits.length === 10 ? digits : null;
+  return us ? `(${us.slice(0, 3)}) ${us.slice(3, 6)}-${us.slice(6)}` : phone.trim();
 }

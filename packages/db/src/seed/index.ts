@@ -6,7 +6,7 @@
  * users and chapters are left alone.
  *
  * Functions:
- * - seedDatabase(db, options): runs the whole seed in one transaction (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
+ * - seedDatabase(db, options): runs the whole seed in one transaction (including loading new or changed contract templates from docs/templates/contracts unless contractTemplates is false) (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
  * - seedSteps(tx, refresh): inserts missing onboarding steps (or overwrites them when refresh is true); returns inserted and updated counts.
  * - addMissingBrokerSteps(tx): gives every existing broker a todo row for any active step they don't have yet (e.g. step 0 "Start here", SPEC D30); returns how many rows were added.
  * - addPasswordLogin(tx, userId, password): creates the Better Auth credential account holding the hashed password.
@@ -29,6 +29,7 @@ import type { Database, Transaction } from "../client";
 import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } from "../schema";
 import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
 import { samplePdf, samplePng } from "./sample-files";
+import { findContractTemplatesDir, seedContractTemplates } from "./contract-templates";
 import { seedStepGuidance } from "./step-content";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
 import { removeRetiredTrainingDrafts, seedTraining } from "./training";
@@ -40,6 +41,7 @@ export type SeedOptions = {
   refreshSteps?: boolean;
   training?: { publish: boolean } | null;
   removeRetiredTrainingDrafts?: boolean;
+  contractTemplates?: { dir?: string | null } | false;
   now?: Date;
   webOrigin?: string;
 };
@@ -49,6 +51,7 @@ export type SeedSummary = {
   stepsUpdated: number;
   stepsGuided: number;
   brokerStepsAdded: number;
+  contractTemplatesAdded?: string[] | "missing";
   owner: "created" | "existing" | "skipped";
   trainingChaptersInserted: number;
   trainingDraftsDeleted?: string[];
@@ -94,6 +97,10 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
     summary.stepsUpdated = steps.updated;
     summary.stepsGuided = await seedStepGuidance(tx);
     summary.brokerStepsAdded = await addMissingBrokerSteps(tx);
+    if (options.contractTemplates !== false) {
+      const dir = findContractTemplatesDir(options.contractTemplates?.dir ?? null);
+      summary.contractTemplatesAdded = dir ? await seedContractTemplates(tx, dir) : "missing";
+    }
 
     if (options.removeRetiredTrainingDrafts) {
       summary.trainingDraftsDeleted = await removeRetiredTrainingDrafts(tx, now);

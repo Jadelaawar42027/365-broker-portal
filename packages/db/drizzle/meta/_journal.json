@@ -71,6 +71,20 @@
       "when": 1792311730080,
       "tag": "0009_start_here_stage",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792313092446,
+      "tag": "0010_contracts",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792313113326,
+      "tag": "0011_contract_step_copy",
+      "breakpoints": true
     }
   ]
 }

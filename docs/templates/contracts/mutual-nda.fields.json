@@ -1,0 +1,54 @@
+{
+  "template": "mutual-nda.pdf",
+  "description": "365 Yachts Mutual Non-Disclosure & Non-Compete Agreement, blank. 2 pages.",
+  "units": "PDF points; page numbers are 1-based; x,y measured from the TOP-LEFT of the page (612 x 792). For pdf-lib (bottom-left origin) use y_pdflib = 792 - y.",
+  "font": "Helvetica (the NDA itself uses Arial), colour #000000",
+  "fields": {
+    "broker_name": {
+      "page": 1,
+      "x": 150,
+      "baseline": 158.5,
+      "size": 11,
+      "maxWidth": 125
+    },
+    "broker_by_name": {
+      "page": 2,
+      "x": 284,
+      "baseline": 189.5,
+      "size": 11,
+      "maxWidth": 180
+    },
+    "broker_signature": {
+      "page": 2,
+      "box": [
+        318,
+        196,
+        468,
+        215
+      ],
+      "kind": "signature-image"
+    },
+    "broker_sign_date": {
+      "page": 2,
+      "x": 296,
+      "baseline": 239.5,
+      "size": 11
+    },
+    "company_signature": {
+      "page": 2,
+      "box": [
+        127,
+        196,
+        250,
+        215
+      ],
+      "kind": "signature-image"
+    },
+    "company_sign_date": {
+      "page": 2,
+      "x": 110,
+      "baseline": 239.5,
+      "size": 11
+    }
+  }
+}

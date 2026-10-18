@@ -14,6 +14,7 @@ export * from "./api-training";
 export * from "./chapters";
 export * from "./commission";
 export * from "./contact";
+export * from "./contracts";
 export * from "./constants";
 export * from "./files";
 export * from "./guidance";

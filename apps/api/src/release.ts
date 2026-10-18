@@ -32,6 +32,12 @@ async function release(): Promise<void> {
   try {
     const summary = await seedDatabase(db, { owner, sampleBrokers: null, training: { publish: false }, removeRetiredTrainingDrafts: true });
     console.log(`Onboarding steps added: ${summary.stepsInserted}. Step guidance filled: ${summary.stepsGuided}. Owner account: ${summary.owner}. Training chapters added as drafts: ${summary.trainingChaptersInserted}.`);
+    const templates = summary.contractTemplatesAdded;
+    console.log(
+      templates === "missing"
+        ? "Contract templates: NOT FOUND (docs/templates/contracts missing; set CONTRACT_TEMPLATES_DIR). Brokers can't sign until they're loaded."
+        : `Contract templates added: ${templates?.length ? templates.join(", ") : "none (already up to date)"}.`,
+    );
     const deleted = summary.trainingDraftsDeleted ?? [];
     console.log(deleted.length ? `Old training drafts deleted (${deleted.length}): ${deleted.join("; ")}.` : "Old training drafts deleted: none.");
   } finally {

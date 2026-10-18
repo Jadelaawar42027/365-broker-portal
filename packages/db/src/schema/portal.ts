@@ -1,6 +1,7 @@
 /**
  * File: packages/db/src/schema/portal.ts
- * Purpose: The portal's own tables: brokers, their commission history (SPEC D29: one row per change of the two splits,
+ * Purpose: The portal's own tables: brokers (with the mailing address and Florida license number given when signing
+ * the agreements, SPEC D31), their commission history (SPEC D29: one row per change of the two splits,
  * in-house leads % and self-generated deals %; the latest row is the current split; the older split columns on brokers
  * and commission_tier are kept but no longer used), account tokens (invites and resets, SPEC D8), the onboarding step
  * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten) and the audit log.
@@ -53,6 +54,8 @@ export const brokers = pgTable(
     onboardedAt: date("onboarded_at", { mode: "string" }),
     leftAt: date("left_at", { mode: "string" }),
     commissionTier: text("commission_tier"),
+    mailingAddress: text("mailing_address"),
+    floridaLicenseNo: text("florida_license_no"),
     inHouseSplit: integer("in_house_split"),
     selfGeneratedSplit: integer("self_generated_split"),
     personaMd: text("persona_md"),

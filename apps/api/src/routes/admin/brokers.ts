@@ -4,7 +4,8 @@
  * broker_training_metrics view), inviting a new broker (name, E.164 phone, optional email, level and both commission
  * splits; without an email the invite link is returned for the admin to send by hand, SPEC D29), a fresh invite link
  * on demand, the full profile with files, persona and commission history, editing level/status/dates, changing the
- * commission split (a new history row), the persona, resending an invite, sending a reset link and reminders.
+ * commission split (a new history row; agreements not yet countersigned are voided so the broker signs again, and
+ * signed ones return the Section 1.7 addendum warning, SPEC D31), the persona, resending an invite, sending a reset link and reminders.
  * Setting a broker to inactive deletes their sessions at once (SPEC D9). Every change writes audit_log.
  *
  * Functions:
@@ -13,10 +14,13 @@
  * - toHistoryEntry(row): shapes a commission_history row for the profile.
  */
 import { randomBytes } from "node:crypto";
-import { addCommissionChange, brokerMetrics, brokers, brokerTrainingMetrics, commissionHistoryFor, createBroker, currentCommission, sessions, users } from "@bp/db";
+import { addCommissionChange, contractDocuments, voidOpenContracts, brokerMetrics, brokers, brokerTrainingMetrics, commissionHistoryFor, createBroker, currentCommission, sessions, users } from "@bp/db";
 import {
   brokerListQuerySchema,
   commissionChangeRequestSchema,
+  commissionChangeResponseSchema,
+  CONTRACT_STEP_KEY,
+  SPLIT_ADDENDUM_WARNING,
   inviteLinkResponseSchema,
   isPlaceholderEmail,
   placeholderEmail,
@@ -34,7 +38,7 @@ import {
   updateBrokerRequestSchema,
   type UpdateBrokerRequest,
 } from "@bp/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -44,7 +48,7 @@ import { currentActor } from "../../plugins/auth-guard";
 import { hasPasswordLogin, issueAccountToken } from "../../services/account-tokens";
 import { writeAudit } from "../../services/audit";
 import { countBrokersByStatus, listBrokerMetrics, loadBrokerWithUser, toBrokerListRow } from "../../services/brokers";
-import { inviteEmail, passwordResetEmail, reminderEmail } from "../../services/emails";
+import { inviteEmail, passwordResetEmail, reminderEmail, resignNeededEmail } from "../../services/emails";
 import { sendSafely } from "../../services/mailer";
 import { loadBrokerSteps, loadFiles, toFileView, toIso } from "../../services/steps";
 import { supportContact, todayFor, webLink } from "../../services/support";
@@ -293,18 +297,18 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         summary: "Change a broker's commission split: adds a history row; the latest row is the current split",
         params: idParams,
         body: commissionChangeRequestSchema,
-        response: { 201: okResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema },
+        response: { 201: commissionChangeResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request, reply) => {
       const actor = currentActor(request);
       const { db } = app.deps;
-      const { broker } = await loadBrokerWithUser(db, request.params.id);
+      const { broker, user } = await loadBrokerWithUser(db, request.params.id);
       const today = todayFor(app.deps.now());
       const effectiveFrom = request.body.effectiveFrom ?? today;
       if (effectiveFrom > today) throw badRequest("The new split can't start in the future. Enter it on the day it starts.", "future_effective_date");
       if (effectiveFrom < broker.joinedAt) throw badRequest("The new split can't start before the broker joined.", "invalid_dates");
-      await db.transaction(async (tx) => {
+      const outcome = await db.transaction(async (tx) => {
         const before = await currentCommission(tx, broker.id);
         await addCommissionChange(tx, {
           brokerId: broker.id,
@@ -322,8 +326,20 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           before: { inHouseSplit: before.inHousePct, selfGeneratedSplit: before.selfGeneratedPct },
           after: { inHouseSplit: request.body.inHouseSplit, selfGeneratedSplit: request.body.selfGeneratedSplit, effectiveFrom, note: request.body.note ?? null },
         });
+        const signed = await tx
+          .select({ id: contractDocuments.id })
+          .from(contractDocuments)
+          .where(and(eq(contractDocuments.brokerId, broker.id), inArray(contractDocuments.status, ["fully_signed", "signed_outside"])))
+          .limit(1);
+        const voided = await voidOpenContracts(tx, { brokerId: broker.id, reason: "Your commission split changed", actorUserId: actor.userId, now: app.deps.now() });
+        return { warning: signed.length ? SPLIT_ADDENDUM_WARNING : null, voided };
       });
-      return reply.status(201).send({ ok: true as const });
+      if (outcome.voided.brokerHadSigned) {
+        await sendSafely(app.deps.mailer, request.log, [
+          { to: user.email, ...resignNeededEmail({ brokerName: user.name, reason: "your commission split changed", link: webLink(app.deps.env, `/app/steps/${CONTRACT_STEP_KEY}`) }) },
+        ]);
+      }
+      return reply.status(201).send({ ok: true as const, warning: outcome.warning, agreementsVoided: outcome.voided.voided > 0 });
     },
   );
 

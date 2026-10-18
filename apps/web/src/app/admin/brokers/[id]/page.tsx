@@ -1,7 +1,8 @@
 /**
  * File: apps/web/src/app/admin/brokers/[id]/page.tsx
  * Purpose: Screen 3c, one broker's profile: header with contact details, level and status, the key dates and numbers,
- * the two commission splits with their history and a "Change commission" form (SPEC D29),
+ * the two commission splits with their history and a "Change commission" form (SPEC D29), the agreements panel
+ * (status, every version, countersign, void and re-issue, signed-outside uploads, SPEC D31),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
  * uploader, the Persona panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score.
  *
@@ -10,12 +11,22 @@
  * - StatTile({ label, value }): one of the grey number tiles under the header.
  * - stepDateText(step): "Approved Aug 18" / "Sent Oct 15" / "Sent back Oct 16" / "Not started" for a record row.
  */
-import { formatFileSize, formatTenure, todayInTimeZone, type AdminStepRow, type BrokerProfileResponse, type BrokerTrainingResponse } from "@bp/shared";
+import {
+  formatFileSize,
+  formatTenure,
+  todayInTimeZone,
+  type AdminContractsResponse,
+  type AdminStepRow,
+  type BrokerProfileResponse,
+  type BrokerTrainingResponse,
+  type CompanySignatureStatus,
+} from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountActions, BrokerControls } from "@/components/admin/broker-controls";
 import { CommissionEditor } from "@/components/admin/commission-editor";
+import { ContractsPanel } from "@/components/admin/contracts-panel";
 import { PersonaPanel } from "@/components/admin/persona-panel";
 import { StepActions } from "@/components/admin/step-actions";
 import { TrainingPanel } from "@/components/admin/training-panel";
@@ -58,9 +69,11 @@ export default async function BrokerProfilePage({
 }) {
   const { id } = await params;
   const { invited } = await searchParams;
-  const [{ data }, { data: training }] = await Promise.all([
+  const [{ data }, { data: training }, { data: contracts }, { data: signature }] = await Promise.all([
     serverGet<BrokerProfileResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}`),
     serverGet<BrokerTrainingResponse>(`/v1/admin/training/brokers/${encodeURIComponent(id)}`),
+    serverGet<AdminContractsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/contracts`),
+    serverGet<CompanySignatureStatus>("/v1/admin/company-signature"),
   ]);
   if (!data) notFound();
   const { broker, metrics, steps } = data;
@@ -106,6 +119,7 @@ export default async function BrokerProfilePage({
             inHouseSplit={broker.inHouseSplit}
             selfGeneratedSplit={broker.selfGeneratedSplit}
             history={data.commissionHistory}
+            agreementsSigned={Boolean(contracts?.fullySigned)}
           />
         </div>
         <div className="mt-5">
@@ -182,6 +196,7 @@ export default async function BrokerProfilePage({
               </ul>
             )}
           </section>
+          {contracts ? <ContractsPanel brokerId={broker.id} data={contracts} signature={signature ?? null} /> : null}
         </div>
 
         <div className="space-y-5">

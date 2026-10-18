@@ -3,7 +3,8 @@
  * Purpose: The routes a broker uses for their own onboarding (screens 1b and 1c): the checklist, one step's detail
  * (with its short guidance, video slots and knowledge-check questions, never their answers), the template download, a
  * fresh play link for an uploaded step video, checking one knowledge-check answer, getting an upload target, and
- * submitting a step (refused until every knowledge-check answer is correct, SPEC D28). A broker can only ever reach
+ * submitting a step (refused until every knowledge-check answer is correct, SPEC D28; step 2 is signed through the
+ * contract routes instead, SPEC D31). A broker can only ever reach
  * their own steps.
  *
  * Functions:
@@ -13,6 +14,7 @@
  */
 import { brokers, users } from "@bp/db";
 import {
+  CONTRACT_STEP_KEY,
   countProgress,
   downloadUrlResponseSchema,
   errorResponseSchema,
@@ -240,6 +242,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const row = await requireOwnStep(app, actor.brokerId!, request.params.key);
+      if (row.key === CONTRACT_STEP_KEY) throw conflict("Sign your agreements on this page instead of uploading them.", "use_contract_signing");
       if (row.status !== "todo" && row.status !== "changes_requested") {
         throw conflict("This step has already been sent.", "step_not_open");
       }
@@ -272,6 +275,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       if (row.kind === "admin") {
         throw conflict("Your Sales Executive marks this step done after your one-on-one.", "admin_only_step");
       }
+      if (row.key === CONTRACT_STEP_KEY) throw conflict("Sign your agreements on this page instead of uploading them.", "use_contract_signing");
       const questions = await loadStepQuestions(app.deps.db, row.stepId);
       if (questions.length > 0 && !isStepCheckPassed(questions, request.body.checkAnswers)) {
         throw conflict("Answer the quick check correctly before you send this step.", "check_not_passed");

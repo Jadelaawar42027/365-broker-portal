@@ -8,6 +8,8 @@
  */
 export { createBroker, type CreateBrokerInput } from "./brokers";
 export { addCommissionChange, commissionHistoryFor, currentCommission, type CommissionChangeInput } from "./commission";
+export { voidOpenContracts } from "./contracts";
+export { findContractTemplatesDir, sha256 } from "./seed/contract-templates";
 export { createDb, type Database, type DbOrTx, type Transaction } from "./client";
 export { readDatabaseUrl } from "./database-url";
 export { parseBrokerCsv, parseCsv, type BrokerCsvRow } from "./import/csv";

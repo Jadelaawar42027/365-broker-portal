@@ -4,7 +4,8 @@
  * the template download, one-line callouts, the manual's text behind "Read the full section", then the upload or
  * answer form (with the knowledge check, if any), and a side column with "What happens next" and the WhatsApp help
  * button. Steps without guidance yet show their numbered instructions instead. Sent-back, waiting and finished steps
- * explain their state instead of showing the form.
+ * explain their state instead of showing the form. Step 2 shows the agreement signing flow instead of an upload form
+ * (SPEC D31).
  *
  * Functions:
  * - StepPage({ params }): loads the step and renders it.
@@ -13,11 +14,12 @@
  * - StatusNotice({ step, supportName }): the banner for a sent-back, waiting or finished step.
  * - WhatHappensNext({ step, supportName }): the side card explaining what follows a submission.
  */
-import type { MeResponse, StepDetailResponse } from "@bp/shared";
+import { CONTRACT_STEP_KEY, type MeResponse, type MyContractsResponse, type StepDetailResponse } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StepForm } from "@/components/broker/step-form";
+import { ContractSigning } from "@/components/contracts/contract-signing";
 import { StepVideos } from "@/components/broker/step-videos";
 import { GuidedContent } from "@/components/guidance/guided-content";
 import { buttonClasses } from "@/components/ui/button";
@@ -125,6 +127,8 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
   const { data: step } = await serverGet<StepDetailResponse>(`/v1/me/steps/${encodeURIComponent(stepKey)}`);
   if (!step) notFound();
   const supportName = me.support.name;
+  const isContractStep = step.key === CONTRACT_STEP_KEY;
+  const contracts = isContractStep ? (await serverGet<MyContractsResponse>("/v1/me/contracts")).data : null;
   const instructions = parseInstructionSteps(step.instructionsMd);
 
   return (
@@ -176,7 +180,7 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
             </section>
           )}
 
-          {step.files.length > 0 && !step.canSubmit ? (
+          {step.files.length > 0 && !step.canSubmit && !isContractStep ? (
             <section aria-labelledby="sent-files" className="rounded-2xl border border-line bg-white px-6 py-6">
               <h2 id="sent-files" className="text-lg font-bold">
                 What you sent
@@ -205,7 +209,7 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
             </section>
           ) : null}
 
-          {step.canSubmit ? <StepForm step={step} supportName={supportName} /> : null}
+          {isContractStep && contracts ? <ContractSigning data={contracts} /> : step.canSubmit ? <StepForm step={step} supportName={supportName} /> : null}
         </div>
 
         <aside className="space-y-6" aria-label="Help with this step">

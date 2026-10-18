@@ -34,6 +34,7 @@ function readOwner(env: NodeJS.ProcessEnv) {
 function printSummary(summary: SeedSummary, samplePassword: string | null): void {
   console.log(`Onboarding steps: ${summary.stepsInserted} added, ${summary.stepsUpdated} refreshed, ${summary.stepsGuided} given their guidance.`);
   console.log(`Owner account: ${summary.owner}.`);
+  console.log(`Contract templates: ${summary.contractTemplatesAdded === "missing" ? "not found" : summary.contractTemplatesAdded?.length ? summary.contractTemplatesAdded.join(", ") : "up to date"}.`);
   console.log(`Training chapters added: ${summary.trainingChaptersInserted}.`);
   for (const sample of summary.sampleBrokers) {
     console.log(`Sample broker ${sample.email}: ${sample.outcome}.`);

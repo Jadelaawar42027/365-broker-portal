@@ -17,6 +17,7 @@ import { registerOriginCheck } from "./plugins/origin-check";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerBrokerStepRoutes } from "./routes/broker-steps";
+import { registerContractRoutes } from "./routes/contracts";
 import { registerFileRoutes } from "./routes/files";
 import { registerHealthRoutes } from "./routes/health";
 import { registerInviteRoutes } from "./routes/invites";
@@ -59,6 +60,7 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
   registerPasswordResetRoutes(app);
   registerMeRoutes(app);
   registerBrokerStepRoutes(app);
+  registerContractRoutes(app);
   registerTrainingRoutes(app);
   await registerFileRoutes(app);
   await registerAdminRoutes(app);

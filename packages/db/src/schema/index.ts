@@ -6,6 +6,7 @@
  * - none
  */
 export * from "./auth";
+export * from "./contracts";
 export * from "./enums";
 export * from "./portal";
 export * from "./steps";

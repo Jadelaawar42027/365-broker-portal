@@ -38,6 +38,7 @@ function memoryStorage(): FileStorage {
   return {
     presignPut: async () => "unused",
     presignGet: async () => "unused",
+    getObject: async (key) => stored.get(key) ?? null,
     putObject: async ({ key, body }) => void stored.set(key, body),
     headObject: async (key) => (stored.has(key) ? { sizeBytes: stored.get(key)!.byteLength, contentType: null } : null),
     setCors: async () => {},
