@@ -2,7 +2,8 @@
  * File: apps/web/src/components/admin/integrations-panel.tsx
  * Purpose: The "Integrations" panel on the admin overview (3a, phase H2): one row each for Google Workspace and
  * GoHighLevel saying whether it is configured (and if not, what is missing), how many account tasks are waiting or
- * failed, and a "Test connection" button that makes one harmless read call and shows the answer in place.
+ * failed, and a "Test connection" button that makes one harmless read call and shows the answer in place. In dry-run
+ * mode (PROVISIONING_MODE=dry-run) each row shows a "Dry run" badge and the panel says nothing is sent.
  *
  * Functions:
  * - IntegrationsPanel({ data }): renders the panel.
@@ -41,7 +42,11 @@ function IntegrationRow({ system }: { system: IntegrationStatus }) {
           <p className="text-[15px] text-muted">{system.configured ? [system.details, counts].filter(Boolean).join(" · ") || "Ready" : system.problem}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Pill tone={system.configured ? "success" : "neutral"}>{system.configured ? "Configured" : "Not configured"}</Pill>
+          {system.dryRun ? (
+            <Pill tone="warning">Dry run</Pill>
+          ) : (
+            <Pill tone={system.configured ? "success" : "neutral"}>{system.configured ? "Configured" : "Not configured"}</Pill>
+          )}
           {system.configured ? (
             <Button variant="outline" size="sm" disabled={busy} onClick={() => void test()}>
               {busy ? "Testing…" : "Test connection"}
@@ -66,7 +71,11 @@ export function IntegrationsPanel({ data }: { data: IntegrationsResponse }) {
         <h2 id="integrations-title" className="text-xl font-bold">
           Integrations
         </h2>
-        <p className="mt-1 text-[15px] text-muted">New brokers get a 365 email and a GoHighLevel user automatically once both are configured.</p>
+        <p className="mt-1 text-[15px] text-muted">
+          {data.systems.some((system) => system.dryRun)
+            ? "Dry run is on: new brokers get a 365 address and GHL user in the portal, but nothing is created in Google or GoHighLevel."
+            : "New brokers get a 365 email and a GoHighLevel user automatically once both are configured."}
+        </p>
       </div>
       <ul>
         {data.systems.map((system) => (

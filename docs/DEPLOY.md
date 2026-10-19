@@ -69,6 +69,7 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `GHL_COMPANY_ID` | your agency (company) id | GHL agency Settings → Company, or the `companyId` in any agency API answer |
 | `GHL_LOCATION_ID` | the 365 Yachts sub-account id | GHL sub-account → Settings → Business Profile (Location ID) |
 | `PROVISIONING_WORKER` | `on` (default) | type `off` only to stop this service running provisioning tasks |
+| `PROVISIONING_MODE` | `live` (default) or `dry-run` | type `dry-run` to try onboarding without creating anything in Google or GHL (section 9) |
 
 Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in production.
 
@@ -161,6 +162,10 @@ Read on Oct 18, 2026 from the official OpenAPI files in [github.com/gohighlevel/
 ## 9. Turning on account provisioning
 
 Until the Google and GHL variables are set, the api logs one warning per system at start-up (`Google Workspace provisioning is not configured: Missing …`), the Integrations panel on the overview says **Not configured**, and nothing is sent anywhere. Adding the variables and redeploying turns each system on. No code change is needed.
+
+**Dry run (no Google or GHL calls, no Workspace billing):** set `PROVISIONING_MODE=dry-run` on the api and redeploy. No Google or GHL credentials are needed; `GOOGLE_DOMAIN` (default `365yachts.org`) and `GHL_LOCATION_ID` are used if set. Both systems show a **Dry run** badge on the Integrations panel. New brokers still get their 365 address picked (`firstname@…`, then `firstname.lastname@…`), saved on their profile and made their portal login, and their Accounts panel shows both accounts as created, with ids starting `dry-run-`. Every call that would have been made is written to the api log as `[dry-run] Google: would create …`. The temporary password on step 9 works nowhere. `pnpm provision:verify` ignores this setting and always talks to the real services.
+
+Before going live: set `PROVISIONING_MODE=live` (or delete it), add the real variables, redeploy, then for each broker who was onboarded in dry run open their profile → Accounts and use **Link existing account** or **Retry** so they get real ids (their dry-run ids point at nothing).
 
 **Google Workspace (Admin SDK Directory API):**
 

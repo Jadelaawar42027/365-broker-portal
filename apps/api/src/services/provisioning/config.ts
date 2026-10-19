@@ -2,13 +2,16 @@
  * File: apps/api/src/services/provisioning/config.ts
  * Purpose: Reads the Google Workspace and GoHighLevel settings from the validated API environment. A system with a
  * missing or malformed variable is "not configured" (with a reason naming what's wrong) and is skipped; the API
- * still starts. Adding the variables later turns the system on with no code change.
+ * still starts. Adding the variables later turns the system on with no code change. With PROVISIONING_MODE=dry-run
+ * both systems count as configured with placeholder settings (only GOOGLE_DOMAIN and GHL_LOCATION_ID are used, and are
+ * optional) and nothing is sent anywhere.
  *
  * Functions:
  * - readGoogleConfig(env): the Google settings, or { configured: false, problem } naming what is missing or malformed.
  * - readGhlConfig(env): the GoHighLevel settings, or { configured: false, problem }.
- * - readIntegrationConfig(env): both of the above.
- * - integrationWarnings(config): one warning line per system that isn't configured, for the start-up log.
+ * - readDryRunConfig(env): placeholder settings for both systems in dry-run mode (domain defaults to 365yachts.org).
+ * - readIntegrationConfig(env): both systems, live or dry-run depending on PROVISIONING_MODE.
+ * - integrationWarnings(config): one warning line per system that isn't configured (or one saying dry-run is on), for the start-up log.
  */
 import type { ApiEnv } from "../../env";
 
@@ -31,12 +34,13 @@ export type GhlConfig = {
 
 export type NotConfigured = { configured: false; problem: string };
 
-export type IntegrationConfig = { google: GoogleConfig | NotConfigured; ghl: GhlConfig | NotConfigured };
+export type IntegrationConfig = { google: GoogleConfig | NotConfigured; ghl: GhlConfig | NotConfigured; dryRun?: boolean };
 
 export type IntegrationEnv = Pick<
   ApiEnv,
   "GOOGLE_SERVICE_ACCOUNT_JSON" | "GOOGLE_ADMIN_SUBJECT" | "GOOGLE_DOMAIN" | "GOOGLE_ORG_UNIT" | "GHL_AGENCY_TOKEN" | "GHL_COMPANY_ID" | "GHL_LOCATION_ID"
->;
+> &
+  Partial<Pick<ApiEnv, "PROVISIONING_MODE">>;
 
 const GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token";
 
@@ -75,12 +79,33 @@ export function readGhlConfig(env: IntegrationEnv): GhlConfig | NotConfigured {
   return { configured: true, agencyToken: env.GHL_AGENCY_TOKEN!, companyId: env.GHL_COMPANY_ID!, locationId: env.GHL_LOCATION_ID! };
 }
 
+export function readDryRunConfig(env: IntegrationEnv): IntegrationConfig {
+  return {
+    google: {
+      configured: true,
+      clientEmail: "dry-run",
+      privateKey: "",
+      tokenUri: GOOGLE_TOKEN_URI,
+      adminSubject: "dry-run",
+      domain: (env.GOOGLE_DOMAIN ?? "365yachts.org").toLowerCase(),
+      orgUnit: env.GOOGLE_ORG_UNIT ?? null,
+    },
+    ghl: { configured: true, agencyToken: "dry-run", companyId: "dry-run", locationId: env.GHL_LOCATION_ID ?? "dry-run" },
+    dryRun: true,
+  };
+}
+
 export function readIntegrationConfig(env: IntegrationEnv): IntegrationConfig {
+  if (env.PROVISIONING_MODE === "dry-run") return readDryRunConfig(env);
   return { google: readGoogleConfig(env), ghl: readGhlConfig(env) };
 }
 
 export function integrationWarnings(config: IntegrationConfig): string[] {
   const warnings: string[] = [];
+  if (config.dryRun) {
+    warnings.push("Account provisioning is in DRY-RUN mode (PROVISIONING_MODE=dry-run): nothing is sent to Google Workspace or GoHighLevel, and accounts get fake dry-run ids.");
+    return warnings;
+  }
   if (!config.google.configured) warnings.push(`Google Workspace provisioning is not configured: ${config.google.problem} Brokers' 365 emails won't be created.`);
   if (!config.ghl.configured) warnings.push(`GoHighLevel provisioning is not configured: ${config.ghl.problem} Brokers' GHL users won't be created.`);
   return warnings;

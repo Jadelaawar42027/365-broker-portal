@@ -28,6 +28,7 @@ export type GhlCreateInput = { email: string; firstName: string; lastName: strin
 
 export type GhlClient = {
   locationId: string;
+  dryRun?: true;
   findUserByEmail(email: string): Promise<GhlUser | null>;
   createUser(input: GhlCreateInput): Promise<GhlUser>;
   deleteUser(userId: string): Promise<void>;

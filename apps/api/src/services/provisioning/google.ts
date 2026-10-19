@@ -42,6 +42,7 @@ export type GoogleCreateInput = {
 
 export type GoogleClient = {
   domain: string;
+  dryRun?: true;
   findUser(email: string): Promise<GoogleUser | null>;
   createUser(input: GoogleCreateInput): Promise<GoogleUser>;
   setSuspended(userId: string, suspended: boolean): Promise<void>;

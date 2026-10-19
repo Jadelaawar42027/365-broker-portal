@@ -56,6 +56,7 @@ export const integrationStatusSchema = z.object({
   system: z.enum(PROVISIONING_SYSTEMS),
   label: z.string(),
   configured: z.boolean(),
+  dryRun: z.boolean().describe("PROVISIONING_MODE=dry-run: nothing is sent to the service; accounts get fake ids"),
   problem: z.string().nullable().describe("What is missing or malformed, when not configured"),
   details: z.string().nullable().describe("The domain or location the system works with, when configured"),
   openTasks: z.number().int(),

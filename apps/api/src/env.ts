@@ -48,6 +48,7 @@ const apiEnvSchema = z
     GHL_COMPANY_ID: optionalString,
     GHL_LOCATION_ID: optionalString,
     PROVISIONING_WORKER: z.enum(["on", "off"]).default("on"),
+    PROVISIONING_MODE: z.enum(["live", "dry-run"]).default("live"),
     COMPANY_SIGNER_EMAIL: z
       .string()
       .trim()

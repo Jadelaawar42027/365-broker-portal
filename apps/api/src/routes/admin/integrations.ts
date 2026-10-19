@@ -2,7 +2,8 @@
  * File: apps/api/src/routes/admin/integrations.ts
  * Purpose: The admin Integrations panel on the overview (phase H2): whether Google Workspace and GoHighLevel are
  * configured (and if not, what's missing), how many tasks are open or failed, and "Test connection", which makes one
- * harmless read call (Google: look up GOOGLE_ADMIN_SUBJECT; GHL: read the location). Mounted in the admin scope.
+ * harmless read call (Google: look up GOOGLE_ADMIN_SUBJECT; GHL: read the location), or in dry-run mode just says
+ * nothing is sent. Mounted in the admin scope.
  *
  * Functions:
  * - registerAdminIntegrationRoutes(app): mounts GET /v1/admin/integrations and POST /v1/admin/integrations/:system/test.
@@ -49,6 +50,7 @@ export function registerAdminIntegrationRoutes(app: FastifyInstance): void {
             system,
             label: PROVISIONING_SYSTEM_LABELS[system],
             configured: entry.configured,
+            dryRun: config.dryRun === true,
             problem: entry.configured ? null : entry.problem,
             details,
             openTasks: count?.open ?? 0,

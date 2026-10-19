@@ -5,7 +5,7 @@
  * on the broker before Google is asked to create it. Google suspends and unsuspends; GoHighLevel has no deactivate
  * endpoint, so suspending deletes the GHL user and unsuspending creates (or finds) one again. Once the Google account
  * exists, the corporate email becomes the broker's portal login. Every change writes audit_log; passwords are generated
- * here, sent to the provider and forgotten.
+ * here, sent to the provider and forgotten. In dry-run mode linking an address nobody holds pretends it was found.
  *
  * Functions:
  * - DeferTask.constructor(message): signals that a task must wait for another one (it doesn't count as an attempt).
@@ -15,12 +15,12 @@
  * - useAsLoginEmail(db, broker, email): makes the corporate email the broker's login when no one else uses it; audits the change.
  * - saveGoogleAccount(db, broker, user, action, extra): stores the Google user id (and address), switches the login email and audits.
  * - googleCreate(context, broker): finds or creates the broker's Workspace user (firstname, then firstname.lastname on a clash, then firstname.lastname2, 3, ...).
- * - googleLink(context, broker): stores the id of the existing Workspace user at the broker's corporate email.
+ * - googleLink(context, broker): stores the id of the existing Workspace user at the broker's corporate email (a pretend one in dry-run).
  * - googleSetSuspended(context, broker, suspended): suspends or unsuspends the broker's Workspace user.
  * - ghlEmail(context, broker): the address to use in GHL, or defers / fails when there is none yet.
  * - saveGhlAccount(db, broker, userId, action): stores the GHL user id and audits.
  * - ghlCreate(context, broker): finds or creates the broker's GHL user in the location.
- * - ghlLink(context, broker): stores the id of the existing GHL user with the broker's corporate email.
+ * - ghlLink(context, broker): stores the id of the existing GHL user with the broker's corporate email (a pretend one in dry-run).
  * - ghlSuspend(context, broker): deletes the broker's GHL user (the API has no deactivate).
  * - runTaskAction(context, task): dispatches a claimed task to the handler for its system and action.
  */
@@ -163,7 +163,10 @@ async function googleCreate(context: TaskContext, broker: TaskBroker): Promise<v
 
 async function googleLink(context: TaskContext, broker: TaskBroker): Promise<void> {
   if (!broker.corporateEmail) throw new ProvisioningError("google", "Google: add the broker's corporate email first, then link.");
-  const found = await context.integrations.google!.findUser(broker.corporateEmail);
+  const google = context.integrations.google!;
+  const found =
+    (await google.findUser(broker.corporateEmail)) ??
+    (google.dryRun ? await google.createUser({ email: broker.corporateEmail, ...splitPersonName(broker.name), password: "", recoveryPhone: null, brokerId: broker.id }) : null);
   if (!found) throw new ProvisioningError("google", `Google: there's no Workspace account for ${broker.corporateEmail}.`);
   await saveGoogleAccount(context.db, broker, found, "linked", { suspended: found.suspended });
 }
@@ -223,7 +226,10 @@ async function ghlCreate(context: TaskContext, broker: TaskBroker, action: "crea
 
 async function ghlLink(context: TaskContext, broker: TaskBroker): Promise<void> {
   if (!broker.corporateEmail) throw new ProvisioningError("ghl", "GHL: add the broker's corporate email first, then link.");
-  const found = await context.integrations.ghl!.findUserByEmail(broker.corporateEmail);
+  const ghl = context.integrations.ghl!;
+  const found =
+    (await ghl.findUserByEmail(broker.corporateEmail)) ??
+    (ghl.dryRun ? await ghl.createUser({ email: broker.corporateEmail, ...splitPersonName(broker.name), phone: null, password: "" }) : null);
   if (!found) throw new ProvisioningError("ghl", `GHL: there's no user with ${broker.corporateEmail} in the agency.`);
   await saveGhlAccount(context.db, broker, found.id, "linked");
 }
