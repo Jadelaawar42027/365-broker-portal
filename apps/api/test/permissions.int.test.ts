@@ -50,6 +50,8 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["POST", `/v1/admin/broker-steps/${brokerStepId}/send-back`, { note: "no" }],
     ["POST", `/v1/admin/broker-steps/${brokerStepId}/mark-done`, {}],
     ["POST", "/v1/admin/admins", { name: "Evil Admin", email: "evil@example.com" }],
+    ["GET", "/v1/admin/admins"],
+    ["POST", `/v1/admin/admins/${id}/resend-invite`],
     ["GET", "/v1/admin/training/chapters"],
     ["POST", "/v1/admin/training/chapters", { code: "Z9", title: "Nope chapter" }],
     ["GET", `/v1/admin/training/chapters/${id}`],

@@ -10,11 +10,10 @@
  * - requireUser(request): preHandler that rejects anonymous callers with 401.
  * - requireBroker(request): preHandler that allows only signed-in brokers.
  * - requireAdmin(request): preHandler that allows only admins and owners.
- * - requireOwner(request): preHandler that allows only owners.
  * - currentActor(request): returns request.actor, throwing 401 if it is missing (for use after a require hook).
  */
 import { brokers, sessions, users } from "@bp/db";
-import { canLogIn, canManageAdmins, isAdminRole } from "@bp/shared";
+import { canLogIn, isAdminRole } from "@bp/shared";
 import { fromNodeHeaders } from "better-auth/node";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -68,11 +67,6 @@ export async function requireBroker(request: FastifyRequest): Promise<void> {
 export async function requireAdmin(request: FastifyRequest): Promise<void> {
   if (!request.actor) throw unauthorized();
   if (!isAdminRole(request.actor.role)) throw forbidden("Only admins can do this.");
-}
-
-export async function requireOwner(request: FastifyRequest): Promise<void> {
-  if (!request.actor) throw unauthorized();
-  if (!canManageAdmins(request.actor.role)) throw forbidden("Only the owner can manage admin accounts.");
 }
 
 export function currentActor(request: FastifyRequest): RequestActor {

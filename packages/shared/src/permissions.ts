@@ -5,7 +5,7 @@
  *
  * Functions:
  * - isAdminRole(role): true for admin and owner.
- * - canManageAdmins(role): true only for owner (SPEC D7).
+ * - canManageAdmins(role): true only for owner; gates owner-only actions such as deleting a broker (any admin may invite admins, SPEC D7).
  * - canAccessBroker(actor, brokerUserId): true if the actor is an admin/owner or is that broker.
  * - canLogIn(input): false for a broker whose status is inactive (SPEC D9), true otherwise.
  */

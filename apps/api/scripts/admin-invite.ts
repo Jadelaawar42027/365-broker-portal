@@ -1,7 +1,7 @@
 /**
  * File: apps/api/scripts/admin-invite.ts
  * Purpose: `pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` creates an admin account and
- * prints its invite link (SPEC D7), for when the owner has no screen for it yet.
+ * prints its invite link (SPEC D7), for the first admin or when nobody can sign in to use the Admins tab.
  *
  * Functions:
  * - readFlag(argv, name): returns the value after --name in argv, or null.

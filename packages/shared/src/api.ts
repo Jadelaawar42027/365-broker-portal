@@ -496,4 +496,16 @@ export const createAdminRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: emailSchema,
 });
-export const createAdminResponseSchema = z.object({ userId: z.string() });
+export const createAdminResponseSchema = z.object({ userId: z.string(), inviteUrl: z.string() });
+export type CreateAdminResponse = z.infer<typeof createAdminResponseSchema>;
+
+export const adminAccountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.enum(["admin", "owner"]),
+  hasLogin: z.boolean(),
+  createdAt: timestampSchema,
+});
+export const adminListResponseSchema = z.object({ admins: z.array(adminAccountSchema) });
+export type AdminListResponse = z.infer<typeof adminListResponseSchema>;
