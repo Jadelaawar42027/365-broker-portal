@@ -5,7 +5,9 @@
  * on the broker before Google is asked to create it. Google suspends and unsuspends; GoHighLevel has no deactivate
  * endpoint, so suspending deletes the GHL user and unsuspending creates (or finds) one again. Once the Google account
  * exists, the corporate email becomes the broker's portal login. Every change writes audit_log; passwords are generated
- * here, sent to the provider and forgotten. In dry-run mode linking an address nobody holds pretends it was found.
+ * here, sent to the provider and forgotten, except that new Google users get GOOGLE_STARTING_PASSWORD when it is set
+ * (the audit row then says startingPassword: true, never the password). In dry-run mode linking an address nobody
+ * holds pretends it was found.
  *
  * Functions:
  * - DeferTask.constructor(message): signals that a task must wait for another one (it doesn't count as an attempt).
@@ -14,7 +16,7 @@
  * - addressInUseByOther(db, address, broker): true when another portal user or broker already holds the address.
  * - useAsLoginEmail(db, broker, email): makes the corporate email the broker's login when no one else uses it; audits the change.
  * - saveGoogleAccount(db, broker, user, action, extra): stores the Google user id (and address), switches the login email and audits.
- * - googleCreate(context, broker): finds or creates the broker's Workspace user (firstname, then firstname.lastname on a clash, then firstname.lastname2, 3, ...).
+ * - googleCreate(context, broker): finds or creates the broker's Workspace user (firstname, then firstname.lastname on a clash, then firstname.lastname2, 3, ...), with the starting password when one is set.
  * - googleLink(context, broker): stores the id of the existing Workspace user at the broker's corporate email (a pretend one in dry-run).
  * - googleSetSuspended(context, broker, suspended): suspends or unsuspends the broker's Workspace user.
  * - ghlEmail(context, broker): the address to use in GHL, or defers / fails when there is none yet.
@@ -145,9 +147,11 @@ async function googleCreate(context: TaskContext, broker: TaskBroker): Promise<v
       }
     }
     const { firstName, lastName } = splitPersonName(broker.name);
+    const googleConfig = context.integrations.config.google;
+    const startingPassword = googleConfig.configured ? googleConfig.startingPassword : undefined;
     let created: GoogleUser;
     try {
-      created = await google.createUser({ email: address, firstName, lastName, password: generateTemporaryPassword(), recoveryPhone: broker.phone, brokerId: broker.id });
+      created = await google.createUser({ email: address, firstName, lastName, password: startingPassword ?? generateTemporaryPassword(), recoveryPhone: broker.phone, brokerId: broker.id });
     } catch (error) {
       if (error instanceof ProvisioningError && error.status === 409 && !fixed) {
         await context.db.update(brokers).set({ corporateEmail: null }).where(eq(brokers.id, broker.id));
@@ -155,7 +159,7 @@ async function googleCreate(context: TaskContext, broker: TaskBroker): Promise<v
       }
       throw error;
     }
-    await saveGoogleAccount(context.db, broker, created, "created");
+    await saveGoogleAccount(context.db, broker, created, "created", startingPassword ? { startingPassword: true } : {});
     return;
   }
   throw new ProvisioningError("google", `Google: couldn't find a free address for ${broker.name}. Enter the corporate email by hand.`);

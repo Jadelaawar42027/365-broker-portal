@@ -4,6 +4,7 @@
  * Required secrets have no defaults, so a misconfigured deploy fails at start-up instead of at the first request.
  * The Google Workspace and GoHighLevel variables (phase H2) are optional here; services/provisioning/config.ts checks
  * them and treats a system with missing or malformed values as not configured instead of refusing to start.
+ * GOOGLE_STARTING_PASSWORD, when set, is the first password every new 365 email gets (at least 8 characters).
  *
  * Functions:
  * - loadApiEnv(source): parses source (defaults to process.env) and returns the typed config; throws listing every invalid variable.
@@ -44,6 +45,11 @@ const apiEnvSchema = z
     GOOGLE_ADMIN_SUBJECT: optionalString,
     GOOGLE_DOMAIN: optionalString,
     GOOGLE_ORG_UNIT: optionalString,
+    GOOGLE_STARTING_PASSWORD: z
+      .string()
+      .min(8, "must be at least 8 characters (Google's minimum)")
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
     GHL_AGENCY_TOKEN: optionalString,
     GHL_COMPANY_ID: optionalString,
     GHL_LOCATION_ID: optionalString,

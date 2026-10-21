@@ -5,7 +5,8 @@
  * retries, partial failures and idempotency without the real services.
  *
  * Functions:
- * - createFakeGoogle(domain): a fake GoogleClient plus its users, calls and failNext(count, error).
+ * - createFakeGoogle(domain): a fake GoogleClient plus its users, calls and failNext(count, error). Users have
+ *   firstPasswordPending (true until a test sets it false), which stillOnFirstPassword reports without recording a call.
  * - createFakeGhl(): a fake GhlClient plus its users, calls and failNext(count, error).
  * - fakeIntegrations(google, ghl): an Integrations object with the given fakes (null = not configured).
  * - maybeFail(state): throws the queued failure, if any, counting it down.
@@ -25,7 +26,7 @@ function maybeFail(state: FailState): void {
 }
 
 export function createFakeGoogle(domain = "365yachts.org") {
-  const users = new Map<string, GoogleUser & { passwordSets: number; recoveryPhone: string | null }>();
+  const users = new Map<string, GoogleUser & { passwordSets: number; recoveryPhone: string | null; firstPasswordPending: boolean }>();
   const calls: string[] = [];
   const fail: FailState = { remaining: 0, error: null };
   let nextId = 1;
@@ -41,7 +42,7 @@ export function createFakeGoogle(domain = "365yachts.org") {
       calls.push(`create ${input.email}`);
       maybeFail(fail);
       if (users.has(input.email)) throw new ProvisioningError("google", "Google: that address is already taken by another account.", { status: 409 });
-      const user = { id: `g-${nextId++}`, email: input.email, suspended: false, brokerId: input.brokerId, passwordSets: 1, recoveryPhone: input.recoveryPhone };
+      const user = { id: `g-${nextId++}`, email: input.email, suspended: false, brokerId: input.brokerId, passwordSets: 1, recoveryPhone: input.recoveryPhone, firstPasswordPending: true };
       users.set(input.email, user);
       return { id: user.id, email: user.email, suspended: false, brokerId: user.brokerId };
     },
@@ -59,6 +60,9 @@ export function createFakeGoogle(domain = "365yachts.org") {
       if (!user) throw new ProvisioningError("google", "Google: that account no longer exists.", { status: 404 });
       user.passwordSets += 1;
     },
+    async stillOnFirstPassword(userId) {
+      return [...users.values()].find((entry) => entry.id === userId)?.firstPasswordPending ?? false;
+    },
     async deleteUser(userId) {
       calls.push(`delete ${userId}`);
       for (const [email, user] of users) if (user.id === userId) users.delete(email);
@@ -74,7 +78,7 @@ export function createFakeGoogle(domain = "365yachts.org") {
     users,
     calls,
     addExisting(email: string, brokerId: string | null = null) {
-      const user = { id: `g-existing-${nextId++}`, email, suspended: false, brokerId, passwordSets: 1, recoveryPhone: null };
+      const user = { id: `g-existing-${nextId++}`, email, suspended: false, brokerId, passwordSets: 1, recoveryPhone: null, firstPasswordPending: false };
       users.set(email, user);
       return user;
     },

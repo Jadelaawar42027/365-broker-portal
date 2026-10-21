@@ -4,7 +4,8 @@
  * missing or malformed variable is "not configured" (with a reason naming what's wrong) and is skipped; the API
  * still starts. Adding the variables later turns the system on with no code change. With PROVISIONING_MODE=dry-run
  * both systems count as configured with placeholder settings (only GOOGLE_DOMAIN and GHL_LOCATION_ID are used, and are
- * optional) and nothing is sent anywhere.
+ * optional) and nothing is sent anywhere. GOOGLE_STARTING_PASSWORD (optional) is the first password new 365 emails
+ * get; without it each new account gets a random one nobody sees.
  *
  * Functions:
  * - readGoogleConfig(env): the Google settings, or { configured: false, problem } naming what is missing or malformed.
@@ -23,6 +24,7 @@ export type GoogleConfig = {
   adminSubject: string;
   domain: string;
   orgUnit: string | null;
+  startingPassword?: string;
 };
 
 export type GhlConfig = {
@@ -40,7 +42,7 @@ export type IntegrationEnv = Pick<
   ApiEnv,
   "GOOGLE_SERVICE_ACCOUNT_JSON" | "GOOGLE_ADMIN_SUBJECT" | "GOOGLE_DOMAIN" | "GOOGLE_ORG_UNIT" | "GHL_AGENCY_TOKEN" | "GHL_COMPANY_ID" | "GHL_LOCATION_ID"
 > &
-  Partial<Pick<ApiEnv, "PROVISIONING_MODE">>;
+  Partial<Pick<ApiEnv, "PROVISIONING_MODE" | "GOOGLE_STARTING_PASSWORD">>;
 
 const GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token";
 
@@ -69,6 +71,7 @@ export function readGoogleConfig(env: IntegrationEnv): GoogleConfig | NotConfigu
     adminSubject: env.GOOGLE_ADMIN_SUBJECT!.toLowerCase(),
     domain,
     orgUnit,
+    startingPassword: env.GOOGLE_STARTING_PASSWORD,
   };
 }
 
@@ -89,6 +92,7 @@ export function readDryRunConfig(env: IntegrationEnv): IntegrationConfig {
       adminSubject: "dry-run",
       domain: (env.GOOGLE_DOMAIN ?? "365yachts.org").toLowerCase(),
       orgUnit: env.GOOGLE_ORG_UNIT ?? null,
+      startingPassword: env.GOOGLE_STARTING_PASSWORD,
     },
     ghl: { configured: true, agencyToken: "dry-run", companyId: "dry-run", locationId: env.GHL_LOCATION_ID ?? "dry-run" },
     dryRun: true,

@@ -4,11 +4,14 @@
  * temporary password", which resets the Google password at that moment (change at next login) and returns it once.
  * Only the signed-in broker can reveal, only for their own account, at most 3 times per Florida day; each reveal writes
  * audit_log without the password. Responses are never cached and the password is never stored or logged.
+ * When the account was made with GOOGLE_STARTING_PASSWORD, the broker hasn't revealed a new one since, and Google says
+ * they haven't chosen their own password yet, GET also returns that starting password for the "How to log in" steps.
  *
  * Functions:
  * - registerMyAccountRoutes(app): mounts GET /v1/me/accounts and POST /v1/me/accounts/google/reveal-password.
  * - loadMyGoogleState(app, brokerId): the broker's corporate email, whether Google is ready, and reveals left today.
  * - revealsToday(app, brokerId): how many reveals the broker made today (Florida time).
+ * - startingPasswordFor(app, brokerId, googleUserId): the configured starting password if the broker's Google account was created with it, no reveal has replaced it and Google still asks them to change it (shown if Google can't be reached); otherwise null.
  */
 import { auditLog, brokers } from "@bp/db";
 import {
@@ -18,7 +21,7 @@ import {
   PASSWORD_REVEALS_PER_DAY,
   revealPasswordResponseSchema,
 } from "@bp/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { HttpError, conflict } from "../errors";
@@ -29,6 +32,7 @@ import { loadAccountViews } from "../services/provisioning/status";
 import { todayFor } from "../services/support";
 
 const REVEAL_ACTION = "google.password_revealed";
+const CREATED_ACTION = "provisioning.google.created";
 const GMAIL_URL = "https://mail.google.com/";
 
 async function revealsToday(app: FastifyInstance, brokerId: string): Promise<number> {
@@ -44,6 +48,29 @@ async function revealsToday(app: FastifyInstance, brokerId: string): Promise<num
       ),
     );
   return row?.count ?? 0;
+}
+
+async function startingPasswordFor(app: FastifyInstance, brokerId: string, googleUserId: string): Promise<string | null> {
+  const googleConfig = app.deps.integrations.config.google;
+  const startingPassword = googleConfig.configured ? googleConfig.startingPassword : undefined;
+  if (!startingPassword) return null;
+  const rows = await app.deps.db
+    .select({ action: auditLog.action })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.entityId, brokerId),
+        or(
+          eq(auditLog.action, REVEAL_ACTION),
+          and(eq(auditLog.action, CREATED_ACTION), sql`${auditLog.after}->>'startingPassword' = 'true'`),
+        ),
+      ),
+    );
+  const createdWithIt = rows.some((row) => row.action === CREATED_ACTION);
+  const replaced = rows.some((row) => row.action === REVEAL_ACTION);
+  if (!createdWithIt || replaced) return null;
+  const stillOnIt = await app.deps.integrations.google!.stillOnFirstPassword(googleUserId).catch(() => true);
+  return stillOnIt ? startingPassword : null;
 }
 
 async function loadMyGoogleState(app: FastifyInstance, brokerId: string) {
@@ -74,6 +101,7 @@ export function registerMyAccountRoutes(app: FastifyInstance): void {
         googleReady: state.ready,
         revealsLeft: state.revealsLeft,
         gmailUrl: GMAIL_URL,
+        startingPassword: state.ready ? await startingPasswordFor(app, state.broker.id, state.broker.googleUserId!) : null,
       };
     },
   );

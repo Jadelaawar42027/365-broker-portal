@@ -76,6 +76,7 @@ export const myAccountsResponseSchema = z.object({
   googleReady: z.boolean().describe("True when Google is configured and the broker's Workspace account exists and is active"),
   revealsLeft: z.number().int(),
   gmailUrl: z.string(),
+  startingPassword: z.string().nullable().describe("The first password of a new 365 email, until the broker resets it from step 9; null when unknown"),
 });
 export type MyAccountsResponse = z.infer<typeof myAccountsResponseSchema>;
 

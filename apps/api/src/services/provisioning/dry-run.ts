@@ -7,7 +7,8 @@
  *
  * Functions:
  * - fakeId(system): a new id like "dry-run-google-<uuid>".
- * - createDryRunGoogleClient(domain, log): a GoogleClient that logs each call; lookups find nobody, creates succeed.
+ * - createDryRunGoogleClient(domain, log): a GoogleClient that logs each call; lookups find nobody, creates succeed, and
+ *   every user counts as still on their first password.
  * - createDryRunGhlClient(locationId, log): a GhlClient that logs each call; lookups find nobody, creates succeed.
  */
 import { randomUUID } from "node:crypto";
@@ -38,6 +39,9 @@ export function createDryRunGoogleClient(domain: string, log: DryRunLog): Google
     },
     async resetPassword(userId) {
       log(`[dry-run] Google: would set a new temporary password for ${userId}`);
+    },
+    async stillOnFirstPassword() {
+      return true;
     },
     async deleteUser(userId) {
       log(`[dry-run] Google: would delete ${userId}`);

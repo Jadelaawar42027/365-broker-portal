@@ -18,6 +18,7 @@
  * - createUser(input): creates the user (temporary password, change at next login, org unit, recovery phone, portal tag) and returns it.
  * - setSuspended(userId, suspended): suspends or unsuspends a user.
  * - resetPassword(userId, password): sets a new temporary password that must be changed at next login.
+ * - stillOnFirstPassword(userId): true while Google still requires the user to choose a new password at next sign-in.
  * - deleteUser(userId): deletes a user (only used by provision:verify for its own test user).
  * - testConnection(): one harmless read: looks up GOOGLE_ADMIN_SUBJECT; returns a message saying who it found.
  */
@@ -47,6 +48,7 @@ export type GoogleClient = {
   createUser(input: GoogleCreateInput): Promise<GoogleUser>;
   setSuspended(userId: string, suspended: boolean): Promise<void>;
   resetPassword(userId: string, password: string): Promise<void>;
+  stillOnFirstPassword(userId: string): Promise<boolean>;
   deleteUser(userId: string): Promise<void>;
   testConnection(): Promise<string>;
 };
@@ -168,6 +170,10 @@ export function createGoogleClient(config: GoogleConfig, fetchImpl: typeof fetch
     async resetPassword(userId, password) {
       const body = await request("PUT", `/users/${encodeURIComponent(userId)}`, { password, changePasswordAtNextLogin: true });
       if (!body) throw new ProvisioningError("google", "Google: that account no longer exists.", { status: 404 });
+    },
+    async stillOnFirstPassword(userId) {
+      const body = await request<{ changePasswordAtNextLogin?: boolean }>("GET", `/users/${encodeURIComponent(userId)}?fields=changePasswordAtNextLogin`);
+      return body?.changePasswordAtNextLogin === true;
     },
     async deleteUser(userId) {
       await request("DELETE", `/users/${encodeURIComponent(userId)}`);
