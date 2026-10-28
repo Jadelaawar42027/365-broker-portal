@@ -12,7 +12,9 @@
  * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with an email and returns their profile URL.
  * - acceptInvite(page, email, password): opens the invite link from the outbox and creates the account.
  * - createSignedInBroker(browser, name): uses a separate admin session to invite a broker, then accepts the invite in a new context; returns that broker's page and email.
- * - testFile(name): a small PDF or PNG payload for setInputFiles.
+ * - testFile(name): a small PDF, or a plain 600 x 600 PNG (the headshot minimum), for setInputFiles.
+ * - pngOfSize(width, height): builds a valid single-colour PNG of that size.
+ * - pngChunk(type, data): one PNG chunk with its length and CRC.
  * - passQuickCheck(page, answer): answers a step's knowledge check correctly and waits for "That's right."
  * - uploadStep(page, stepKey, fileName, checkAnswer): opens a step, uploads one file, passes its knowledge check if one is given, and sends it.
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
@@ -23,6 +25,7 @@
 import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 export const OWNER = { email: "owner@e2e.test", password: "e2e-owner-password" };
@@ -108,11 +111,33 @@ export async function createSignedInBroker(browser: Browser, name: string, optio
   return { page, email, profileUrl, context: brokerContext };
 }
 
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(zlib.crc32(body));
+  return Buffer.concat([length, body, crc]);
+}
+
+function pngOfSize(width: number, height: number): Buffer {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 200)]);
+  const pixels = zlib.deflateSync(Buffer.concat(Array.from({ length: height }, () => row)));
+  return Buffer.concat([
+    Buffer.from("89504e470d0a1a0a", "hex"),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", pixels),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
 export function testFile(name: string) {
   const isPng = name.endsWith(".png");
-  const buffer = isPng
-    ? Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108020000009077053e0000000c4944415408d763f8cfc0000003010100c9fe92ef0000000049454e44ae426082", "hex")
-    : Buffer.from(`%PDF-1.4\n% e2e test file ${name}\n%%EOF\n`);
+  const buffer = isPng ? pngOfSize(600, 600) : Buffer.from(`%PDF-1.4\n% e2e test file ${name}\n%%EOF\n`);
   return { name, mimeType: isPng ? "image/png" : "application/pdf", buffer };
 }
 
@@ -171,10 +196,10 @@ export async function completeBrokerSteps(page: Page): Promise<void> {
   await answerStep(page, "start_here", (p) => p.getByLabel("I've watched the walkthrough").check());
   await uploadStep(page, "photo_id", "photo-id.pdf");
   await signAgreements(page);
-  await answerStep(page, "bio", (p) => p.getByLabel("Your bio").fill("I grew up on the water in Palm Beach and have sold boats for ten years. ".repeat(6)));
+  await answerStep(page, "bio", (p) => p.getByLabel("Your bio").fill("I grew up on the water in Palm Beach and have sold boats for ten years. ".repeat(7)));
   await uploadStep(page, "headshot", "headshot.png");
   await uploadStep(page, "w9", "w9.pdf");
-  await answerStep(page, "license_situation", (p) => p.getByLabel(/I hold a Florida yacht & ship license/).check());
+  await answerStep(page, "license_situation", (p) => p.getByLabel(/I already have a Florida yacht & ship license/).check());
   await uploadStep(page, "dbpr_filing", "dbpr-confirmation.pdf");
   await uploadStep(page, "license_bond", "license-and-bond.pdf", DEPOSIT_ANSWER);
   await answerStep(page, "email_signature", (p) => p.getByLabel(/activated my 365 email/).check());

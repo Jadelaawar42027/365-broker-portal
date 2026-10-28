@@ -89,7 +89,7 @@ describe("inviting a broker", () => {
     expect(response.json()).toEqual({ role: "broker" });
     const cookie = ([] as string[]).concat(response.headers["set-cookie"] ?? []).map((value) => value.split(";")[0]).join("; ");
     const me = await ctx.call("GET", "/v1/me", { cookie });
-    expect(me.json()).toMatchObject({ user: { name: "Daniel Reyes", phone: "(561) 555-0123" }, broker: { status: "onboarding" } });
+    expect(me.json()).toMatchObject({ user: { name: "Daniel Reyes", phone: "+15615550123" }, broker: { status: "onboarding" } });
     const audit = await ctx.db.select().from(auditLog).where(eq(auditLog.entityId, brokerId));
     expect(audit.map((row) => row.action)).toEqual(expect.arrayContaining(["broker.created", "broker.status_changed"]));
     expect(await ctx.login("daniel.reyes@example.com", acceptBody.password)).toContain("session_token");
@@ -170,13 +170,13 @@ describe("inviting admins (owner only)", () => {
     expect((await ctx.call("GET", "/v1/admin/overview", { cookie: shelly })).statusCode).toBe(200);
   });
 
-  it("refuses admins and brokers", async () => {
+  it("lets any admin invite an admin, but refuses brokers", async () => {
     const shelly = await ctx.login("shelly@example.com", "shelly-password-1");
+    const byAdmin = await ctx.call("POST", "/v1/admin/admins", { cookie: shelly, body: { name: "Max Admin", email: "max.admin@example.com" } });
+    expect(byAdmin.statusCode).toBe(201);
     const broker = await ctx.createBroker({ email: "wannabe@example.com" });
-    for (const cookie of [shelly, broker.cookie]) {
-      const response = await ctx.call("POST", "/v1/admin/admins", { cookie, body: { name: "Nope Person", email: "nope@example.com" } });
-      expect(response.statusCode).toBe(403);
-    }
+    const byBroker = await ctx.call("POST", "/v1/admin/admins", { cookie: broker.cookie, body: { name: "Nope Person", email: "nope@example.com" } });
+    expect(byBroker.statusCode).toBe(403);
   });
 
   it("refuses an email that already exists", async () => {

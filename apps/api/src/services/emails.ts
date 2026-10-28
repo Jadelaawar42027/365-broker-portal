@@ -13,6 +13,7 @@
  * - stepApprovedEmail(input): tells a broker a step was approved.
  * - onboardingCompleteBrokerEmail(input): congratulates a broker on finishing onboarding.
  * - onboardingCompleteAdminEmail(input): tells admins a broker finished onboarding.
+ * - brokerNeedsHelpAdminEmail(input): tells admins a broker picked an answer that asks for help (a step's alertChoices), with their phone and a profile link.
  * - reminderEmail(input): nudges a broker about their next step.
  * - contractsSignedEmail(input): sends a broker their signed agreements (attached), or says they're waiting for the countersignature (SPEC D31).
  * - countersignNeededEmail(input): tells the company signer a broker's agreements are waiting for her countersignature.
@@ -134,6 +135,20 @@ export function onboardingCompleteAdminEmail(input: { brokerName: string; link: 
   return {
     subject: `${input.brokerName} finished onboarding`,
     text: [`${input.brokerName} has every onboarding step approved and is now active.`, "", input.link].join("\n"),
+  };
+}
+
+export function brokerNeedsHelpAdminEmail(input: { brokerName: string; stepTitle: string; answer: string; phone: string | null; link: string }): Email {
+  return {
+    subject: `${input.brokerName} asked for help: ${input.stepTitle}`,
+    text: [
+      `${input.brokerName} answered "${input.stepTitle}" with:`,
+      `"${input.answer}"`,
+      "",
+      `Please get in touch with them${input.phone ? ` (${input.phone})` : ""} to work out the next steps together.`,
+      "",
+      input.link,
+    ].join("\n"),
   };
 }
 

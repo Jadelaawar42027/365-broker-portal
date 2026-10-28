@@ -8,14 +8,16 @@
  *
  * Functions:
  * - StepForm({ step, supportName }): renders the right form for the step kind, the knowledge check if any, and sends it.
- * - UploadArea({ step, files, setFiles }): the drop zone and file cards; uploads each picked file straight away.
- * - AnswerFields({ step, answer, setAnswer }): the text, choice, confirm or checklist inputs.
+ * - UploadArea({ step, files, setFiles }): the drop zone and file cards; uploads each picked file straight away, skipping duplicates, files past the step's file limit and images smaller than config.minImagePx.
+ * - AnswerFields({ step, answer, setAnswer }): the text (with character and word counts), choice, confirm or checklist inputs.
+ * - bioCountMessage(step, text): the "120 words · looks good" style line under the bio box, and whether the text is within limits.
+ * - fileLimitText(min, max): "1 file" / "1 or 2 files" / "2 to 5 files" wording for the drop zone.
  * - initialAnswer(step): the starting answer, pre-filled from a previous submission.
  * - buildFormData(step, answer): the form_data object the API expects for the step kind.
  */
 "use client";
 
-import { formatFileSize, type StepDetailResponse, type UploadTargetResponse } from "@bp/shared";
+import { countWords, fileCountLimits, formatFileSize, type StepDetailResponse, type UploadTargetResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent } from "react";
 import { FormMessage } from "@/components/auth/form-message";
@@ -23,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { CheckIcon, UploadIcon } from "@/components/ui/icons";
 import { apiRequest, ApiError, uploadToTarget } from "@/lib/api-client";
 import { StepCheck } from "./step-check";
-import { checkFileBeforeUpload, describeAcceptedTypes } from "@/lib/steps";
+import { checkFileBeforeUpload, checkImageDimensions, describeAcceptedTypes } from "@/lib/steps";
 
 type PickedFile = {
   id: string;
@@ -37,7 +39,26 @@ type PickedFile = {
 
 type Answer = { text: string; choice: string; confirmed: boolean; checked: string[] };
 
-const MAX_FILES = 5;
+function fileLimitText(min: number, max: number): string {
+  if (max === 1) return "1 file";
+  if (min === max) return `${max} files`;
+  if (min === 1 && max === 2) return "1 or 2 files";
+  return `${min} to ${max} files`;
+}
+
+function bioCountMessage(step: StepDetailResponse, text: string): { ok: boolean; message: string } {
+  const trimmed = text.trim();
+  const characters = trimmed.length;
+  const words = countWords([trimmed]);
+  const minChars = step.config.minLength ?? 1;
+  const minWords = step.config.minWords ?? 0;
+  const maxWords = step.config.maxWords;
+  const counts = minWords || maxWords ? `${words} words` : `${characters} characters`;
+  if (maxWords !== undefined && words > maxWords) return { ok: false, message: `${counts} · keep it to ${maxWords} or fewer` };
+  if (words < minWords) return { ok: false, message: `${counts} · at least ${minWords}` };
+  if (characters < minChars) return { ok: false, message: `${characters} characters · at least ${minChars}` };
+  return { ok: true, message: `${counts} · looks good` };
+}
 
 function initialAnswer(step: StepDetailResponse): Answer {
   const data = step.formData ?? {};
@@ -68,11 +89,12 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
 
   const uploaded = files.filter((file) => file.state === "uploaded");
   const uploading = files.some((file) => file.state === "uploading");
+  const limits = fileCountLimits(step.config);
   const ready =
     step.kind === "upload"
-      ? uploaded.length > 0 && !uploading
+      ? uploaded.length >= limits.min && uploaded.length <= limits.max && !uploading
       : step.kind === "text"
-        ? answer.text.trim().length >= (step.config.minLength ?? 1)
+        ? bioCountMessage(step, answer.text).ok
         : step.kind === "choice"
           ? Boolean(answer.choice)
           : step.kind === "confirm"
@@ -137,6 +159,8 @@ function UploadArea({
   const [dragging, setDragging] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
   const acceptsImages = step.acceptedTypes.some((type) => type.startsWith("image/"));
+  const limits = fileCountLimits(step.config);
+  const uploadedCount = files.filter((file) => file.state === "uploaded").length;
 
   async function uploadOne(file: File, id: string) {
     try {
@@ -152,15 +176,23 @@ function UploadArea({
     }
   }
 
-  function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | null) {
     setPickError(null);
     if (!list) return;
-    const picked = Array.from(list);
-    const room = MAX_FILES - files.length;
-    if (picked.length > room) setPickError(`You can send up to ${MAX_FILES} files for this step.`);
+    const kept = files.filter((file) => file.state !== "failed");
+    const room = limits.max - kept.length;
     const accepted: { file: File; entry: PickedFile }[] = [];
-    for (const file of picked.slice(0, Math.max(room, 0))) {
-      const problem = checkFileBeforeUpload(file, step);
+    for (const file of Array.from(list)) {
+      const duplicate = [...kept, ...accepted.map((item) => item.entry)].some((item) => item.name === file.name && item.size === file.size);
+      if (duplicate) {
+        setPickError(`"${file.name}" is already added.`);
+        continue;
+      }
+      if (accepted.length >= room) {
+        setPickError(limits.max === 1 ? "This step takes one file. Remove the current one to replace it." : `You can send up to ${limits.max} files for this step.`);
+        break;
+      }
+      const problem = checkFileBeforeUpload(file, step) ?? (step.config.minImagePx ? await checkImageDimensions(file, step.config.minImagePx) : null);
       if (problem) {
         setPickError(problem);
         continue;
@@ -168,14 +200,14 @@ function UploadArea({
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       accepted.push({ file, entry: { id, name: file.name, size: file.size, type: file.type, state: "uploading" } });
     }
-    setFiles((current) => [...current, ...accepted.map((item) => item.entry)]);
+    setFiles((current) => [...current.filter((file) => file.state !== "failed"), ...accepted.map((item) => item.entry)]);
     for (const item of accepted) void uploadOne(item.file, item.entry.id);
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
-    addFiles(event.dataTransfer.files);
+    void addFiles(event.dataTransfer.files);
   }
 
   return (
@@ -194,9 +226,10 @@ function UploadArea({
         <span className="grid size-14 place-items-center rounded-full bg-brand-soft text-brand">
           <UploadIcon className="size-7" />
         </span>
-        <p className="mt-4 text-xl font-bold">Drop your file here</p>
+        <p className="mt-4 text-xl font-bold">{limits.max === 1 ? "Drop your file here" : "Drop your files here"}</p>
         <p className="mt-1 text-base text-muted">
-          {describeAcceptedTypes(step.acceptedTypes)} · up to {formatFileSize(step.maxSizeBytes)}
+          {fileLimitText(limits.min, limits.max)} · {describeAcceptedTypes(step.acceptedTypes)} · up to {formatFileSize(step.maxSizeBytes)} each
+          {step.config.minImagePx ? ` · at least ${step.config.minImagePx} × ${step.config.minImagePx} px` : ""}
         </p>
         <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row">
           <Button variant="navy" size="lg" className="min-w-[180px]" onClick={() => chooseRef.current?.click()}>
@@ -211,13 +244,13 @@ function UploadArea({
         <input
           ref={chooseRef}
           type="file"
-          multiple
+          multiple={limits.max > 1}
           accept={step.acceptedTypes.join(",")}
           className="sr-only"
           tabIndex={-1}
           aria-label="Choose files to upload"
           onChange={(event) => {
-            addFiles(event.target.files);
+            void addFiles(event.target.files);
             event.target.value = "";
           }}
         />
@@ -230,12 +263,17 @@ function UploadArea({
           tabIndex={-1}
           aria-label="Take a photo to upload"
           onChange={(event) => {
-            addFiles(event.target.files);
+            void addFiles(event.target.files);
             event.target.value = "";
           }}
         />
       </div>
       {pickError ? <FormMessage tone="error">{pickError}</FormMessage> : null}
+      {limits.min > 1 && uploadedCount > 0 && uploadedCount < limits.min ? (
+        <p className="text-base text-muted" aria-live="polite">
+          {uploadedCount} of {limits.min} files added. Add {limits.min - uploadedCount} more to send this step.
+        </p>
+      ) : null}
       {files.length > 0 ? (
         <ul className="space-y-3" aria-live="polite">
           {files.map((file) => (
@@ -266,8 +304,7 @@ function UploadArea({
 
 function AnswerFields({ step, answer, setAnswer }: { step: StepDetailResponse; answer: Answer; setAnswer: (answer: Answer) => void }) {
   if (step.kind === "text") {
-    const min = step.config.minLength ?? 1;
-    const count = answer.text.trim().length;
+    const count = bioCountMessage(step, answer.text);
     return (
       <div className="rounded-2xl border border-line bg-white p-6 sm:p-8">
         <label htmlFor="answer-text" className="block text-xl font-bold">
@@ -283,8 +320,8 @@ function AnswerFields({ step, answer, setAnswer }: { step: StepDetailResponse; a
           aria-describedby="answer-count"
           className="mt-3 block w-full rounded-xl border border-[#cdd5e1] px-4 py-3 text-lg leading-relaxed focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/25"
         />
-        <p id="answer-count" className={`mt-2 text-base ${count >= min ? "text-success" : "text-muted"}`}>
-          {count} characters{count < min ? ` · at least ${min}` : " · looks good"}
+        <p id="answer-count" aria-live="polite" className={`mt-2 text-base ${count.ok ? "text-success" : "text-muted"}`}>
+          {count.message}
         </p>
       </div>
     );

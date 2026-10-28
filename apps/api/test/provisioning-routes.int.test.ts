@@ -154,7 +154,7 @@ describe("account provisioning routes, both systems configured", () => {
   it("reveals a fresh temporary password to the broker, 3 times a day, audited without the password", async () => {
     const linked = await linkedBroker("Rita Reveal", "rita.personal@example.com");
     const cookie = await ctx.login(linked.corporate, PASSWORD);
-    expect((await ctx.call("GET", "/v1/me/accounts", { cookie })).json()).toEqual({ googleConfigured: true, corporateEmail: linked.corporate, googleReady: true, revealsLeft: 3, gmailUrl: "https://mail.google.com/" });
+    expect((await ctx.call("GET", "/v1/me/accounts", { cookie })).json()).toEqual({ googleConfigured: true, corporateEmail: linked.corporate, googleReady: true, revealsLeft: 3, gmailUrl: "https://mail.google.com/", startingPassword: null });
     const first = await ctx.call("POST", "/v1/me/accounts/google/reveal-password", { cookie, body: {} });
     expect(first.statusCode).toBe(200);
     expect(first.headers["cache-control"]).toBe("no-store");

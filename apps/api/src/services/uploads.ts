@@ -9,6 +9,7 @@
  * - signUploadToken(payload, secret): returns a tamper-proof token describing one permitted proxy upload.
  * - verifyUploadToken(token, secret, now): returns the payload of a valid, unexpired token; throws 400 otherwise.
  * - createUploadTarget(deps, input): returns the storage key and where/how the browser should PUT the file.
+ * - takeUploadLink(scope, now): counts one upload link for a broker step; throws 429 after UPLOAD_LINKS_PER_HOUR in the past hour (stops a broker filling the bucket with files they never send).
  * - verifySubmittedFiles(deps, input): checks each submitted file belongs to this broker step, exists in storage, is new, and has an allowed type and size; returns the verified files.
  */
 import { files as filesTable } from "@bp/db";
@@ -16,10 +17,23 @@ import { buildStorageKey, storageKeyPrefix, type UploadTargetResponse, type Uplo
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import type { AppDeps } from "../deps";
-import { badRequest } from "../errors";
+import { badRequest, tooManyRequests } from "../errors";
 import type { VerifiedFile } from "./steps";
 
 export const UPLOAD_URL_TTL_SECONDS = 15 * 60;
+export const UPLOAD_LINKS_PER_HOUR = 40;
+
+const uploadLinkTimes = new Map<string, number[]>();
+
+export function takeUploadLink(scope: string, now: Date): void {
+  const hourAgo = now.getTime() - 60 * 60 * 1000;
+  const recent = (uploadLinkTimes.get(scope) ?? []).filter((time) => time > hourAgo);
+  if (recent.length >= UPLOAD_LINKS_PER_HOUR) {
+    throw tooManyRequests("You've tried a lot of uploads on this step. Wait an hour, or message us if something isn't working.", "too_many_uploads");
+  }
+  recent.push(now.getTime());
+  uploadLinkTimes.set(scope, recent);
+}
 
 type UploadableStep = { kind: string; acceptedTypes: string[]; maxSizeBytes: number; shortTitle: string };
 

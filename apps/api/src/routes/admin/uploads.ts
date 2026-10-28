@@ -4,12 +4,13 @@
  * brokers. Files are stored the same way, recorded with the admin as uploader, and the step is marked approved.
  *
  * Functions:
- * - registerAdminUploadRoutes(app): mounts POST /v1/admin/brokers/:id/steps/:key/upload-url and .../upload-complete.
+ * - registerAdminUploadRoutes(app): mounts POST /v1/admin/brokers/:id/steps/:key/upload-url and .../upload-complete (refuses more files than the step takes).
  * - requireStep(app, brokerId, key): loads the broker's step by key (checking the broker exists) or throws 404.
  */
 import {
   adminUploadCompleteRequestSchema,
   errorResponseSchema,
+  fileCountLimits,
   stepActionResponseSchema,
   uploadTargetResponseSchema,
   uploadUrlRequestSchema,
@@ -17,7 +18,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { notFound } from "../../errors";
+import { badRequest, notFound } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { loadBrokerWithUser } from "../../services/brokers";
 import { activateIfComplete, applyStepAction, loadBrokerStepByKey, nextFileVersion } from "../../services/steps";
@@ -76,6 +77,8 @@ export function registerAdminUploadRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const row = await requireStep(app, request.params.id, request.params.key);
+      const { max } = fileCountLimits(row.config);
+      if (request.body.files.length > max) throw badRequest(`This step takes up to ${max} ${max === 1 ? "file" : "files"}.`, "wrong_file_count");
       const verified = await verifySubmittedFiles(app.deps, { brokerId: row.brokerId, step: row, files: request.body.files });
       const now = app.deps.now();
       const result = await app.deps.db.transaction(async (tx) => {

@@ -113,10 +113,10 @@ export function InviteForm({
             className={`${inputClasses()} cursor-not-allowed tabular-nums`}
           />
         ) : (
-          <input id="phone" name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="(561) 000-0000" aria-describedby="phone-hint" className={inputClasses()} />
+          <input id="phone" name="phone" type="tel" required maxLength={30} autoComplete="tel" inputMode="tel" placeholder="(561) 555-0123" aria-describedby="phone-hint" className={inputClasses()} />
         )}
         <p id="phone-hint" className="mt-2 text-[15px] text-muted">
-          {phone ? "The number 365 Yachts has for you. Message us if it's wrong." : "We email you when a step is waiting, and call if something is urgent."}
+          {phone ? "The number 365 Yachts has for you. Message us if it's wrong." : "A US number, or start with + and the country code. We email you when a step is waiting, and call if something is urgent."}
         </p>
       </div>
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}

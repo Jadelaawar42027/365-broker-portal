@@ -5,12 +5,12 @@
  *
  * Functions:
  * - StepActions({ brokerId, step }): the buttons that fit the step's state, plus their dialogs (upload only for open steps or approved steps with no file, e.g. imported brokers).
- * - UploadDialog({ dialogRef, brokerId, step }): picks files, uploads them and records them as approved.
+ * - UploadDialog({ dialogRef, brokerId, step }): picks files (refusing more than MAX_FILES_PER_SUBMISSION; the API applies the step's own limit), uploads them and records them as approved.
  * - MarkDoneDialog({ dialogRef, step }): confirms marking the step done, with an optional note.
  */
 "use client";
 
-import type { AdminStepRow, UploadTargetResponse } from "@bp/shared";
+import { MAX_FILES_PER_SUBMISSION, type AdminStepRow, type UploadTargetResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 import { FormMessage } from "@/components/auth/form-message";
@@ -61,11 +61,15 @@ function UploadDialog({ dialogRef, brokerId, step }: { dialogRef: RefObject<HTML
       setError("Choose at least one file.");
       return;
     }
+    if (picked.length > MAX_FILES_PER_SUBMISSION) {
+      setError(`Choose up to ${MAX_FILES_PER_SUBMISSION} files.`);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const files = [];
-      for (const file of picked.slice(0, 5)) {
+      for (const file of picked) {
         const target = await apiRequest<UploadTargetResponse>(`/v1/admin/brokers/${brokerId}/steps/${step.key}/upload-url`, {
           method: "POST",
           body: { fileName: file.name, contentType: file.type, sizeBytes: file.size },

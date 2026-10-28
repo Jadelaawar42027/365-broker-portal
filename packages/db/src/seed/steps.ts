@@ -2,12 +2,16 @@
  * File: packages/db/src/seed/steps.ts
  * Purpose: The onboarding steps from docs/SPEC.md: step 0 "Start here" (a portal walkthrough video, SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
  * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
- * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27).
+ * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Upload
+ * steps carry their own file-count limits (minFiles/maxFiles) and the bio its word limits; migration 0014 adds them to existing databases.
+ * The DBPR confirmation is PDF only (migration 0015). Steps 6 to 8 use the licensing guides in
+ * license-paths.ts: step 6's answer picks the guide steps 7 and 8 show, and "not sure" emails the admins (migration 0016).
  *
  * Functions:
  * - none
  */
 import { MAX_UPLOAD_BYTES, type StepConfig, type StepKind, type StepStage } from "@bp/shared";
+import { DBPR_FILING_PATHS, LICENSE_BOND_PATHS, LICENSE_CHOICE_VALUES, LICENSE_CHOICES } from "./license-paths";
 
 export type StepSeed = {
   key: string;
@@ -27,6 +31,7 @@ export type StepSeed = {
 
 const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const IMAGE_TYPES = ["image/jpeg", "image/png"];
+const PDF_TYPES = ["application/pdf"];
 
 export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   {
@@ -60,12 +65,14 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     instructionsMd: [
       "1. Use your driver's license or passport.",
       "2. Lay it flat in good light so all four corners and every word are readable.",
-      "3. Upload it here — a clear phone photo is fine.",
+      "3. Upload it here — a clear phone photo is fine. For a driver's license, add the front and the back (2 files at most).",
     ].join("\n"),
     acceptedTypes: DOCUMENT_TYPES,
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 2,
+      minFiles: 1,
+      maxFiles: 2,
       reviewChecklist: ["Photo is clear and readable", "Name matches the broker", "Not expired"],
     },
   },
@@ -112,6 +119,8 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
       minutes: 10,
       minLength: 300,
       maxLength: 2000,
+      minWords: 100,
+      maxWords: 250,
       placeholder: "I grew up on the water in…",
       reviewChecklist: ["Professional tone", "No spelling mistakes", "Roughly 100 to 200 words"],
     },
@@ -129,12 +138,15 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     instructionsMd: [
       "1. Stand in front of a plain, light background.",
       "2. Frame it from the shoulders up, facing the camera, in good daylight.",
-      "3. No sunglasses, hats or filters — then upload it here.",
+      "3. No sunglasses, hats or filters — then upload one photo here, at least 600 × 600 pixels.",
     ].join("\n"),
     acceptedTypes: IMAGE_TYPES,
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 5,
+      minFiles: 1,
+      maxFiles: 1,
+      minImagePx: 600,
       reviewChecklist: ["Plain background", "Shoulders up, facing the camera", "Sharp and well lit"],
     },
   },
@@ -157,6 +169,8 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 5,
+      minFiles: 1,
+      maxFiles: 2,
       templateLink: { label: "Download blank W-9", url: "https://www.irs.gov/pub/irs-pdf/fw9.pdf" },
       reviewChecklist: ["Name matches their ID", "Tax ID filled in", "Signed and dated"],
     },
@@ -168,22 +182,19 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     title: "Tell us your license situation (new, transfer or not yet licensed)",
     shortTitle: "License situation",
     summary: "One question so we can guide you through the right licensing path. Takes 1 minute.",
-    intro: "Florida requires a yacht and ship license to sell any used vessel over 32 feet. Tell us where you stand.",
+    intro: "Florida requires a yacht and ship license to sell any used vessel over 32 feet. Tell us where you stand, and steps 7 and 8 will show you exactly what to do.",
     kind: "choice",
     needsApproval: false,
     instructionsMd: [
       "1. Pick the option that describes you today.",
-      "2. Not sure? Pick \"Not licensed yet\" and we'll help you work it out.",
+      "2. Not sure? Pick the last option and we'll message you to work it out together.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 1,
-      choices: [
-        { value: "new", label: "New to Florida brokerage — I'll apply for a new license" },
-        { value: "transfer", label: "I hold a Florida yacht & ship license and will transfer it to 365" },
-        { value: "not_licensed_yet", label: "Not licensed yet — I need help getting started" },
-      ],
+      choices: LICENSE_CHOICES,
+      alertChoices: [LICENSE_CHOICE_VALUES.notSure],
     },
   },
   {
@@ -200,13 +211,16 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     instructionsMd: [
       "1. New license: register on the DBPR online portal and complete the application, fingerprints, surety bond and fee. You get a temporary 90-day license while background checks run.",
       "2. Transfer: request a license transfer through DBPR to associate your license with 365 Yachts Inc., and tell your Sales Executive the day you submit.",
-      "3. Upload the confirmation here — a screenshot or PDF is fine.",
+      "3. Upload the confirmation here as a PDF. On the DBPR page, use Print, then Save as PDF.",
     ].join("\n"),
-    acceptedTypes: DOCUMENT_TYPES,
+    acceptedTypes: PDF_TYPES,
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 30,
-      links: [{ label: "DBPR online services", url: "https://www.myfloridalicense.com/" }],
+      minFiles: 1,
+      maxFiles: 2,
+      links: [{ label: "DBPR Yacht and Ship forms", url: "https://www2.myfloridalicense.com/yacht-and-ships/forms-and-publications/" }],
+      paths: { fromStep: "license_situation", options: DBPR_FILING_PATHS },
       reviewChecklist: ["Application or transfer confirmation is visible", "Name matches their ID"],
     },
   },
@@ -224,12 +238,15 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     instructionsMd: [
       "1. Find your license (temporary or permanent) and your surety bond.",
       "2. Make sure your name and license number are readable on both.",
-      "3. Upload both here — you can add up to 5 files.",
+      "3. Upload both here — one file with both is fine, or up to 5 separate files.",
     ].join("\n"),
     acceptedTypes: DOCUMENT_TYPES,
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 5,
+      minFiles: 1,
+      maxFiles: 5,
+      paths: { fromStep: "license_situation", options: LICENSE_BOND_PATHS },
       reviewChecklist: ["License number visible", "Bond amount matches license type", "Names match"],
     },
   },

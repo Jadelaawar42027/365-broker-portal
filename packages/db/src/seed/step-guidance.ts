@@ -5,11 +5,13 @@
  * manual's original text for the "Read the full section" panel, empty video slots, and the optional knowledge check.
  * Bond and fee figures stay in the full text only, next to the manual's WATCH that they change.
  * Step 0 "Start here" (SPEC D30) has no manual text: just bullets and the slot for Shelly's portal walkthrough video.
+ * Steps 6 to 8 take their bullets and DBPR links from license-paths.ts, next to the step-by-step licensing guides.
  *
  * Functions:
  * - none
  */
 import type { GuidanceCallout } from "@bp/shared";
+import { DBPR_FILING_TODO, DBPR_OFFICIAL_LINKS_MD, LICENSE_BOND_TODO, LICENSE_SITUATION_TODO } from "./license-paths";
 
 export type StepGuidanceSeed = {
   todoItems: string[];
@@ -73,7 +75,7 @@ export const STEP_GUIDANCE: Readonly<Record<string, StepGuidanceSeed>> = {
       "Use your driver's license or passport.",
       "Lay it flat in good light, with all four corners showing.",
       "Check that every word is readable.",
-      "Upload it here. A phone photo is fine.",
+      "Upload it here. A phone photo is fine. For a driver's license, add the front and the back.",
     ],
     callouts: [],
     fullTextMd: `${WEEK_ONE_INTRO}\n\n${DOCUMENTS_TO_SUBMIT}`,
@@ -112,7 +114,7 @@ The bio is a **personal professional bio summary, written by you**. Clients read
       "Stand against a plain, light background.",
       "Shoulders up, facing the camera, in daylight.",
       "No sunglasses, hats or filters.",
-      "Upload it here.",
+      "Upload one photo, at least 600 × 600 pixels.",
     ],
     callouts: [],
     fullTextMd: `${DOCUMENTS_TO_SUBMIT}
@@ -136,12 +138,7 @@ You are paid in irregular lumps, taxed as an independent contractor, and carried
 **Nothing is withheld.** Commission arrives gross. No income tax withheld, no self-employment tax withheld. The money in your account is not all yours, and the bill arrives whether you set it aside or not.`,
   },
   license_situation: {
-    todoItems: [
-      "Florida needs a license to sell any used boat over 32 feet.",
-      "New to Florida brokerage? Pick the new license option.",
-      "Already hold a Florida yacht and ship license? Pick transfer.",
-      "Not sure? Pick \"Not licensed yet\" and we'll help.",
-    ],
+    todoItems: LICENSE_SITUATION_TODO,
     callouts: [],
     fullTextMd: `Florida regulates yacht and ship brokers under Chapter 326, Florida Statutes, administered by the Department of Business and Professional Regulation (DBPR). A license is required to sell or offer to sell any used vessel over 32 feet.
 
@@ -150,13 +147,7 @@ ${LICENSE_TABLE}
 ${FEES_WATCH_FULL}`,
   },
   dbpr_filing: {
-    todoItems: [
-      "New license: apply on the DBPR portal, with fingerprints, bond and fee.",
-      "You get a temporary 90-day license while checks run.",
-      "Transfer: request it through DBPR to 365 Yachts Inc.",
-      "Tell your Sales Executive the day you submit.",
-      "Upload the confirmation here.",
-    ],
+    todoItems: DBPR_FILING_TODO,
     callouts: [FEES_WATCH],
     videoSlots: ["How to file your DBPR application"],
     fullTextMd: `## Process
@@ -165,11 +156,7 @@ ${FEES_WATCH_FULL}`,
 - **Transferring an existing license** — Request a license transfer through DBPR to associate your license with 365 Yachts Inc. Notify your Sales Executive the day you submit.
 - **Renewal** — Two-year cycle. Watch for the DBPR notice 60 days out. Do not let a license lapse — you cannot legally take a listing or write an offer with an expired credential.
 
-## Official links
-
-- DBPR Yacht & Ship Licensing — applications, forms, requirements
-- DBPR Yacht & Ship FAQs — bond amounts, fees, license terms
-- Chapter 326, Florida Statutes — the Florida Yacht and Ship Brokers Act
+${DBPR_OFFICIAL_LINKS_MD}
 
 ## Week 1 checklist (Module 06)
 
@@ -178,11 +165,7 @@ ${FEES_WATCH_FULL}`,
 ${FEES_WATCH_FULL}`,
   },
   license_bond: {
-    todoItems: [
-      "Find your license (temporary or permanent) and your surety bond.",
-      "Check your name and license number are readable on both.",
-      "Upload both here. You can add up to 5 files.",
-    ],
+    todoItems: LICENSE_BOND_TODO,
     callouts: [
       { kind: "NEVER", text: "Never hold client funds personally. Every deposit goes to the brokerage escrow account by wire." },
       FEES_WATCH,

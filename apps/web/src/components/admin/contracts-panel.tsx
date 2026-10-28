@@ -7,11 +7,11 @@
  *
  * Functions:
  * - ContractsPanel({ brokerId, data, signature }): the panel.
- * - OutsideUpload({ brokerId, documentKey, onDone }): the form to upload one already-signed document.
+ * - OutsideUpload({ brokerId, documentKey, onDone }): the form to upload one already-signed document (the signing date can't be after today).
  */
 "use client";
 
-import { CONTRACT_STEP_KEY, CONTRACT_TEMPLATE_KEYS, CONTRACT_TITLES, contractStatusLabel, type AdminContractsResponse, type CompanySignatureStatus, type ContractTemplateKey, type UploadTargetResponse } from "@bp/shared";
+import { CONTRACT_STEP_KEY, CONTRACT_TEMPLATE_KEYS, CONTRACT_TITLES, contractStatusLabel, todayInTimeZone, type AdminContractsResponse, type CompanySignatureStatus, type ContractTemplateKey, type UploadTargetResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 import { FormMessage } from "@/components/auth/form-message";
@@ -60,7 +60,7 @@ function OutsideUpload({ brokerId, documentKey, onDone }: { brokerId: string; do
         </div>
         <div>
           <FieldLabel htmlFor={`outside-date-${documentKey}`}>Signed on</FieldLabel>
-          <input id={`outside-date-${documentKey}`} name="signedOn" type="date" required className={inputClasses()} />
+          <input id={`outside-date-${documentKey}`} name="signedOn" type="date" required max={todayInTimeZone()} className={inputClasses()} />
         </div>
       </div>
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}

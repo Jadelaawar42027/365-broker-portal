@@ -7,6 +7,7 @@
  * - parseInstructionSteps(markdown): returns the text of each "1. …" line, or the non-empty lines if none are numbered.
  * - describeAcceptedTypes(types): "PDF, JPG or PNG" style wording for a list of MIME types.
  * - checkFileBeforeUpload(file, rules): returns an error message for a wrong type, empty or oversized file, or null.
+ * - checkImageDimensions(file, minPx): returns an error message when an image is narrower or shorter than minPx, or null (also null for PDFs and images the browser can't read).
  * - groupByStage(steps): returns [{ stage, stageTitle, number, steps }] in the order the stages first appear; the number is the stage's place in STEP_STAGES, so "Start here" is 0 and "Paperwork" is 1.
  */
 import { formatFileSize, STEP_STAGES } from "@bp/shared";
@@ -41,6 +42,21 @@ export function checkFileBeforeUpload(
     return `"${file.name}" is ${formatFileSize(file.size)}. The limit is ${formatFileSize(rules.maxSizeBytes)}.`;
   }
   return null;
+}
+
+export async function checkImageDimensions(file: Blob & { name: string; type: string }, minPx: number): Promise<string | null> {
+  if (!file.type.startsWith("image/") || typeof createImageBitmap !== "function") return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const { width, height } = bitmap;
+    bitmap.close();
+    if (width < minPx || height < minPx) {
+      return `"${file.name}" is ${width} × ${height} pixels. Use a photo at least ${minPx} × ${minPx}.`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function groupByStage<T extends { stage: string; stageTitle: string }>(steps: readonly T[]) {

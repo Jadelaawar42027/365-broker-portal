@@ -26,7 +26,7 @@
  * - signAgreements(deps, input): the broker signs both documents; returns whether they're fully signed, the final PDFs and whether onboarding completed.
  * - countersignAgreements(deps, input): the company signer countersigns both broker-signed documents.
  * - voidAndReissue(deps, input): voids every current document (even fully signed ones) and resets step 2 so the broker signs again.
- * - markSignedOutside(deps, input): records an already-signed copy uploaded by an admin and approves step 2 when both documents are covered.
+ * - markSignedOutside(deps, input): records an already-signed copy uploaded by an admin (an accepted file type and size, signed no later than today) and approves step 2 when both documents are covered.
  * - decodePng(dataUrl): the PNG bytes of a data URL, checked to be a real PNG.
  */
 import { randomUUID } from "node:crypto";
@@ -563,6 +563,7 @@ export async function markSignedOutside(
   const { db } = deps;
   const now = deps.now();
   if (!input.storageKey.startsWith(storageKeyPrefix(input.brokerId, CONTRACT_STEP_KEY))) throw badRequest("That upload doesn't belong to this broker's step 2.", "upload_not_for_step");
+  if (input.signedOn > todayFor(now)) throw badRequest("The signing date can't be in the future.", "invalid_dates");
   const stored = await deps.storage.headObject(input.storageKey);
   if (!stored || stored.sizeBytes <= 0) throw badRequest("The file didn't finish uploading. Try again.", "upload_missing");
   const templates = await activeTemplates(db);
@@ -570,6 +571,9 @@ export async function markSignedOutside(
   if (!template) throw conflict("The agreements aren't loaded yet.", "templates_missing");
   const row = await loadBrokerStepByKey(db, input.brokerId, CONTRACT_STEP_KEY);
   if (!row) throw notFound("That onboarding step doesn't exist.");
+  const storedType = stored.contentType?.split(";")[0]?.trim() ?? "";
+  if (!row.acceptedTypes.includes(storedType)) throw badRequest("Upload the signed copy as a PDF, JPG or PNG.", "file_type_not_allowed");
+  if (stored.sizeBytes > row.maxSizeBytes) throw badRequest("That file is too big.", "file_too_large");
 
   return db.transaction(async (tx) => {
     const open = openDocuments(await documentsFor(tx, input.brokerId)).get(input.key);

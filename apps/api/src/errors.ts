@@ -10,6 +10,7 @@
  * - forbidden(message): 403.
  * - notFound(message): 404.
  * - conflict(message, code): 409.
+ * - tooManyRequests(message, code): 429.
  */
 export class HttpError extends Error {
   readonly statusCode: number;
@@ -28,3 +29,4 @@ export const unauthorized = (message = "Please sign in.") => new HttpError(401, 
 export const forbidden = (message = "You don't have access to this.") => new HttpError(403, "forbidden", message);
 export const notFound = (message = "Not found.") => new HttpError(404, "not_found", message);
 export const conflict = (message: string, code = "conflict") => new HttpError(409, code, message);
+export const tooManyRequests = (message: string, code = "too_many_requests") => new HttpError(429, code, message);

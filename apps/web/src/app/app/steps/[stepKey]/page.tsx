@@ -5,7 +5,8 @@
  * answer form (with the knowledge check, if any), and a side column with "What happens next" and the WhatsApp help
  * button. Steps without guidance yet show their numbered instructions instead. Sent-back, waiting and finished steps
  * explain their state instead of showing the form. Step 2 shows the agreement signing flow instead of an upload form
- * (SPEC D31). Step 9 (365 email) shows the broker's corporate email and "Reveal my temporary password" (phase H2).
+ * (SPEC D31). Step 9 (365 email) shows the broker's corporate email and "Reveal my temporary password" (phase H2). Steps with
+ * config.paths (7 and 8) show the step-by-step guide for the licensing route the broker picked at step 6.
  *
  * Functions:
  * - StepPage({ params }): loads the step and renders it.
@@ -20,6 +21,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CorporateEmailCard } from "@/components/broker/corporate-email-card";
 import { StepForm } from "@/components/broker/step-form";
+import { StepPathGuide } from "@/components/broker/step-path-guide";
 import { ContractSigning } from "@/components/contracts/contract-signing";
 import { StepVideos } from "@/components/broker/step-videos";
 import { GuidedContent } from "@/components/guidance/guided-content";
@@ -160,6 +162,8 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
           {accounts ? <CorporateEmailCard accounts={accounts} supportName={supportName} /> : null}
 
           <StepVideos stepKey={step.key} videos={step.videos} />
+
+          <StepPathGuide step={step} supportName={supportName} />
 
           {step.guidance ? (
             <GuidedContent todoItems={step.guidance.todoItems} callouts={step.guidance.callouts} fullTextMd={step.guidance.fullTextMd}>

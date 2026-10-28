@@ -8,8 +8,10 @@
  * their own steps.
  *
  * Functions:
- * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url and POST /v1/me/steps/:key/submit.
+ * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url (at most UPLOAD_LINKS_PER_HOUR per step) and POST /v1/me/steps/:key/submit (an answer step that can't be sent now is refused before its answer is checked; upload steps must send between the step's minFiles and maxFiles).
  * - requireOwnStep(app, brokerId, key): loads the broker's own step by key or throws 404.
+ * - choiceOnStep(rows, stepKey): the broker's saved choice answer on that step, or null (picks the guide a step with config.paths shows).
+ * - notifyAdminsBrokerNeedsHelp(app, log, input): emails every admin when a broker's answer is one of the step's alertChoices (e.g. "I'm not sure, I'd like help").
  * - notifyOnboardingComplete(app, log, brokerId): emails the broker and every admin that onboarding is complete.
  */
 import { brokers, users } from "@bp/db";
@@ -20,7 +22,9 @@ import {
   errorResponseSchema,
   findNextStep,
   findSentBackSteps,
+  fileCountProblem,
   formDataSchemaForStep,
+  transitionStep,
   isOnboardingComplete,
   isStepCheckPassed,
   myStepsResponseSchema,
@@ -38,7 +42,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { badRequest, conflict, notFound } from "../errors";
 import { currentActor, requireBroker } from "../plugins/auth-guard";
-import { onboardingCompleteAdminEmail, onboardingCompleteBrokerEmail } from "../services/emails";
+import { brokerNeedsHelpAdminEmail, onboardingCompleteAdminEmail, onboardingCompleteBrokerEmail } from "../services/emails";
 import { sendSafely } from "../services/mailer";
 import {
   activateIfComplete,
@@ -55,7 +59,7 @@ import {
 } from "../services/steps";
 import { loadStepQuestions, loadStepVideos, STEP_VIDEO_URL_TTL_SECONDS, toBrokerCheckQuestion, toBrokerStepVideo, toGuidanceView } from "../services/step-content";
 import { adminEmails, todayFor, webLink } from "../services/support";
-import { assertUploadAllowed, createUploadTarget, verifySubmittedFiles } from "../services/uploads";
+import { assertUploadAllowed, createUploadTarget, takeUploadLink, verifySubmittedFiles } from "../services/uploads";
 
 const keyParams = z.object({ key: z.string().min(1).max(60) });
 const videoParams = keyParams.extend({ videoId: z.uuid() });
@@ -83,6 +87,31 @@ export async function notifyOnboardingComplete(app: FastifyInstance, log: Fastif
       ...onboardingCompleteAdminEmail({ brokerName: broker.name, link: webLink(env, `/admin/brokers/${brokerId}`) }),
     })),
   ]);
+}
+
+export function choiceOnStep(rows: { key: string; formData: Record<string, unknown> | null }[], stepKey: string | undefined): string | null {
+  if (!stepKey) return null;
+  const choice = rows.find((row) => row.key === stepKey)?.formData?.choice;
+  return typeof choice === "string" ? choice : null;
+}
+
+async function notifyAdminsBrokerNeedsHelp(app: FastifyInstance, log: FastifyBaseLogger, input: { brokerId: string; stepTitle: string; answer: string }) {
+  const { db, env, mailer } = app.deps;
+  const [broker] = await db
+    .select({ name: users.name, phone: users.phone })
+    .from(brokers)
+    .innerJoin(users, eq(users.id, brokers.userId))
+    .where(eq(brokers.id, input.brokerId));
+  if (!broker) return;
+  const admins = await adminEmails(db);
+  await sendSafely(
+    mailer,
+    log,
+    admins.map((to) => ({
+      to,
+      ...brokerNeedsHelpAdminEmail({ brokerName: broker.name, stepTitle: input.stepTitle, answer: input.answer, phone: broker.phone, link: webLink(env, `/admin/brokers/${input.brokerId}`) }),
+    })),
+  );
 }
 
 export function registerBrokerStepRoutes(app: FastifyInstance): void {
@@ -138,7 +167,8 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       if (!row) throw notFound("That onboarding step doesn't exist.");
       const next = findNextStep(rows);
       const files = latestVersionFiles(await loadFiles(app.deps.db, [row.brokerStepId]));
-      const { reviewChecklist: _internal, ...config } = row.config;
+      const { reviewChecklist: _reviewChecklist, alertChoices: _alertChoices, ...config } = row.config;
+      const pathChoice = choiceOnStep(rows, row.config.paths?.fromStep);
       const videos = await loadStepVideos(app.deps.db, row.stepId);
       const questions = await loadStepQuestions(app.deps.db, row.stepId);
       return {
@@ -152,6 +182,8 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         acceptedTypes: row.acceptedTypes,
         maxSizeBytes: row.maxSizeBytes,
         config,
+        pathChoice,
+        pathFromTitle: rows.find((candidate) => candidate.key === row.config.paths?.fromStep)?.shortTitle ?? null,
         hasTemplateFile: Boolean(row.templateFileKey),
         formData: row.formData,
         files: files.map(toFileView),
@@ -236,7 +268,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         summary: "Where to upload one file for this step (direct to storage or via the API)",
         params: keyParams,
         body: uploadUrlRequestSchema,
-        response: { 200: uploadTargetResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, ...brokerErrors },
+        response: { 200: uploadTargetResponseSchema, 400: errorResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, 429: errorResponseSchema, ...brokerErrors },
       },
     },
     async (request) => {
@@ -247,6 +279,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         throw conflict("This step has already been sent.", "step_not_open");
       }
       assertUploadAllowed(row, request.body);
+      takeUploadLink(row.brokerStepId, app.deps.now());
       return createUploadTarget(app.deps, {
         brokerId: actor.brokerId!,
         stepKey: row.key,
@@ -286,7 +319,10 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         const submitted = request.body.files ?? [];
         if (submitted.length === 0) throw badRequest("Add at least one file before sending.", "files_required");
         verifiedFiles = await verifySubmittedFiles(app.deps, { brokerId: actor.brokerId!, step: row, files: submitted });
+        const countProblem = fileCountProblem(row.config, submitted.length);
+        if (countProblem) throw badRequest(countProblem, "wrong_file_count");
       } else {
+        transitionStep({ from: row.status, action: "submit", needsApproval: row.needsApproval });
         const parsed = formDataSchemaForStep(row).safeParse(request.body.formData ?? {});
         if (!parsed.success) {
           throw badRequest(parsed.error.issues[0]?.message ?? "Please check your answer.", "invalid_answer");
@@ -310,6 +346,10 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         return { status: change.to, onboardingComplete: completed };
       });
       if (result.onboardingComplete) await notifyOnboardingComplete(app, request.log, actor.brokerId!);
+      const choice = typeof formData?.choice === "string" ? formData.choice : null;
+      if (choice && row.config.alertChoices?.includes(choice)) {
+        await notifyAdminsBrokerNeedsHelp(app, request.log, { brokerId: actor.brokerId!, stepTitle: row.shortTitle, answer: row.config.choices?.find((option) => option.value === choice)?.label ?? choice });
+      }
       return result;
     },
   );

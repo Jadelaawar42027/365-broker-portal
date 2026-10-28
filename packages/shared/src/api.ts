@@ -21,17 +21,13 @@ import {
 } from "./constants";
 import { commissionPctSchema } from "./commission";
 import { ACCOUNT_STATUSES } from "./provisioning";
-import { e164PhoneSchema } from "./contact";
+import { e164PhoneSchema, mobilePhoneSchema } from "./contact";
 import { guidanceViewSchema } from "./guidance";
 import { emailSchema, isoDateSchema, passwordSchema, stepConfigSchema } from "./schemas";
 
 const timestampSchema = z.string().describe("ISO 8601 timestamp");
 const nullableTimestamp = timestampSchema.nullable();
 const toneSchema = z.enum(["success", "warning", "danger", "info", "neutral"]);
-const phoneSchema = z
-  .string()
-  .trim()
-  .regex(/^[0-9()+\-.\s]{7,20}$/, "Enter a phone number like (561) 000-0000.");
 
 export const errorResponseSchema = z.object({
   error: z.string(),
@@ -126,7 +122,7 @@ export const fileViewSchema = z.object({
 });
 export type FileView = z.infer<typeof fileViewSchema>;
 
-export const brokerStepConfigSchema = stepConfigSchema.omit({ reviewChecklist: true });
+export const brokerStepConfigSchema = stepConfigSchema.omit({ reviewChecklist: true, alertChoices: true });
 
 export const stepVideoViewSchema = z.object({
   id: z.string(),
@@ -155,6 +151,8 @@ export const stepDetailResponseSchema = stepSummarySchema.extend({
   acceptedTypes: z.array(z.string()),
   maxSizeBytes: z.number().int(),
   config: brokerStepConfigSchema,
+  pathChoice: z.string().nullable().describe("The broker's answer on config.paths.fromStep, which picks the guide to show; null when unanswered or the step has no paths"),
+  pathFromTitle: z.string().nullable().describe("Short title of config.paths.fromStep, for the 'answer step N first' link; null when the step has no paths"),
   hasTemplateFile: z.boolean(),
   formData: z.record(z.string(), z.unknown()).nullable(),
   files: z.array(fileViewSchema),
@@ -220,7 +218,7 @@ export type InviteInfoResponse = z.infer<typeof inviteInfoResponseSchema>;
 export const acceptInviteRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   password: passwordSchema,
-  phone: phoneSchema.optional().describe("Only needed when the admin didn't enter a phone; otherwise the one on file is kept"),
+  phone: mobilePhoneSchema.optional().describe("Only needed when the admin didn't enter a phone; otherwise the one on file is kept. Saved in E.164 form (a 10-digit number is taken as US)"),
   email: emailSchema.optional().describe("Required when the invite has no email yet; becomes the sign-in email"),
 });
 export type AcceptInviteRequest = z.infer<typeof acceptInviteRequestSchema>;

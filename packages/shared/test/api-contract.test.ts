@@ -43,9 +43,12 @@ describe("response schemas", () => {
 
 describe("request schemas", () => {
   it("accept an invite with a name, a password and a phone number", () => {
-    const valid = { name: "Daniel Reyes", password: "long-enough", phone: "(561) 000-0000" };
-    expect(acceptInviteRequestSchema.safeParse(valid).success).toBe(true);
+    const valid = { name: "Daniel Reyes", password: "long-enough", phone: "(561) 555-0123" };
+    expect(acceptInviteRequestSchema.parse(valid).phone).toBe("+15615550123");
+    expect(acceptInviteRequestSchema.parse({ ...valid, phone: "+44 20 7946 0958" }).phone).toBe("+442079460958");
     expect(acceptInviteRequestSchema.safeParse({ ...valid, phone: "call me" }).success).toBe(false);
+    expect(acceptInviteRequestSchema.safeParse({ ...valid, phone: "(561) 000-0000" }).success).toBe(false);
+    expect(acceptInviteRequestSchema.safeParse({ ...valid, phone: "-------" }).success).toBe(false);
     expect(acceptInviteRequestSchema.safeParse({ ...valid, name: "D" }).success).toBe(false);
   });
 
