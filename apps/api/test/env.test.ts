@@ -25,7 +25,8 @@ describe("loadApiEnv", () => {
       WEB_ORIGIN: "http://localhost:3000",
       STORAGE_UPLOAD_MODE: "direct",
       S3_FORCE_PATH_STYLE: false,
-      SUPPORT_CONTACT_NAME: "Shelly",
+      SUPPORT_CONTACT_NAME: "365 Yachts AI",
+      SUPPORT_WHATSAPP_NUMBER: "19547381542",
     });
     expect(env.RESEND_API_KEY).toBeUndefined();
   });

@@ -55,8 +55,8 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `STORAGE_UPLOAD_MODE` | `direct` (or `proxy`, see step 5) | type it |
 | `RESEND_API_KEY` | `re_…` | Resend dashboard. Leave unset to only log emails |
 | `EMAIL_FROM` | `365 Yachts <onboarding@365yachts.org>` | a sender on your verified Resend domain |
-| `SUPPORT_CONTACT_NAME` | `Shelly` | type it |
-| `SUPPORT_WHATSAPP_NUMBER` | `15614459241` | type it (international format, digits only; empty hides the WhatsApp buttons) |
+| `SUPPORT_CONTACT_NAME` | `365 Yachts AI` | type it (the web service references it, so set it here even though it's the default) |
+| `SUPPORT_WHATSAPP_NUMBER` | `19547381542` | type it (the 365 Yachts AI on WhatsApp; international format, digits only; empty hides the WhatsApp buttons) |
 | `SEED_OWNER_NAME` | `Aj` | type it (first deploy) |
 | `SEED_OWNER_EMAIL` | your email | type it (first deploy) |
 | `SEED_OWNER_PASSWORD` | a long password | type it (first deploy). You can delete the three `SEED_OWNER_*` variables after the first successful deploy. |

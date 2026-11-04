@@ -16,7 +16,6 @@
       "Bash(git push *)",
       "Bash(git remote *)",
       "Bash(gh *)",
-      "Bash(railway *)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./**/.env)",

@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/components/ui/whatsapp-button.tsx
- * Purpose: The green "Message Shelly on WhatsApp" button (SPEC D13). It opens wa.me in a new tab with a pre-filled
+ * Purpose: The green "Message [support contact] on WhatsApp" button (SPEC D13), the 365 Yachts AI by default. It opens wa.me in a new tab with a pre-filled
  * message naming the broker and their step, and renders nothing when no WhatsApp number is configured.
  *
  * Functions:

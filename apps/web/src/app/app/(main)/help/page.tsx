@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/app/app/(main)/help/page.tsx
- * Purpose: The Help page (SPEC D13, D16): mainly a "Message Shelly on WhatsApp" button with a message naming the broker
+ * Purpose: The Help page (SPEC D13, D16): mainly a "Message [support contact] on WhatsApp" button with a message naming the broker
  * and their next step, plus where to find each kind of help.
  *
  * Functions:
@@ -25,7 +25,7 @@ export default async function HelpPage() {
       <div>
         <h1 className="text-[34px] leading-tight font-extrabold tracking-tight sm:text-[38px]">Help</h1>
         <p className="mt-3 text-xl leading-relaxed text-muted">
-          Stuck on a step or not sure what something means? Message {name} on WhatsApp. Replies usually come the same day.
+          Stuck on a step or not sure what something means? Message {name} on WhatsApp.
         </p>
       </div>
       <section className="rounded-2xl border border-line bg-white px-6 py-8">

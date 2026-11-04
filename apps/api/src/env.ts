@@ -5,10 +5,12 @@
  * The Google Workspace and GoHighLevel variables (phase H2) are optional here; services/provisioning/config.ts checks
  * them and treats a system with missing or malformed values as not configured instead of refusing to start.
  * GOOGLE_STARTING_PASSWORD, when set, is the first password every new 365 email gets (at least 8 characters).
+ * The WhatsApp help contact defaults to the 365 Yachts AI; an empty SUPPORT_WHATSAPP_NUMBER hides the help buttons.
  *
  * Functions:
  * - loadApiEnv(source): parses source (defaults to process.env) and returns the typed config; throws listing every invalid variable.
  */
+import { DEFAULT_SUPPORT_CONTACT } from "@bp/shared";
 import { z } from "zod";
 
 const optionalString = z
@@ -38,8 +40,8 @@ const apiEnvSchema = z
     STORAGE_UPLOAD_MODE: z.enum(["direct", "proxy"]).default("direct"),
     RESEND_API_KEY: optionalString,
     EMAIL_FROM: z.string().default("365 Yachts <onboarding@365yachts.org>"),
-    SUPPORT_CONTACT_NAME: z.string().trim().min(1).default("Shelly"),
-    SUPPORT_WHATSAPP_NUMBER: optionalString,
+    SUPPORT_CONTACT_NAME: z.string().trim().min(1).default(DEFAULT_SUPPORT_CONTACT.name),
+    SUPPORT_WHATSAPP_NUMBER: z.string().trim().default(DEFAULT_SUPPORT_CONTACT.whatsappNumber),
     EMAIL_OUTBOX_DIR: optionalString,
     GOOGLE_SERVICE_ACCOUNT_JSON: optionalString,
     GOOGLE_ADMIN_SUBJECT: optionalString,
