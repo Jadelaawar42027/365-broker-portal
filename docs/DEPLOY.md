@@ -70,6 +70,9 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `GHL_LOCATION_ID` | the 365 Yachts sub-account id | GHL sub-account → Settings → Business Profile (Location ID) |
 | `PROVISIONING_WORKER` | `on` (default) | type `off` only to stop this service running provisioning tasks |
 | `PROVISIONING_MODE` | `live` (default) or `dry-run` | type `dry-run` to try onboarding without creating anything in Google or GHL (section 9) |
+| `AI_ROSTER_SYNC_ENABLED` | `false` (default) | type `true` only when real brokers are being added: each new broker is then added to the 365 Yachts AI roster (it texts them a welcome) and each deleted broker is deactivated there. Anything other than `true` keeps it off |
+| `AI_ROSTER_API_URL` | the AI bot's public address, e.g. `https://<bot>.up.railway.app` | the AI bot's Railway service → Settings → Networking |
+| `AI_ROSTER_API_SECRET` | the bot's `ROSTER_API_SECRET` | copy it from the AI bot's Railway variables |
 
 Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in production.
 

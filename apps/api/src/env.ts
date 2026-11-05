@@ -6,6 +6,8 @@
  * them and treats a system with missing or malformed values as not configured instead of refusing to start.
  * GOOGLE_STARTING_PASSWORD, when set, is the first password every new 365 email gets (at least 8 characters).
  * The WhatsApp help contact defaults to the 365 Yachts AI; an empty SUPPORT_WHATSAPP_NUMBER hides the help buttons.
+ * AI_ROSTER_SYNC_ENABLED is off unless it is exactly "true"; only then (and with AI_ROSTER_API_URL and AI_ROSTER_API_SECRET
+ * set) are new and deleted brokers sent to the 365 Yachts AI's roster.
  *
  * Functions:
  * - loadApiEnv(source): parses source (defaults to process.env) and returns the typed config; throws listing every invalid variable.
@@ -57,6 +59,17 @@ const apiEnvSchema = z
     GHL_LOCATION_ID: optionalString,
     PROVISIONING_WORKER: z.enum(["on", "off"]).default("on"),
     PROVISIONING_MODE: z.enum(["live", "dry-run"]).default("live"),
+    AI_ROSTER_SYNC_ENABLED: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value === "true"),
+    AI_ROSTER_API_URL: z
+      .url()
+      .optional()
+      .or(z.literal("").transform(() => undefined))
+      .transform((value) => value?.replace(/\/+$/, "")),
+    AI_ROSTER_API_SECRET: optionalString,
     COMPANY_SIGNER_EMAIL: z
       .string()
       .trim()

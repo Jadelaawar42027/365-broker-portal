@@ -14,6 +14,8 @@
  * Setting a broker to inactive deletes their sessions at once (SPEC D9), ends their open invite link, cancels open account set-up and queues suspending
  * their Google account and deactivating their GHL user; reactivating queues unsuspending them (phase H2). The CRM phone
  * is edited here too. The list carries each broker's account status for the icons on 3b. Every change writes audit_log.
+ * When AI_ROSTER_SYNC_ENABLED is "true", a new broker (invited or added as existing) is added to the 365 Yachts AI roster and
+ * a deleted broker is deactivated there (services/ai-roster.ts); otherwise the bot is never called.
  *
  * Functions:
  * - registerAdminBrokerRoutes(app): mounts the /v1/admin/brokers routes.
@@ -59,6 +61,7 @@ import { z } from "zod";
 import { badRequest, conflict, forbidden } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { hasPasswordLogin, issueAccountToken, issueBrokerInviteToken, revokeOpenTokens } from "../../services/account-tokens";
+import { addBrokerToAiRoster, removeBrokerFromAiRoster } from "../../services/ai-roster";
 import { writeAudit } from "../../services/audit";
 import { deleteBrokerCompletely } from "../../services/broker-deletion";
 import { ensureBrokerInviteUrl, inviteUrl as inviteUrlFor, replaceBrokerInviteUrl } from "../../services/invite-links";
@@ -186,6 +189,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         return { brokerId: created.brokerId, token: issued };
       });
       app.deps.wakeProvisioning();
+      await addBrokerToAiRoster(app.deps, request.log, { brokerId, name: request.body.name, phone: request.body.phone, email: request.body.email ?? null, actorUserId: actor.userId });
       const inviteUrl = inviteUrlFor(env, token);
       if (request.body.email) {
         await sendSafely(mailer, request.log, [{ to: request.body.email, ...inviteEmail({ name: request.body.name, link: inviteUrl, support: supportContact(env) }) }]);
@@ -281,6 +285,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         return { brokerId: created.brokerId, token: issued };
       });
       app.deps.wakeProvisioning();
+      await addBrokerToAiRoster(app.deps, request.log, { brokerId, name: body.name, phone: body.phone, email: corporateEmail ?? body.email ?? null, actorUserId: actor.userId });
       return reply.status(201).send({ brokerId, inviteUrl: inviteUrlFor(env, token), phone: body.phone });
     },
   );
@@ -520,10 +525,12 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       if (!canManageAdmins(actor.role)) throw forbidden("Only the owner can delete a broker.");
+      const { user } = await loadBrokerWithUser(app.deps.db, request.params.id);
       const result = await deleteBrokerCompletely(
         { db: app.deps.db, storage: app.deps.storage, log: request.log },
         { brokerId: request.params.id, confirmName: request.body.confirmName, actorUserId: actor.userId },
       );
+      await removeBrokerFromAiRoster(app.deps, request.log, { brokerId: request.params.id, name: user.name, phone: user.phone, actorUserId: actor.userId });
       return { ok: true as const, ...result };
     },
   );
