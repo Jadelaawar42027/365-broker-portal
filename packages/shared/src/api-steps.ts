@@ -8,7 +8,7 @@
  * - none
  */
 import { z } from "zod";
-import { STEP_KINDS, STEP_STAGES, VIDEO_PROVIDERS, VIDEO_SOURCES } from "./constants";
+import { STEP_KINDS, STEP_STAGES } from "./constants";
 import { calloutsSchema, guidanceCalloutSchema, todoItemsSchema } from "./guidance";
 
 export const adminStepListRowSchema = z.object({
@@ -32,9 +32,7 @@ export const adminStepVideoSchema = z.object({
   id: z.string(),
   position: z.number().int(),
   title: z.string(),
-  source: z.enum(VIDEO_SOURCES).nullable(),
-  provider: z.enum(VIDEO_PROVIDERS).nullable(),
-  embedUrl: z.string().nullable(),
+  source: z.literal("upload").nullable(),
   fileName: z.string().nullable(),
   sizeBytes: z.number().int().nullable(),
 });

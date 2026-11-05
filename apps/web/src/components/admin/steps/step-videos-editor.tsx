@@ -1,8 +1,9 @@
 /**
  * File: apps/web/src/components/admin/steps/step-videos-editor.tsx
  * Purpose: The video slots of an onboarding step in the admin step editor (SPEC D28). Each slot has a title and is
- * empty (brokers see "video on its way"), an embedded YouTube / Loom / Vimeo link, or an uploaded MP4 (up to 1 GB,
- * straight to the bucket in parts). Admins can add, rename and remove slots, set or replace the video, or clear it.
+ * empty (brokers see "video on its way") or holds an uploaded MP4 (up to 1 GB, straight to the bucket in parts); step
+ * videos are MP4s only, so the portal can tell how much of each one a broker has watched (SPEC D34). Admins can add,
+ * rename and remove slots, upload or replace the video, or clear it.
  *
  * Functions:
  * - StepVideosEditor({ stepKey, videos }): the list of slots and the "Add a video slot" form.
@@ -21,8 +22,6 @@ import { apiRequest } from "@/lib/api-client";
 import { uploadStepVideo } from "@/lib/video-upload";
 import { useAction } from "../training/use-action";
 
-const PROVIDER_NAMES = { upload: "Uploaded video", youtube: "YouTube", loom: "Loom", vimeo: "Vimeo" } as const;
-
 function formatBytes(bytes: number): string {
   return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
 }
@@ -33,13 +32,6 @@ function VideoSlot({ video }: { video: AdminStepVideo }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const { busy, error, setError, run } = useAction();
   const base = `/v1/admin/step-videos/${video.id}`;
-
-  async function saveEmbed(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const url = String(new FormData(formElement).get("url") ?? "").trim();
-    if (await run(() => apiRequest(`${base}/embed`, { method: "PUT", body: { url } }))) formElement.reset();
-  }
 
   async function rename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,9 +94,10 @@ function VideoSlot({ video }: { video: AdminStepVideo }) {
       {video.source ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-page px-4 py-3">
           <p className="min-w-0 text-[17px]">
-            <span className="block font-semibold">{PROVIDER_NAMES[video.provider ?? "upload"]}</span>
+            <span className="block font-semibold">Uploaded video</span>
             <span className="block truncate text-[15px] text-muted">
-              {video.source === "embed" ? video.embedUrl : `${video.fileName ?? "video.mp4"}${video.sizeBytes ? ` · ${formatBytes(video.sizeBytes)}` : ""}`}
+              {video.fileName ?? "video.mp4"}
+              {video.sizeBytes ? ` · ${formatBytes(video.sizeBytes)}` : ""}
             </span>
           </p>
           <Button variant="outline" size="sm" disabled={busy} onClick={clearVideo}>
@@ -114,19 +107,18 @@ function VideoSlot({ video }: { video: AdminStepVideo }) {
       ) : (
         <p className="rounded-xl border-2 border-dashed border-line px-4 py-3 text-[17px] text-muted">Empty. Brokers see it as “On its way”.</p>
       )}
-      <form onSubmit={saveEmbed} className="flex flex-col gap-3 sm:flex-row">
-        <label htmlFor={`embed-${video.id}`} className="sr-only">
-          YouTube, Loom or Vimeo link for {video.title}
-        </label>
-        <input id={`embed-${video.id}`} name="url" type="url" required inputMode="url" spellCheck={false} placeholder="YouTube, Loom or Vimeo link" autoComplete="off" className={inputClasses()} />
-        <Button type="submit" variant="outline" disabled={busy} className="shrink-0">
-          Use this link
-        </Button>
-      </form>
       <label className={`inline-flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-white px-5 text-base font-bold text-navy hover:bg-page has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-brand ${busy ? "pointer-events-none opacity-60" : ""}`}>
-        <input ref={fileRef} type="file" accept={VIDEO_MIME_TYPE} disabled={busy} className="sr-only" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0])} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={VIDEO_MIME_TYPE}
+          disabled={busy}
+          aria-label={`Upload an MP4 for ${video.title}`}
+          className="sr-only"
+          onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0])}
+        />
         <UploadIcon />
-        Or upload an MP4 (up to 1 GB)
+        {video.source ? "Replace with another MP4 (up to 1 GB)" : "Upload an MP4 (up to 1 GB)"}
       </label>
       {progress !== null ? (
         <div className="space-y-1.5" aria-live="polite">

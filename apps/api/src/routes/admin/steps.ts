@@ -3,7 +3,7 @@
  * Purpose: Admin routes for the onboarding-step editor (SPEC D28): list the active steps, read one step with its
  * guidance, video slots and knowledge check, edit its titles (title, sub-header, short title, summary) and guidance
  * (What to do, callouts, full text), manage video slots
- * (add, rename, remove, set an embed link, upload an MP4 straight to the bucket in parts, clear the video), and add,
+ * (add, rename, remove, upload an MP4 straight to the bucket in parts, clear the video; step videos are MP4s only, SPEC D34), and add,
  * edit or delete up to 3 knowledge-check questions. Every change writes audit_log.
  *
  * Functions:
@@ -12,6 +12,7 @@
  * - requireStepVideo(app, id): loads a step video slot by id or throws 404.
  * - requireStepQuestion(app, id): loads a knowledge-check question by id or throws 404.
  * - stepRow(step, videos, questionCount): the list/detail summary of a step.
+ * - hasUpload(video): true when a slot holds an uploaded MP4 (a slot still holding an old link counts as empty).
  * - definedFields(body, keys): the subset of body keys that were sent, for a partial update.
  * - replaceStepOptions(tx, questionId, options): saves a question's options, keeping the ids of options that stay.
  */
@@ -21,13 +22,11 @@ import {
   adminStepDetailResponseSchema,
   adminStepListResponseSchema,
   completeVideoUploadRequestSchema,
-  embedVideoRequestSchema,
   errorResponseSchema,
   idResponseSchema,
   MAX_STEP_CHECK_QUESTIONS,
   MAX_VIDEO_BYTES,
   okResponseSchema,
-  parseEmbedVideoUrl,
   startVideoUploadRequestSchema,
   startVideoUploadResponseSchema,
   stepQuestionFieldsSchema,
@@ -78,6 +77,10 @@ function definedFields<T extends Record<string, unknown>, K extends keyof T>(bod
   return Object.fromEntries(keys.filter((key) => body[key] !== undefined).map((key) => [key, body[key]])) as Partial<Pick<T, K>>;
 }
 
+function hasUpload(video: StepVideoRow): boolean {
+  return video.source === "upload" && Boolean(video.storageKey);
+}
+
 function stepRow(step: StepRecord, videos: StepVideoRow[], questionCount: number): AdminStepListRow {
   return {
     key: step.key,
@@ -87,8 +90,8 @@ function stepRow(step: StepRecord, videos: StepVideoRow[], questionCount: number
     shortTitle: step.shortTitle,
     kind: step.kind,
     todoCount: step.todoItems?.length ?? 0,
-    videoCount: videos.filter((video) => video.source !== null).length,
-    emptyVideoSlots: videos.filter((video) => video.source === null).length,
+    videoCount: videos.filter(hasUpload).length,
+    emptyVideoSlots: videos.filter((video) => !hasUpload(video)).length,
     checkQuestionCount: questionCount,
   };
 }
@@ -150,11 +153,9 @@ export function registerAdminStepRoutes(app: FastifyInstance): void {
           id: video.id,
           position: video.position,
           title: video.title,
-          source: video.source,
-          provider: video.provider,
-          embedUrl: video.embedUrl,
-          fileName: video.fileName,
-          sizeBytes: video.sizeBytes,
+          source: hasUpload(video) ? ("upload" as const) : null,
+          fileName: hasUpload(video) ? video.fileName : null,
+          sizeBytes: hasUpload(video) ? video.sizeBytes : null,
         })),
         questions: questions.map((question) => ({ id: question.id, position: question.position, prompt: question.prompt, explanation: question.explanation, options: question.options })),
       };
@@ -230,21 +231,6 @@ export function registerAdminStepRoutes(app: FastifyInstance): void {
     },
   );
 
-  r.put(
-    "/v1/admin/step-videos/:id/embed",
-    { schema: { tags: ["admin", "files"], summary: "Use a YouTube, Loom or Vimeo link in a step video slot", params: idParams, body: embedVideoRequestSchema, response: { 200: okResponseSchema, ...errors } } },
-    async (request) => {
-      const actor = currentActor(request);
-      const video = await requireStepVideo(app, request.params.id);
-      const parsed = parseEmbedVideoUrl(request.body.url);
-      if (!parsed) throw badRequest("Use a YouTube, Loom or Vimeo link (https).", "invalid_video_url");
-      const values = { source: "embed" as const, provider: parsed.provider, embedUrl: parsed.embedUrl, storageKey: null, fileName: null, sizeBytes: null, durationSeconds: null, uploadedBy: actor.userId };
-      await app.deps.db.update(stepVideos).set(values).where(eq(stepVideos.id, video.id));
-      await writeAudit(app.deps.db, { actorUserId: actor.userId, action: "step.video_set", entityType: "onboarding_step", entityId: video.stepId, after: { videoId: video.id, source: "embed", provider: parsed.provider, embedUrl: parsed.embedUrl } });
-      return { ok: true as const };
-    },
-  );
-
   r.delete(
     "/v1/admin/step-videos/:id/video",
     { schema: { tags: ["admin", "files"], summary: "Clear a slot's video, leaving the empty slot", params: idParams, response: { 200: okResponseSchema, ...errors } } },
@@ -274,7 +260,7 @@ export function registerAdminStepRoutes(app: FastifyInstance): void {
     async (request) => {
       const video = await requireStepVideo(app, request.params.id);
       if (app.deps.env.STORAGE_UPLOAD_MODE !== "direct") {
-        throw conflict("Video uploads need direct uploads to the bucket (STORAGE_UPLOAD_MODE=direct). Use a YouTube, Loom or Vimeo link instead.", "video_upload_unavailable");
+        throw conflict("Video uploads need direct uploads to the bucket (STORAGE_UPLOAD_MODE=direct).", "video_upload_unavailable");
       }
       const storageKey = stepVideoKey(video.stepId, request.body.fileName);
       const uploadId = await app.deps.storage.createMultipartUpload({ key: storageKey, contentType: VIDEO_MIME_TYPE });

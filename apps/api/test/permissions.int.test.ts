@@ -82,7 +82,6 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["POST", "/v1/admin/steps/w9/questions", { prompt: "Nope question?", explanation: "No.", options: [{ label: "A", isCorrect: true }, { label: "B", isCorrect: false }] }],
     ["PATCH", `/v1/admin/step-videos/${id}`, { title: "Nope video" }],
     ["DELETE", `/v1/admin/step-videos/${id}`],
-    ["PUT", `/v1/admin/step-videos/${id}/embed`, { url: "https://youtu.be/dQw4w9WgXcQ" }],
     ["DELETE", `/v1/admin/step-videos/${id}/video`],
     ["POST", `/v1/admin/step-videos/${id}/uploads`, { fileName: "a.mp4", contentType: "video/mp4", sizeBytes: 10 }],
     ["POST", `/v1/admin/step-videos/${id}/uploads/complete`, { uploadId: "x", storageKey: "x", fileName: "a.mp4", parts: [{ partNumber: 1, etag: "x" }] }],

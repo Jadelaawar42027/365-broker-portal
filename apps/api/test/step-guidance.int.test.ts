@@ -4,8 +4,9 @@
  * a step's guidance, video slots and knowledge-check questions without the answers; checking an answer returns right
  * or wrong with the explanation; a step with a check can't be sent until every answer is right; uploaded step videos
  * play through short-lived links; the two Start here steps each have their own video slot; step 11 (CRM training)
- * can't be finished until its video is watched (YouTube and uploads tracked to 90%, Loom by "I've watched this
- * video"), with progress kept per broker and only for the step's own videos; and admins edit a step's
+ * can't be finished until its video is watched (uploaded MP4s tracked to 90%; step videos are MP4s only, SPEC D34, so
+ * links are refused and a slot still holding an old link counts as empty), with progress kept per broker and only for
+ * the step's own videos; and admins edit a step's
  * titles (title, sub-header, short title, summary), guidance, video slots and questions (validated, capped at 3,
  * audited). Lessons return and save their What to do bullets and callouts.
  *
@@ -107,13 +108,17 @@ describe("step 11 needs its video watched", () => {
     expect(response.json().error).toBe("video_not_ready");
   });
 
-  it("tracks a YouTube video and unlocks the step at 90% watched", async () => {
+  it("tracks an uploaded MP4 and unlocks the step at 90% watched", async () => {
     const slotId = await crmSlotId();
-    expect((await ctx.call("PUT", `/v1/admin/step-videos/${slotId}/embed`, { cookie: owner, body: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })).statusCode).toBe(200);
+    const [slot] = await ctx.db.select().from(stepVideos).where(eq(stepVideos.id, slotId));
+    await ctx.db
+      .update(stepVideos)
+      .set({ source: "upload", provider: "upload", storageKey: `onboarding/steps/${slot!.stepId}/videos/abc-crm.mp4`, fileName: "crm.mp4", durationSeconds: 300 })
+      .where(eq(stepVideos.id, slotId));
     expect((await finishCrm(broker.cookie)).json().error).toBe("video_not_watched");
-    expect((await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/watched`, { cookie: broker.cookie })).json().error).toBe("video_tracked_automatically");
+    expect((await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/watched`, { cookie: broker.cookie })).statusCode).toBe(404);
     const progress = (seconds: number) =>
-      ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: broker.cookie, body: { watchedSeconds: seconds, durationSeconds: 300 } });
+      ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: broker.cookie, body: { watchedSeconds: seconds, durationSeconds: 9000 } });
     expect((await progress(100)).json()).toEqual({ watched: false, watchedSeconds: 100 });
     expect((await progress(50)).json()).toEqual({ watched: false, watchedSeconds: 100 });
     expect((await finishCrm(broker.cookie)).json().error).toBe("video_not_watched");
@@ -130,14 +135,21 @@ describe("step 11 needs its video watched", () => {
     expect((await finishCrm(other.cookie)).json().error).toBe("video_not_watched");
   });
 
-  it("uses \"I've watched this video\" for a Loom video, whose player can't report watch time", async () => {
+  it("treats a slot still holding an old YouTube, Loom or Vimeo link as empty", async () => {
     const slotId = await crmSlotId();
-    expect((await ctx.call("PUT", `/v1/admin/step-videos/${slotId}/embed`, { cookie: owner, body: { url: "https://www.loom.com/share/0123456789abcdef0123456789abcdef" } })).statusCode).toBe(200);
-    const loomBroker = await ctx.createBroker({ name: "Loom Broker", email: "loom-crm@example.com" });
-    const progress = await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: loomBroker.cookie, body: { watchedSeconds: 10 } });
-    expect(progress.json().error).toBe("video_not_trackable");
-    expect((await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/watched`, { cookie: loomBroker.cookie })).json()).toEqual({ watched: true, watchedSeconds: 0 });
-    expect((await finishCrm(loomBroker.cookie)).json().status).toBe("approved");
+    const [uploaded] = await ctx.db.select().from(stepVideos).where(eq(stepVideos.id, slotId));
+    await ctx.db
+      .update(stepVideos)
+      .set({ source: "embed", provider: "loom", embedUrl: "https://www.loom.com/embed/0123456789abcdef0123456789abcdef", storageKey: null, fileName: null })
+      .where(eq(stepVideos.id, slotId));
+    const legacyBroker = await ctx.createBroker({ name: "Legacy Broker", email: "legacy-crm@example.com" });
+    const step = (await ctx.call("GET", "/v1/me/steps/crm_login", { cookie: legacyBroker.cookie })).json();
+    expect(step.videos).toEqual([{ id: slotId, title: "CRM sign in and training", source: null, playUrl: null, watched: false, watchedSeconds: 0 }]);
+    const progress = await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: legacyBroker.cookie, body: { watchedSeconds: 10 } });
+    expect(progress.statusCode).toBe(409);
+    expect(progress.json().error).toBe("video_not_uploaded");
+    expect((await finishCrm(legacyBroker.cookie)).json().error).toBe("video_not_ready");
+    await ctx.db.update(stepVideos).set({ source: uploaded!.source, provider: uploaded!.provider, embedUrl: null, storageKey: uploaded!.storageKey, fileName: uploaded!.fileName }).where(eq(stepVideos.id, slotId));
   });
 
   it("only records progress on the step's own videos", async () => {
@@ -246,17 +258,21 @@ describe("the admin step editor", () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it("adds a video slot, sets an embed link, clears it and removes the slot", async () => {
+  it("adds a video slot, refuses a YouTube link, clears an uploaded video and removes the slot", async () => {
     const created = await ctx.call("POST", "/v1/admin/steps/w9/videos", { cookie: owner, body: { title: "Filling in your W-9" } });
     expect(created.statusCode).toBe(201);
     const id = created.json().id as string;
-    expect((await ctx.call("PUT", `/v1/admin/step-videos/${id}/embed`, { cookie: owner, body: { url: "https://example.com/video.mp4" } })).json().error).toBe("invalid_video_url");
-    expect((await ctx.call("PUT", `/v1/admin/step-videos/${id}/embed`, { cookie: owner, body: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })).statusCode).toBe(200);
+    expect((await ctx.call("PUT", `/v1/admin/step-videos/${id}/embed`, { cookie: owner, body: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })).statusCode).toBe(404);
+    const [slot] = await ctx.db.select().from(stepVideos).where(eq(stepVideos.id, id));
+    await ctx.db.update(stepVideos).set({ source: "upload", provider: "upload", storageKey: `onboarding/steps/${slot!.stepId}/videos/abc-w9.mp4`, fileName: "w9.mp4", sizeBytes: 2048 }).where(eq(stepVideos.id, id));
     let step = (await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie })).json();
-    expect(step.videos).toEqual([expect.objectContaining({ title: "Filling in your W-9", source: "embed", provider: "youtube", embedUrl: expect.stringContaining("youtube-nocookie.com/embed/dQw4w9WgXcQ") })]);
+    expect(step.videos).toEqual([expect.objectContaining({ title: "Filling in your W-9", source: "upload", playUrl: expect.stringMatching(/^https?:\/\//) })]);
+    expect(step.videos[0]).not.toHaveProperty("embedUrl");
+    const admin = (await ctx.call("GET", "/v1/admin/steps/w9", { cookie: owner })).json();
+    expect(admin.videos).toEqual([{ id, position: 1, title: "Filling in your W-9", source: "upload", fileName: "w9.mp4", sizeBytes: 2048 }]);
     expect((await ctx.call("DELETE", `/v1/admin/step-videos/${id}/video`, { cookie: owner })).statusCode).toBe(200);
     step = (await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie })).json();
-    expect(step.videos[0]).toMatchObject({ source: null, embedUrl: null });
+    expect(step.videos[0]).toMatchObject({ source: null, playUrl: null });
     expect((await ctx.call("PATCH", `/v1/admin/step-videos/${id}`, { cookie: owner, body: { title: "W-9 walkthrough" } })).statusCode).toBe(200);
     expect((await ctx.call("DELETE", `/v1/admin/step-videos/${id}`, { cookie: owner })).statusCode).toBe(200);
     step = (await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie })).json();

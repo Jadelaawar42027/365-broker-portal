@@ -1,36 +1,30 @@
 /**
  * File: apps/web/src/components/broker/step-videos.tsx
- * Purpose: The videos at the top of an onboarding step (SPEC D28). Each slot shows an embedded YouTube, Loom or Vimeo
- * player or an uploaded MP4 (its 5-minute link is refreshed if it expires mid-watch); empty slots are a slim
- * "on its way" row so they don't push the step's instructions down. On a step that must have its video watched
- * (SPEC D32), uploaded, YouTube and Vimeo videos report the furthest second watched every 10 seconds (skipping ahead
- * doesn't count) and are marked watched at 90%; a Loom video, whose player can't report watch time, gets an "I've
- * watched this video" button. Either way the page refreshes so the confirm box unlocks.
+ * Purpose: The videos at the top of an onboarding step (SPEC D28). Each slot plays an uploaded MP4 (its 5-minute link
+ * is refreshed if it expires mid-watch, at most once a minute so a video that can't play doesn't keep asking); step
+ * videos are MP4s only (SPEC D34). Empty slots are a slim "on its way" row
+ * so they don't push the step's instructions down. On a step that must have its video watched (SPEC D32), the player
+ * reports the furthest second watched every 10 seconds (skipping ahead doesn't count), the video is marked watched at
+ * 90%, and the page refreshes so the confirm box unlocks.
  *
  * Functions:
- * - useWatchProgress({ stepKey, video, enabled, maxJumpSeconds }): follows the player's position and sends the furthest second watched; returns { track(position, duration), flush() }.
+ * - useWatchProgress({ stepKey, video, enabled, maxJumpSeconds }): follows the player's position and sends the furthest second watched; returns { track(position, duration), seeked(position), flush() }.
  * - StepVideos({ stepKey, videos, trackWatching }): the list of video slots, one under the other.
- * - StepVideo({ stepKey, video, trackWatching }): one slot with a video, as a full-width player.
- * - EmbedStepVideo({ stepKey, video, trackWatching }): the YouTube, Loom or Vimeo iframe; on a tracked step it listens to YouTube and Vimeo player messages, or shows the Loom button.
  * - EmptySlot({ title }): one empty slot as a single "on its way" row.
  * - UploadedStepVideo({ stepKey, video, trackWatching }): the native player for an uploaded MP4, sending watch progress when tracked.
- * - MarkWatchedButton({ stepKey, video }): the "I've watched this video" button for a Loom video on a tracked step.
  * - WatchedNote({ watched }): the "Watched" tick or the "Watch the whole video to unlock this step" hint under a tracked video.
  */
 "use client";
 
-import { canTrackEmbed, isPlayerReady, PLAYER_ORIGINS, readPlayerTime, trackingEmbedUrl, type StepVideoView } from "@bp/shared";
+import type { StepVideoView } from "@bp/shared";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef } from "react";
 import { CheckIcon, PlayIcon } from "@/components/ui/icons";
-import { apiRequest, ApiError } from "@/lib/api-client";
+import { apiRequest } from "@/lib/api-client";
 
 const HEARTBEAT_MS = 10_000;
 const MAX_NATURAL_JUMP_SECONDS = 3;
-const MAX_EMBED_JUMP_SECONDS = 5;
-const PLAYER_HANDSHAKE_MS = 1_000;
-const PLAYER_HANDSHAKE_TRIES = 15;
+const MIN_LINK_REFRESH_MS = 60_000;
 
 function useWatchProgress({ stepKey, video, enabled, maxJumpSeconds }: { stepKey: string; video: StepVideoView; enabled: boolean; maxJumpSeconds: number }) {
   const router = useRouter();
@@ -91,6 +85,7 @@ function useWatchProgress({ stepKey, video, enabled, maxJumpSeconds }: { stepKey
 function UploadedStepVideo({ stepKey, video, trackWatching }: { stepKey: string; video: StepVideoView; trackWatching: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const refreshing = useRef(false);
+  const lastRefresh = useRef(0);
   const progress = useWatchProgress({ stepKey, video, enabled: trackWatching && !video.watched, maxJumpSeconds: MAX_NATURAL_JUMP_SECONDS });
 
   function playerDuration(): number | null {
@@ -100,8 +95,9 @@ function UploadedStepVideo({ stepKey, video, trackWatching }: { stepKey: string;
 
   async function refreshLink() {
     const player = videoRef.current;
-    if (!player || refreshing.current) return;
+    if (!player || refreshing.current || Date.now() - lastRefresh.current < MIN_LINK_REFRESH_MS) return;
     refreshing.current = true;
+    lastRefresh.current = Date.now();
     const resumeAt = player.currentTime;
     try {
       const { url } = await apiRequest<{ url: string }>(`/v1/me/steps/${stepKey}/videos/${video.id}/url`);
@@ -131,102 +127,6 @@ function UploadedStepVideo({ stepKey, video, trackWatching }: { stepKey: string;
   );
 }
 
-function EmbedStepVideo({ stepKey, video, trackWatching }: { stepKey: string; video: StepVideoView; trackWatching: boolean }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const tracked = trackWatching && !video.watched && canTrackEmbed(video.provider);
-  const [src, setSrc] = useState(tracked ? null : video.embedUrl);
-  const heard = useRef(false);
-  const progress = useWatchProgress({ stepKey, video, enabled: tracked, maxJumpSeconds: MAX_EMBED_JUMP_SECONDS });
-  const { track } = progress;
-
-  useEffect(() => {
-    if (!tracked || !video.embedUrl) return;
-    setSrc(trackingEmbedUrl(video.embedUrl, video.provider, window.location.origin));
-  }, [tracked, video.embedUrl, video.provider]);
-
-  useEffect(() => {
-    if (!tracked) return;
-    function subscribe() {
-      const player = iframeRef.current?.contentWindow;
-      if (!player) return;
-      if (video.provider === "youtube") player.postMessage(JSON.stringify({ event: "listening", id: video.id, channel: "widget" }), "*");
-      else player.postMessage(JSON.stringify({ method: "addEventListener", value: "timeupdate" }), "*");
-    }
-    function onMessage(event: MessageEvent) {
-      if (event.source !== iframeRef.current?.contentWindow || !(PLAYER_ORIGINS as readonly string[]).includes(event.origin)) return;
-      if (isPlayerReady(video.provider, event.data)) subscribe();
-      const time = readPlayerTime(video.provider, event.data);
-      if (!time) return;
-      heard.current = true;
-      track(time.currentTime, time.duration);
-    }
-    window.addEventListener("message", onMessage);
-    let tries = 0;
-    const handshake = window.setInterval(() => {
-      tries += 1;
-      if (heard.current || tries > PLAYER_HANDSHAKE_TRIES) window.clearInterval(handshake);
-      else subscribe();
-    }, PLAYER_HANDSHAKE_MS);
-    return () => {
-      window.removeEventListener("message", onMessage);
-      window.clearInterval(handshake);
-    };
-  }, [track, tracked, video.id, video.provider]);
-
-  return (
-    <>
-      <div className="aspect-video w-full overflow-hidden rounded-2xl bg-navy">
-        {src ? (
-          <iframe
-            ref={iframeRef}
-            src={src}
-            title={`Video: ${video.title}`}
-            className="size-full"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            allowFullScreen
-            loading={tracked ? "eager" : "lazy"}
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        ) : null}
-      </div>
-      {trackWatching && !video.watched && !canTrackEmbed(video.provider) ? <MarkWatchedButton stepKey={stepKey} video={video} /> : null}
-    </>
-  );
-}
-
-function MarkWatchedButton({ stepKey, video }: { stepKey: string; video: StepVideoView }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function markWatched() {
-    setBusy(true);
-    setError(null);
-    try {
-      await apiRequest(`/v1/me/steps/${stepKey}/videos/${video.id}/watched`, { method: "POST" });
-      router.refresh();
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Something went wrong. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <Button variant="brand-outline" size="lg" disabled={busy} aria-busy={busy} onClick={() => void markWatched()}>
-        <CheckIcon className="size-5" />
-        {busy ? "Saving…" : "I've watched this video"}
-      </Button>
-      {error ? (
-        <p role="alert" className="text-base text-danger">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 function WatchedNote({ watched }: { watched: boolean }) {
   return watched ? (
     <p className="flex items-center gap-2 text-base font-semibold text-success">
@@ -236,11 +136,6 @@ function WatchedNote({ watched }: { watched: boolean }) {
   ) : (
     <p className="text-base text-muted">Watch the whole video to unlock this step.</p>
   );
-}
-
-function StepVideo({ stepKey, video, trackWatching }: { stepKey: string; video: StepVideoView; trackWatching: boolean }) {
-  if (video.source === "embed" && video.embedUrl) return <EmbedStepVideo stepKey={stepKey} video={video} trackWatching={trackWatching} />;
-  return <UploadedStepVideo stepKey={stepKey} video={video} trackWatching={trackWatching} />;
 }
 
 function EmptySlot({ title }: { title: string }) {
@@ -257,13 +152,13 @@ function EmptySlot({ title }: { title: string }) {
 
 export function StepVideos({ stepKey, videos, trackWatching = false }: { stepKey: string; videos: StepVideoView[]; trackWatching?: boolean }) {
   if (videos.length === 0) return null;
-  const ready = videos.filter((video) => (video.source === "embed" && video.embedUrl) || (video.source === "upload" && video.playUrl));
+  const ready = videos.filter((video) => video.source === "upload" && video.playUrl);
   const waiting = videos.filter((video) => !ready.includes(video));
   return (
     <section aria-label="Videos for this step" className="space-y-5">
       {ready.map((video) => (
         <figure key={video.id} className="space-y-2.5">
-          <StepVideo stepKey={stepKey} video={video} trackWatching={trackWatching} />
+          <UploadedStepVideo stepKey={stepKey} video={video} trackWatching={trackWatching} />
           <figcaption className="flex items-center gap-2 text-lg font-bold">
             <PlayIcon className="size-5 shrink-0 text-brand" />
             {video.title}

@@ -16,8 +16,6 @@ import {
   STEP_STAGES,
   STEP_STATUSES,
   USER_ROLES,
-  VIDEO_PROVIDERS,
-  VIDEO_SOURCES,
 } from "./constants";
 import { commissionPctSchema } from "./commission";
 import { ACCOUNT_STATUSES } from "./provisioning";
@@ -127,11 +125,9 @@ export const brokerStepConfigSchema = stepConfigSchema.omit({ reviewChecklist: t
 export const stepVideoViewSchema = z.object({
   id: z.string(),
   title: z.string(),
-  source: z.enum(VIDEO_SOURCES).nullable(),
-  provider: z.enum(VIDEO_PROVIDERS).nullable(),
-  embedUrl: z.string().nullable(),
+  source: z.literal("upload").nullable().describe("upload when the slot has an MP4 in it, null while it is empty"),
   playUrl: z.string().nullable(),
-  watched: z.boolean().describe("True once this broker has watched the video (90% of an upload, or marked watched for an embed)"),
+  watched: z.boolean().describe("True once this broker has watched 90% of the video"),
   watchedSeconds: z.number().int().describe("Furthest second of an uploaded video this broker has watched"),
 });
 export type StepVideoView = z.infer<typeof stepVideoViewSchema>;

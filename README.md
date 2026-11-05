@@ -81,6 +81,10 @@ On **Brokers** (`/admin/brokers`):
 - **Sign-in link:** until a broker creates their password, their profile shows their sign-in link with **Copy link** and **Send via WhatsApp**. It is the same link every time and has no time limit. It stops working once they use it, when you click **Replace link**, or when you set them to Inactive. **Email the invite** emails that same link. Admin invite links still expire after 7 days.
 - **Remove** (owner only, on each row) deletes a broker and everything stored about them for good, after you type their name. If someone only left, set them to Inactive on their profile instead.
 
+## Onboarding step videos
+
+Step videos are set in **Admin → Onboarding steps** and are MP4 uploads only (up to 1 GB, sent straight to the bucket). Uploads give the portal the video's real length, so on a step that needs its video watched (step 11, CRM training) the broker has to play 90% of it before the step unlocks; skipping ahead doesn't count. Training lessons can still use a YouTube, Loom or Vimeo link.
+
 ## Importing your current brokers
 
 1. Create `data/import/` (it is gitignored and never leaves your machine).

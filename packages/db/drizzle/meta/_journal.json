@@ -155,6 +155,13 @@
       "when": 1793906466137,
       "tag": "0021_invite_links_without_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793913810070,
+      "tag": "0022_step_videos_mp4_only",
+      "breakpoints": true
     }
   ]
 }

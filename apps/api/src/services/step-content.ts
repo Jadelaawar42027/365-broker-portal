@@ -4,14 +4,14 @@
  * videos play through 5-minute presigned links, like lesson videos) and its knowledge-check questions. Broker views
  * never include which option is correct; that is only used to check answers on the server. It also records how far a
  * broker has watched each step video, for steps that must have their video watched (config.requireVideo, SPEC D32).
+ * Step videos are uploaded MP4s only (SPEC D34); a slot still holding an old link counts as empty.
  *
  * Functions:
  * - toGuidanceView(step): the What to do bullets, callouts and full text of a step, or null when it has no bullets.
  * - loadStepVideos(db, stepId): the step's video slots in order.
- * - toBrokerStepVideo(deps, video, progress): a video slot as the broker sees it, with a short-lived play link for uploads and whether this broker has watched it.
+ * - toBrokerStepVideo(deps, video, progress): a video slot as the broker sees it, with a short-lived play link when it holds an MP4 and whether this broker has watched it.
  * - loadStepVideoProgress(db, brokerId, videoIds): this broker's progress on those videos, as a map from video id.
- * - recordStepVideoProgress(db, input): stores the furthest second watched of an uploaded, YouTube or Vimeo video and marks it watched at 90%; returns { watched, watchedSeconds }.
- * - markStepVideoWatched(db, input): marks a Loom video watched (the broker's "I've watched this video"); returns { watched, watchedSeconds }.
+ * - recordStepVideoProgress(db, input): stores the furthest second watched of an uploaded video and marks it watched at 90%; returns { watched, watchedSeconds }.
  * - loadStepQuestions(db, stepId): the step's knowledge-check questions with their options (including which is correct).
  * - toBrokerCheckQuestion(question): a question without correctness, for the broker's step page.
  * - stepVideoKey(stepId, fileName): a fresh storage key for an uploaded step video.
@@ -38,16 +38,14 @@ export async function loadStepVideos(db: DbOrTx, stepId: string): Promise<StepVi
 }
 
 export async function toBrokerStepVideo(deps: Pick<AppDeps, "storage">, video: StepVideoRow, progress?: StepVideoProgressRow): Promise<StepVideoView> {
-  const playUrl =
-    video.source === "upload" && video.storageKey
-      ? await deps.storage.presignGet({ key: video.storageKey, fileName: video.fileName ?? "video.mp4", expiresInSeconds: STEP_VIDEO_URL_TTL_SECONDS, inline: true })
-      : null;
+  const uploaded = video.source === "upload" && video.storageKey ? video.storageKey : null;
+  const playUrl = uploaded
+    ? await deps.storage.presignGet({ key: uploaded, fileName: video.fileName ?? "video.mp4", expiresInSeconds: STEP_VIDEO_URL_TTL_SECONDS, inline: true })
+    : null;
   return {
     id: video.id,
     title: video.title,
-    source: video.source,
-    provider: video.provider,
-    embedUrl: video.source === "embed" ? video.embedUrl : null,
+    source: uploaded ? "upload" : null,
     playUrl,
     watched: Boolean(progress?.watchedAt),
     watchedSeconds: progress?.watchedSeconds ?? 0,
@@ -83,18 +81,6 @@ export async function recordStepVideoProgress(
     })
     .returning({ watchedSeconds: stepVideoProgress.watchedSeconds, watchedAt: stepVideoProgress.watchedAt });
   return { watched: Boolean(row?.watchedAt), watchedSeconds: row?.watchedSeconds ?? reported };
-}
-
-export async function markStepVideoWatched(db: DbOrTx, input: { brokerId: string; videoId: string; now: Date }): Promise<{ watched: boolean; watchedSeconds: number }> {
-  const [row] = await db
-    .insert(stepVideoProgress)
-    .values({ brokerId: input.brokerId, stepVideoId: input.videoId, watchedAt: input.now })
-    .onConflictDoUpdate({
-      target: [stepVideoProgress.brokerId, stepVideoProgress.stepVideoId],
-      set: { watchedAt: sql`COALESCE(${stepVideoProgress.watchedAt}, ${input.now.toISOString()}::timestamptz)`, updatedAt: input.now },
-    })
-    .returning({ watchedSeconds: stepVideoProgress.watchedSeconds });
-  return { watched: true, watchedSeconds: row?.watchedSeconds ?? 0 };
 }
 
 export async function loadStepQuestions(db: DbOrTx, stepId: string) {

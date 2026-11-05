@@ -1,19 +1,17 @@
 /**
  * File: apps/web/e2e/journey-8-step-guidance.spec.ts
  * Purpose: The short onboarding-step layout (SPEC D28) end to end. An admin edits a step's What to do bullets and its
- * sub-header, and puts a YouTube link in step 12's (BoatWizard) video slot; the broker sees the video first, the new
- * sub-header, the bullets, the callouts and the manual's text behind "Read the full section"; step 11 (CRM training)
- * keeps its confirm box locked until its video is marked watched and shows the transcript behind "Read along with the
- * video" (SPEC D32); step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
+ * sub-header, and uploads an MP4 to step 12's (BoatWizard) video slot (step video slots take MP4s only, no links,
+ * SPEC D34); the broker sees the video first, the new sub-header, the bullets, the callouts and the manual's text
+ * behind "Read the full section"; step 11 (CRM training) keeps its confirm box locked until its video has been
+ * watched to the end and shows the transcript behind "Read along with the video" (SPEC D32); step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
  * send button stays disabled until the deposit question is answered correctly, after a wrong try with its explanation.
  *
  * Functions:
  * - none
  */
 import { expect, test } from "@playwright/test";
-import { createSignedInBroker, DEPOSIT_ANSWER, OWNER, signIn, testFile } from "./support/helpers";
-
-const VIDEO_HOSTS = /youtube|youtube-nocookie|ytimg|googlevideo|loom\.com|vimeo/;
+import { createSignedInBroker, DEPOSIT_ANSWER, markStepVideoWatched, OWNER, signIn, testFile, testVideo } from "./support/helpers";
 
 test("admins edit step guidance and videos; brokers read it and pass the knowledge check", async ({ page, browser }) => {
   test.setTimeout(180_000);
@@ -24,9 +22,13 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await steps.getByRole("link", { name: /BoatWizard sign in/ }).click();
   await expect(page.getByRole("heading", { name: "Sign in to BoatWizard" })).toBeVisible();
   await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(1);
-  await page.getByLabel("YouTube, Loom or Vimeo link for BoatWizard walkthrough").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  await page.getByRole("listitem").filter({ hasText: "BoatWizard walkthrough" }).getByRole("button", { name: "Use this link" }).click();
+  const slot = page.getByRole("listitem").filter({ hasText: "BoatWizard walkthrough" });
+  await expect(slot.getByRole("button", { name: "Use this link" })).toHaveCount(0);
+  await expect(page.getByPlaceholder("YouTube, Loom or Vimeo link")).toHaveCount(0);
+  await page.getByLabel("Upload an MP4 for BoatWizard walkthrough").setInputFiles(testVideo("boatwizard.mp4"));
   await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(0);
+  await expect(slot.getByText("Uploaded video")).toBeVisible();
+  await expect(slot.getByText(/boatwizard\.mp4/)).toBeVisible();
 
   await steps.getByRole("link", { name: /365 email/ }).click();
   await expect(page.getByRole("heading", { name: "Log in to your 365 Yachts email" })).toBeVisible();
@@ -41,12 +43,12 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(page.getByText("Your 365 email is where every client record lives.")).toBeVisible();
 
   const broker = await createSignedInBroker(browser, "Marco Silva");
-  await broker.context.route(VIDEO_HOSTS, (route) => route.abort());
   const brokerPage = broker.page;
 
   await brokerPage.goto("/app/steps/boatwizard_login");
   const videos = brokerPage.getByRole("region", { name: "Videos for this step" });
-  await expect(videos.locator("iframe[title='Video: BoatWizard walkthrough']")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/);
+  await expect(videos.locator("video[aria-label='Video: BoatWizard walkthrough']")).toHaveAttribute("src", /boatwizard\.mp4/);
+  await expect(videos.locator("iframe")).toHaveCount(0);
   await expect(videos.getByText("On its way", { exact: true })).toHaveCount(0);
   await expect(brokerPage.getByRole("heading", { name: "What to do" })).toBeVisible();
   await expect(brokerPage.getByText("Run one practice search for a boat a client might want.")).toBeVisible();
@@ -62,7 +64,8 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(brokerPage.getByRole("button", { name: "Mark this step done" })).toBeDisabled();
   await brokerPage.getByText("Read along with the video").click();
   await expect(brokerPage.getByRole("heading", { name: "Broker outcomes: how we track your leads" })).toBeVisible();
-  await brokerPage.getByRole("button", { name: "I've watched this video" }).click();
+  await expect(brokerPage.getByRole("button", { name: "I've watched this video" })).toHaveCount(0);
+  await markStepVideoWatched(brokerPage, "crm_login");
   await expect(crmConfirm).toBeEnabled();
   await expect(brokerPage.getByText("Watched", { exact: true })).toBeVisible();
 
