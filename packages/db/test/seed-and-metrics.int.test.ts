@@ -61,15 +61,15 @@ function urlForUser(url: string, username: string, password: string): string {
 }
 
 describe("seed", () => {
-  it("creates the 11 onboarding steps in spec order (step 0 first), without the retired commission step", async () => {
+  it("creates the 12 onboarding steps in spec order (the two Start here steps first), without the retired commission step", async () => {
     const steps = await testDb.db.select().from(onboardingSteps).orderBy(onboardingSteps.position);
-    expect(firstSummary.stepsInserted).toBe(11);
+    expect(firstSummary.stepsInserted).toBe(12);
     expect(steps.map((step) => step.key)).toEqual([
-      "start_here", "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
+      "start_here", "ai_agent", "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
       "dbpr_filing", "license_bond", "email_signature", "platform_logins",
     ]);
     expect(steps.filter((step) => !step.needsApproval).map((step) => step.key)).toEqual([
-      "start_here", "license_situation", "email_signature", "platform_logins",
+      "start_here", "ai_agent", "license_situation", "email_signature", "platform_logins",
     ]);
     expect(steps.filter((step) => step.kind === "admin")).toEqual([]);
   });
@@ -162,7 +162,7 @@ describe("seed", () => {
   it("restores edited step copy with refreshSteps", async () => {
     await testDb.db.update(onboardingSteps).set({ title: "Edited" }).where(eq(onboardingSteps.key, "w9"));
     const refreshed = await seedDatabase(testDb.db, { refreshSteps: true });
-    expect(refreshed.stepsUpdated).toBe(11);
+    expect(refreshed.stepsUpdated).toBe(12);
     const [w9] = await testDb.db.select().from(onboardingSteps).where(eq(onboardingSteps.key, "w9"));
     expect(w9?.title).toBe("Upload your W-9");
   });
@@ -182,8 +182,8 @@ describe("broker_metrics view", () => {
       onboardedAt: "2026-08-27",
       leftAt: null,
       daysToOnboard: 9,
-      stepsTotal: 11,
-      stepsApproved: 11,
+      stepsTotal: 12,
+      stepsApproved: 12,
       stepsWaitingReview: 0,
     });
     expect(kevin.tenureDays).toBe(daysBetween("2026-08-18", today()));
@@ -198,7 +198,7 @@ describe("broker_metrics view", () => {
       joinedAt: addDays("2026-10-17", -4),
       onboardedAt: null,
       daysToOnboard: null,
-      stepsTotal: 11,
+      stepsTotal: 12,
       stepsApproved: 3,
       stepsWaitingReview: 1,
     });
@@ -221,7 +221,7 @@ describe("broker_metrics view", () => {
   it("leaves retired steps out of the totals", async () => {
     await testDb.db.update(onboardingSteps).set({ active: false }).where(eq(onboardingSteps.key, "license_situation"));
     const daniel = await metricsFor("daniel.reyes@example.com");
-    expect(daniel).toMatchObject({ stepsTotal: 10, stepsApproved: 2 });
+    expect(daniel).toMatchObject({ stepsTotal: 11, stepsApproved: 2 });
     await testDb.db.update(onboardingSteps).set({ active: true }).where(eq(onboardingSteps.key, "license_situation"));
   });
 

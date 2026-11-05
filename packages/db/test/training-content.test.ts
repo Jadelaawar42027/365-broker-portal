@@ -4,7 +4,7 @@
  * measured", whose lessons have 3 to 5 short bullets and callouts, whose 8 to 25 questions are well formed and tied to a
  * lesson, with an 80% pass mark and no disputed co-broke figures; Volume Two parts are empty. Steps: every onboarding
  * step has guidance in the short layout, every NEVER and WATCH from Modules 01 and 02 is kept, the video slots and the
- * step 8 knowledge check are in place, and no bond or fee figure appears outside the full text.
+ * step 9 knowledge check are in place, and no bond or fee figure appears outside the full text.
  *
  * Functions:
  * - calloutKinds(blocks): every callout kind used in a parsed lesson, including nested ones.
@@ -89,9 +89,9 @@ describe("onboarding step guidance", () => {
       expect(guidance.todoItems.length, key).toBeLessThanOrEqual(5);
       expect(countWords(guidance.todoItems), key).toBeLessThanOrEqual(60);
       expect([...guidance.todoItems, ...guidance.callouts.map((callout) => callout.text)].join(" "), key).not.toMatch(/\$\d/);
-      if (key !== "start_here") expect(parseLessonMarkdown(guidance.fullTextMd).length, key).toBeGreaterThan(0);
+      if (key !== "start_here" && key !== "ai_agent") expect(parseLessonMarkdown(guidance.fullTextMd).length, key).toBeGreaterThan(0);
     }
-    expect(Object.entries(STEP_GUIDANCE).filter(([, guidance]) => !guidance.fullTextMd).map(([key]) => key)).toEqual(["start_here"]);
+    expect(Object.entries(STEP_GUIDANCE).filter(([, guidance]) => !guidance.fullTextMd).map(([key]) => key)).toEqual(["start_here", "ai_agent"]);
   });
 
   it("keeps every NEVER and WATCH from Modules 01 and 02 as one-line callouts", () => {
@@ -103,12 +103,14 @@ describe("onboarding step guidance", () => {
     for (const callout of all) expect(callout.text.length).toBeLessThanOrEqual(120);
   });
 
-  it("adds empty video slots on step 10 and step 7", () => {
+  it("adds empty video slots on steps 0, 1, 8 and 11", () => {
+    expect(STEP_GUIDANCE.start_here!.videoSlots).toEqual(["Part 1: Aj walks you through the platform"]);
+    expect(STEP_GUIDANCE.ai_agent!.videoSlots).toEqual(["Part 2: Introducing Your Personal AI Agent"]);
     expect(STEP_GUIDANCE.platform_logins!.videoSlots).toEqual(["GoHighLevel CRM walkthrough", "BoatWizard walkthrough", "YachtCloser walkthrough"]);
     expect(STEP_GUIDANCE.dbpr_filing!.videoSlots).toEqual(["How to file your DBPR application"]);
   });
 
-  it("puts the deposit question on step 8 only, within the 3-question limit", () => {
+  it("puts the deposit question on step 9 only, within the 3-question limit", () => {
     const withChecks = Object.entries(STEP_GUIDANCE).filter(([, guidance]) => guidance.checkQuestions?.length);
     expect(withChecks.map(([key]) => key)).toEqual(["license_bond"]);
     const [question] = STEP_GUIDANCE.license_bond!.checkQuestions!;

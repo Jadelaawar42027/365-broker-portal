@@ -18,9 +18,9 @@
  * - passQuickCheck(page, answer): answers a step's knowledge check correctly and waits for "That's right."
  * - uploadStep(page, stepKey, fileName, checkAnswer): opens a step, uploads one file, passes its knowledge check if one is given, and sends it.
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
- * - signAgreements(page): opens and reads both agreements on step 2, checks the details, signs by typed name and waits for the signed state.
+ * - signAgreements(page): opens and reads both agreements on step 3, checks the details, signs by typed name and waits for the signed state.
  * - setUpCompanySignature(page): as the signed-in company signer, stores an authorized signature so new agreements are countersigned automatically.
- * - completeBrokerSteps(page): does all 11 steps a broker does themselves (ticking step 0, signing the agreements, passing step 8's deposit check).
+ * - completeBrokerSteps(page): does all 12 steps a broker does themselves (ticking steps 0 and 1, signing the agreements, passing step 9's deposit check).
  */
 import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
@@ -194,6 +194,7 @@ export async function setUpCompanySignature(page: Page): Promise<void> {
 
 export async function completeBrokerSteps(page: Page): Promise<void> {
   await answerStep(page, "start_here", (p) => p.getByLabel("I've watched the walkthrough").check());
+  await answerStep(page, "ai_agent", (p) => p.getByLabel("I've watched the AI agent video").check());
   await uploadStep(page, "photo_id", "photo-id.pdf");
   await signAgreements(page);
   await answerStep(page, "bio", (p) => p.getByLabel("Your bio").fill("I grew up on the water in Palm Beach and have sold boats for ten years. ".repeat(7)));

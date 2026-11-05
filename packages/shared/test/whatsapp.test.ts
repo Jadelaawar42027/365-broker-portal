@@ -1,13 +1,14 @@
 /**
  * File: packages/shared/test/whatsapp.test.ts
  * Purpose: Tests for the WhatsApp support link (SPEC D13): message wording, URL encoding, and hiding the button
- * when the number is missing or invalid.
+ * when the number is missing or invalid; and the "Start chat with AI agent" link on step 1, which always goes to the
+ * 365 Yachts AI with a hello message.
  *
  * Functions:
  * - none
  */
 import { describe, expect, it } from "vitest";
-import { buildSupportMessage, buildWhatsAppLink, normalizeWhatsAppNumber } from "../src/whatsapp";
+import { buildAiAgentMessage, buildAiAgentWhatsAppLink, buildSupportMessage, buildWhatsAppLink, DEFAULT_SUPPORT_CONTACT, normalizeWhatsAppNumber } from "../src/whatsapp";
 
 describe("buildSupportMessage", () => {
   it("names the broker and the step", () => {
@@ -45,5 +46,18 @@ describe("buildWhatsAppLink", () => {
 
   it("trims surrounding spaces", () => {
     expect(normalizeWhatsAppNumber(" 15614459241 ")).toBe("15614459241");
+  });
+});
+
+describe("the AI agent chat link", () => {
+  it("says hello with the broker's name, or without it when unknown", () => {
+    expect(buildAiAgentMessage({ brokerName: " Daniel Reyes " })).toBe("Hey 365 Yachts AI, it's Daniel Reyes. I'm new here and doing my onboarding.");
+    expect(buildAiAgentMessage({ brokerName: null })).toBe("Hey 365 Yachts AI. I'm new here and doing my onboarding.");
+  });
+
+  it("always opens the 365 Yachts AI's WhatsApp with the message filled in", () => {
+    const link = buildAiAgentWhatsAppLink({ brokerName: "Daniel Reyes" });
+    expect(link).toMatch(new RegExp(`^https://wa\\.me/${DEFAULT_SUPPORT_CONTACT.whatsappNumber}\\?text=`));
+    expect(new URL(link!).searchParams.get("text")).toBe("Hey 365 Yachts AI, it's Daniel Reyes. I'm new here and doing my onboarding.");
   });
 });

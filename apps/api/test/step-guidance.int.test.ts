@@ -3,11 +3,12 @@
  * Purpose: Integration tests for the short step and lesson layout (SPEC D28) on a real Postgres container: brokers get
  * a step's guidance, video slots and knowledge-check questions without the answers; checking an answer returns right
  * or wrong with the explanation; a step with a check can't be sent until every answer is right; uploaded step videos
- * play through short-lived links; and admins edit guidance, video slots and questions (validated, capped at 3,
+ * play through short-lived links; the two Start here steps each have their own video slot; and admins edit a step's
+ * titles (title, sub-header, short title, summary), guidance, video slots and questions (validated, capped at 3,
  * audited). Lessons return and save their What to do bullets and callouts.
  *
  * Functions:
- * - depositQuestion(): the step 8 knowledge-check question with its option ids, read from the database.
+ * - depositQuestion(): the step 9 knowledge-check question with its option ids, read from the database.
  */
 import { auditLog, onboardingSteps, stepQuestionOptions, stepQuestions, stepVideos } from "@bp/db";
 import { and, eq } from "drizzle-orm";
@@ -51,7 +52,15 @@ describe("a broker's step page", () => {
     expect(response.body).not.toContain("Taking a deposit into a personal account");
   });
 
-  it("lists step 10's three empty video slots in order", async () => {
+  it("gives step 0 the Part 1 video slot and step 1 the Part 2 slot", async () => {
+    const startHere = (await ctx.call("GET", "/v1/me/steps/start_here", { cookie: broker.cookie })).json();
+    expect(startHere.videos.map((video: { title: string }) => video.title)).toEqual(["Part 1: Aj walks you through the platform"]);
+    const aiAgent = (await ctx.call("GET", "/v1/me/steps/ai_agent", { cookie: broker.cookie })).json();
+    expect(aiAgent).toMatchObject({ position: 1, stageTitle: "Start here", kind: "confirm", needsApproval: false, title: "Introducing your personal AI agent" });
+    expect(aiAgent.videos.map((video: { title: string }) => video.title)).toEqual(["Part 2: Introducing Your Personal AI Agent"]);
+  });
+
+  it("lists step 11's three empty video slots in order", async () => {
     const body = (await ctx.call("GET", "/v1/me/steps/platform_logins", { cookie: broker.cookie })).json();
     expect(body.videos.map((video: { title: string; source: string | null; playUrl: string | null }) => [video.title, video.source, video.playUrl])).toEqual([
       ["GoHighLevel CRM walkthrough", null, null],
@@ -111,10 +120,11 @@ describe("the knowledge check", () => {
 });
 
 describe("the admin step editor", () => {
-  it("lists the 11 steps with their guidance, video slots and checks", async () => {
+  it("lists the 12 steps with their guidance, video slots and checks", async () => {
     const body = (await ctx.call("GET", "/v1/admin/steps", { cookie: owner })).json();
-    expect(body.steps).toHaveLength(11);
+    expect(body.steps).toHaveLength(12);
     expect(body.steps[0]).toMatchObject({ key: "start_here", emptyVideoSlots: 1, checkQuestionCount: 0 });
+    expect(body.steps[1]).toMatchObject({ key: "ai_agent", position: 1, emptyVideoSlots: 1, checkQuestionCount: 0 });
     expect(body.steps.find((step: { key: string }) => step.key === "platform_logins")).toMatchObject({ videoCount: 1, emptyVideoSlots: 2, checkQuestionCount: 0 });
     expect(body.steps.find((step: { key: string }) => step.key === "license_bond")).toMatchObject({ checkQuestionCount: 1 });
     const detail = (await ctx.call("GET", "/v1/admin/steps/license_bond", { cookie: owner })).json();
@@ -137,6 +147,34 @@ describe("the admin step editor", () => {
     const [w9] = await ctx.db.select({ id: onboardingSteps.id }).from(onboardingSteps).where(eq(onboardingSteps.key, "w9"));
     const audits = await ctx.db.select().from(auditLog).where(and(eq(auditLog.entityId, w9!.id), eq(auditLog.action, "step.guidance_updated")));
     expect(audits).toHaveLength(1);
+  });
+
+  it("edits a step's title, sub-header, short title and summary, and writes step.copy_updated", async () => {
+    const before = (await ctx.call("GET", "/v1/admin/steps/headshot", { cookie: owner })).json();
+    expect(before.step).toMatchObject({ title: "Upload a professional headshot", shortTitle: "Professional headshot", summary: expect.stringContaining("A recent photo") });
+    const blank = await ctx.call("PATCH", "/v1/admin/steps/headshot", { cookie: owner, body: { title: " " } });
+    expect(blank.statusCode).toBe(400);
+    const saved = await ctx.call("PATCH", "/v1/admin/steps/headshot", {
+      cookie: owner,
+      body: { title: "  Send us your headshot  ", intro: "A sharp photo for your profile.", shortTitle: "Headshot", summary: "One photo, shoulders up." },
+    });
+    expect(saved.statusCode).toBe(200);
+    const step = (await ctx.call("GET", "/v1/me/steps/headshot", { cookie: broker.cookie })).json();
+    expect(step).toMatchObject({ title: "Send us your headshot", intro: "A sharp photo for your profile.", shortTitle: "Headshot", summary: "One photo, shoulders up." });
+    const [headshot] = await ctx.db.select({ id: onboardingSteps.id }).from(onboardingSteps).where(eq(onboardingSteps.key, "headshot"));
+    const audits = await ctx.db.select().from(auditLog).where(eq(auditLog.entityId, headshot!.id));
+    expect(audits).toMatchObject([
+      {
+        action: "step.copy_updated",
+        before: { title: "Upload a professional headshot", shortTitle: "Professional headshot" },
+        after: { title: "Send us your headshot", intro: "A sharp photo for your profile.", shortTitle: "Headshot", summary: "One photo, shoulders up." },
+      },
+    ]);
+  });
+
+  it("refuses a title edit from a broker", async () => {
+    const response = await ctx.call("PATCH", "/v1/admin/steps/headshot", { cookie: broker.cookie, body: { title: "Hacked" } });
+    expect(response.statusCode).toBe(403);
   });
 
   it("adds a video slot, sets an embed link, clears it and removes the slot", async () => {

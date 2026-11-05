@@ -19,7 +19,7 @@ let daniel: Awaited<ReturnType<TestContext["createBroker"]>>;
 let marisol: Awaited<ReturnType<TestContext["createBroker"]>>;
 
 const ALL_BUT_LAST = [
-  "start_here", "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
+  "start_here", "ai_agent", "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
   "dbpr_filing", "license_bond", "email_signature",
 ];
 
@@ -45,8 +45,8 @@ describe("review queue", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       status: "submitted",
-      position: 3,
-      totalSteps: 11,
+      position: 4,
+      totalSteps: 12,
       stageTitle: "Paperwork",
       step: { key: "bio", shortTitle: "Professional bio" },
       broker: { name: "Daniel Reyes", firstName: "Daniel" },

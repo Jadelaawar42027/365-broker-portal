@@ -1,8 +1,9 @@
 /**
  * File: apps/web/e2e/journey-8-step-guidance.spec.ts
- * Purpose: The short onboarding-step layout (SPEC D28) end to end. An admin edits a step's What to do bullets and puts
- * a YouTube link in one of step 10's video slots; the broker sees the videos first (with "on its way" placeholders for
- * the empty slots), the bullets, the callouts and the manual's text behind "Read the full section"; and on step 8 the
+ * Purpose: The short onboarding-step layout (SPEC D28) end to end. An admin edits a step's What to do bullets and its
+ * sub-header, and puts a YouTube link in one of step 11's video slots; the broker sees the videos first (with "on its
+ * way" placeholders for the empty slots), the new sub-header, the bullets, the callouts and the manual's text behind
+ * "Read the full section"; step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
  * send button stays disabled until the deposit question is answered correctly, after a wrong try with its explanation.
  *
  * Functions:
@@ -32,6 +33,11 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await todo.fill(`${await todo.inputValue()}\nAsk Shelly if the signature looks wrong.`);
   await page.getByRole("button", { name: "Save guidance" }).click();
   await expect(page.getByText("Saved. Brokers see the change now.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit titles" }).click();
+  await page.getByLabel("Sub-header").fill("Your 365 email is where every client record lives.");
+  await page.getByRole("button", { name: "Save titles" }).click();
+  await expect(page.getByRole("button", { name: "Edit titles" })).toBeVisible();
+  await expect(page.getByText("Your 365 email is where every client record lives.")).toBeVisible();
 
   const broker = await createSignedInBroker(browser, "Marco Silva");
   await broker.context.route(VIDEO_HOSTS, (route) => route.abort());
@@ -50,7 +56,13 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
 
   await brokerPage.goto("/app/steps/email_signature");
   await expect(brokerPage.getByText("Ask Shelly if the signature looks wrong.")).toBeVisible();
+  await expect(brokerPage.getByText("Your 365 email is where every client record lives.")).toBeVisible();
   await expect(brokerPage.getByText("HOUSE RULE", { exact: true }).first()).toBeVisible();
+
+  await brokerPage.goto("/app/steps/ai_agent");
+  await expect(brokerPage.getByText("Step 1 of 12 · Start here")).toBeVisible();
+  const chat = brokerPage.getByRole("link", { name: /Start chat with AI agent/ });
+  await expect(chat).toHaveAttribute("href", /^https:\/\/wa\.me\/19547381542\?text=Hey%20365%20Yachts%20AI%2C%20it's%20Marco%20Silva\./);
 
   await brokerPage.goto("/app/steps/license_bond");
   await expect(brokerPage.getByText("NEVER", { exact: true }).first()).toBeVisible();
@@ -75,6 +87,6 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(send).toBeEnabled();
   await send.click();
   await brokerPage.waitForURL("**/app");
-  await expect(brokerPage.getByText("You've sent in 1 of 11 steps")).toBeVisible();
+  await expect(brokerPage.getByText("You've sent in 1 of 12 steps")).toBeVisible();
   await broker.context.close();
 });

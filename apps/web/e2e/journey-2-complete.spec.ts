@@ -1,6 +1,6 @@
 /**
  * File: apps/web/e2e/journey-2-complete.spec.ts
- * Purpose: Journey 2 from docs/SPEC.md: a broker completes every step (step 0, uploads, signing both agreements, bio,
+ * Purpose: Journey 2 from docs/SPEC.md: a broker completes every step (steps 0 and 1, uploads, signing both agreements, bio,
  * choice, confirmation, checklist), the agreements are countersigned automatically with the owner's stored signature,
  * an admin approves each other submission and the last approval makes them active, the broker sees the onboarding-complete
  * screen with their two commission splits, and the admin sees them as Active.
@@ -18,7 +18,7 @@ test("a broker completes onboarding and becomes active", async ({ page, browser 
   await setUpCompanySignature(page);
   const broker = await createSignedInBroker(browser, name);
   await completeBrokerSteps(broker.page);
-  await expect(broker.page.getByText("You've sent in 11 of 11 steps and 5 are approved")).toBeVisible();
+  await expect(broker.page.getByText("You've sent in 12 of 12 steps and 6 are approved")).toBeVisible();
 
   for (let round = 0; round < 6; round += 1) {
     await page.goto("/admin/reviews");
