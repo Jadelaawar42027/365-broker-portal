@@ -3,13 +3,15 @@
  * Purpose: The interactive part of a step page (screen 1c). Upload steps get the drop zone, "Choose a file",
  * "Take a photo", the uploaded-file cards and "Send to Shelly for approval"; other steps get the matching answer
  * (bio text, a choice, a confirmation or a checklist). When the step has a knowledge check (SPEC D28), the send
- * button stays disabled until every check answer is right, and those answers go with the submission. Submitting
+ * button stays disabled until every check answer is right, and those answers go with the submission. When the step
+ * needs its video watched (SPEC D32), the answer is locked with a note until the video above is watched. Submitting
  * returns the broker to their checklist.
  *
  * Functions:
  * - StepForm({ step, supportName }): renders the right form for the step kind, the knowledge check if any, and sends it.
  * - UploadArea({ step, files, setFiles }): the drop zone and file cards; uploads each picked file straight away, skipping duplicates, files past the step's file limit and images smaller than config.minImagePx.
- * - AnswerFields({ step, answer, setAnswer }): the text (with character and word counts), choice, confirm or checklist inputs.
+ * - AnswerFields({ step, answer, setAnswer, locked }): the text (with character and word counts), choice, confirm or checklist inputs; locked disables them.
+ * - VideoLockNote({ step }): the note above a locked answer saying the video must be watched first (or isn't ready yet).
  * - bioCountMessage(step, text): the "120 words · looks good" style line under the bio box, and whether the text is within limits.
  * - fileLimitText(min, max): "1 file" / "1 or 2 files" / "2 to 5 files" wording for the drop zone.
  * - initialAnswer(step): the starting answer, pre-filled from a previous submission.
@@ -17,12 +19,12 @@
  */
 "use client";
 
-import { countWords, fileCountLimits, formatFileSize, type StepDetailResponse, type UploadTargetResponse } from "@bp/shared";
+import { countWords, fileCountLimits, formatFileSize, hasVideoContent, type StepDetailResponse, type UploadTargetResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent } from "react";
 import { FormMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, UploadIcon } from "@/components/ui/icons";
+import { CheckIcon, PlayIcon, UploadIcon } from "@/components/ui/icons";
 import { apiRequest, ApiError, uploadToTarget } from "@/lib/api-client";
 import { StepCheck } from "./step-check";
 import { checkFileBeforeUpload, checkImageDimensions, describeAcceptedTypes } from "@/lib/steps";
@@ -86,6 +88,7 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
   const [busy, setBusy] = useState(false);
   const [checkAnswers, setCheckAnswers] = useState<Record<string, string>>({});
   const checkPassed = step.checkQuestions.every((question) => checkAnswers[question.id]);
+  const videoLocked = step.videoRequired && !step.videosWatched;
 
   const uploaded = files.filter((file) => file.state === "uploaded");
   const uploading = files.some((file) => file.state === "uploading");
@@ -127,7 +130,10 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
       {step.kind === "upload" ? (
         <UploadArea step={step} files={files} setFiles={setFiles} />
       ) : (
-        <AnswerFields step={step} answer={answer} setAnswer={setAnswer} />
+        <>
+          {videoLocked ? <VideoLockNote step={step} /> : null}
+          <AnswerFields step={step} answer={answer} setAnswer={setAnswer} locked={videoLocked} />
+        </>
       )}
       {step.checkQuestions.length ? (
         <StepCheck
@@ -138,7 +144,7 @@ export function StepForm({ step, supportName }: { step: StepDetailResponse; supp
         />
       ) : null}
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
-      <Button size="xl" className="w-full" disabled={!ready || !checkPassed || busy} onClick={send}>
+      <Button size="xl" className="w-full" disabled={!ready || !checkPassed || videoLocked || busy} onClick={send}>
         {busy ? "Sending…" : label}
       </Button>
     </div>
@@ -302,7 +308,21 @@ function UploadArea({
   );
 }
 
-function AnswerFields({ step, answer, setAnswer }: { step: StepDetailResponse; answer: Answer; setAnswer: (answer: Answer) => void }) {
+function VideoLockNote({ step }: { step: StepDetailResponse }) {
+  const hasVideo = step.videos.some(hasVideoContent);
+  return (
+    <div role="status" className="flex gap-3 rounded-2xl border border-warn-line bg-warn-soft px-5 py-4">
+      <PlayIcon className="mt-1 size-5 shrink-0 text-warn" />
+      <p className="text-lg text-[#5b3a10]">
+        {hasVideo
+          ? "Watch the whole video above first. This box unlocks once you've watched it."
+          : "The video for this step is on its way. You can carry on with the next steps meanwhile."}
+      </p>
+    </div>
+  );
+}
+
+function AnswerFields({ step, answer, setAnswer, locked = false }: { step: StepDetailResponse; answer: Answer; setAnswer: (answer: Answer) => void; locked?: boolean }) {
   if (step.kind === "text") {
     const count = bioCountMessage(step, answer.text);
     return (
@@ -356,14 +376,14 @@ function AnswerFields({ step, answer, setAnswer }: { step: StepDetailResponse; a
       ? [{ value: "confirmed", label: step.config.confirmLabel ?? "I've done this" }]
       : (step.config.items ?? []);
   return (
-    <fieldset className="space-y-3">
+    <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <legend className="mb-3 text-xl font-bold">{step.kind === "confirm" ? "Confirm when it's done" : "Tick each one when it's done"}</legend>
       {items.map((item) => {
         const checked = step.kind === "confirm" ? answer.confirmed : answer.checked.includes(item.value);
         return (
           <label
             key={item.value}
-            className={`flex min-h-14 cursor-pointer items-center gap-4 rounded-2xl border-2 bg-white px-5 py-4 text-lg font-semibold ${checked ? "border-success bg-success-soft" : "border-line"}`}
+            className={`flex min-h-14 items-center gap-4 rounded-2xl border-2 bg-white px-5 py-4 text-lg font-semibold ${locked ? "cursor-not-allowed" : "cursor-pointer"} ${checked ? "border-success bg-success-soft" : "border-line"}`}
           >
             <input
               type="checkbox"

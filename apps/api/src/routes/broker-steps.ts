@@ -4,20 +4,26 @@
  * (with its short guidance, video slots and knowledge-check questions, never their answers), the template download, a
  * fresh play link for an uploaded step video, checking one knowledge-check answer, getting an upload target, and
  * submitting a step (refused until every knowledge-check answer is correct, SPEC D28; step 3 is signed through the
- * contract routes instead, SPEC D31). A broker can only ever reach
+ * contract routes instead, SPEC D31), recording how far they've watched a step video, and refusing to finish a step
+ * with config.requireVideo until its video is watched (the CRM training, SPEC D32). A broker can only ever reach
  * their own steps.
  *
  * Functions:
- * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url (at most UPLOAD_LINKS_PER_HOUR per step) and POST /v1/me/steps/:key/submit (an answer step that can't be sent now is refused before its answer is checked; upload steps must send between the step's minFiles and maxFiles).
+ * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/videos/:videoId/progress (uploaded videos), POST /v1/me/steps/:key/videos/:videoId/watched (embedded videos), POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url (at most UPLOAD_LINKS_PER_HOUR per step) and POST /v1/me/steps/:key/submit (an answer step that can't be sent now is refused before its answer is checked; upload steps must send between the step's minFiles and maxFiles).
  * - requireOwnStep(app, brokerId, key): loads the broker's own step by key or throws 404.
+ * - requireOwnStepVideo(app, brokerId, key, videoId): loads the broker's own step and one of its video slots, or throws 404.
+ * - loadWatchedVideos(app, brokerId, stepId): the step's videos as the broker sees them, with whether each one is watched.
+ * - assertRequiredVideoWatched(app, row, brokerId): throws 409 when the step needs its video watched and it isn't yet (or no video has been added).
  * - choiceOnStep(rows, stepKey): the broker's saved choice answer on that step, or null (picks the guide a step with config.paths shows).
  * - notifyAdminsBrokerNeedsHelp(app, log, input): emails every admin when a broker's answer is one of the step's alertChoices (e.g. "I'm not sure, I'd like help").
  * - notifyOnboardingComplete(app, log, brokerId): emails the broker and every admin that onboarding is complete.
  */
 import { brokers, users } from "@bp/db";
 import {
+  areStepVideosWatched,
   CONTRACT_STEP_KEY,
   countProgress,
+  hasVideoContent,
   downloadUrlResponseSchema,
   errorResponseSchema,
   findNextStep,
@@ -31,6 +37,8 @@ import {
   stepCheckRequestSchema,
   stepCheckResponseSchema,
   stepDetailResponseSchema,
+  stepVideoProgressRequestSchema,
+  stepVideoProgressResponseSchema,
   submitStepRequestSchema,
   submitStepResponseSchema,
   uploadTargetResponseSchema,
@@ -57,7 +65,17 @@ import {
   toStepSummary,
   type VerifiedFile,
 } from "../services/steps";
-import { loadStepQuestions, loadStepVideos, STEP_VIDEO_URL_TTL_SECONDS, toBrokerCheckQuestion, toBrokerStepVideo, toGuidanceView } from "../services/step-content";
+import {
+  loadStepQuestions,
+  loadStepVideoProgress,
+  loadStepVideos,
+  markStepVideoWatched,
+  recordStepVideoProgress,
+  STEP_VIDEO_URL_TTL_SECONDS,
+  toBrokerCheckQuestion,
+  toBrokerStepVideo,
+  toGuidanceView,
+} from "../services/step-content";
 import { adminEmails, todayFor, webLink } from "../services/support";
 import { assertUploadAllowed, createUploadTarget, takeUploadLink, verifySubmittedFiles } from "../services/uploads";
 
@@ -69,6 +87,28 @@ async function requireOwnStep(app: FastifyInstance, brokerId: string, key: strin
   const row = await loadBrokerStepByKey(app.deps.db, brokerId, key);
   if (!row) throw notFound("That onboarding step doesn't exist.");
   return row;
+}
+
+async function requireOwnStepVideo(app: FastifyInstance, brokerId: string, key: string, videoId: string) {
+  const row = await requireOwnStep(app, brokerId, key);
+  const video = (await loadStepVideos(app.deps.db, row.stepId)).find((candidate) => candidate.id === videoId);
+  if (!video) throw notFound("That video doesn't exist.");
+  return { row, video };
+}
+
+async function loadWatchedVideos(app: FastifyInstance, brokerId: string, stepId: string) {
+  const videos = await loadStepVideos(app.deps.db, stepId);
+  const progress = await loadStepVideoProgress(app.deps.db, brokerId, videos.map((video) => video.id));
+  return Promise.all(videos.map((video) => toBrokerStepVideo(app.deps, video, progress.get(video.id))));
+}
+
+async function assertRequiredVideoWatched(app: FastifyInstance, row: { stepId: string; config: { requireVideo?: boolean } }, brokerId: string) {
+  if (!row.config.requireVideo) return;
+  const videos = await loadWatchedVideos(app, brokerId, row.stepId);
+  if (!videos.some(hasVideoContent)) {
+    throw conflict("The video for this step isn't ready yet. You can carry on with the next steps meanwhile.", "video_not_ready");
+  }
+  if (!areStepVideosWatched(videos)) throw conflict("Watch the whole video before you finish this step.", "video_not_watched");
 }
 
 export async function notifyOnboardingComplete(app: FastifyInstance, log: FastifyBaseLogger, brokerId: string) {
@@ -169,14 +209,16 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       const files = latestVersionFiles(await loadFiles(app.deps.db, [row.brokerStepId]));
       const { reviewChecklist: _reviewChecklist, alertChoices: _alertChoices, ...config } = row.config;
       const pathChoice = choiceOnStep(rows, row.config.paths?.fromStep);
-      const videos = await loadStepVideos(app.deps.db, row.stepId);
+      const videos = await loadWatchedVideos(app, actor.brokerId!, row.stepId);
       const questions = await loadStepQuestions(app.deps.db, row.stepId);
       return {
         ...toStepSummary(row, next?.key ?? null),
         intro: row.intro,
         instructionsMd: row.instructionsMd,
         guidance: toGuidanceView(row),
-        videos: await Promise.all(videos.map((video) => toBrokerStepVideo(app.deps, video))),
+        videos,
+        videoRequired: Boolean(row.config.requireVideo),
+        videosWatched: areStepVideosWatched(videos),
         checkQuestions: questions.map(toBrokerCheckQuestion),
         videoUrl: row.videoUrl,
         acceptedTypes: row.acceptedTypes,
@@ -234,6 +276,51 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       if (!video || video.source !== "upload") throw notFound("That video doesn't exist.");
       const { playUrl } = await toBrokerStepVideo(app.deps, video);
       return { url: playUrl!, expiresAt: new Date(app.deps.now().getTime() + STEP_VIDEO_URL_TTL_SECONDS * 1000).toISOString() };
+    },
+  );
+
+  r.post(
+    "/v1/me/steps/:key/videos/:videoId/progress",
+    {
+      preHandler: requireBroker,
+      schema: {
+        tags: ["broker"],
+        summary: "Video watch heartbeat for an uploaded step video: furthest second watched (watched at 90%)",
+        params: videoParams,
+        body: stepVideoProgressRequestSchema,
+        response: { 200: stepVideoProgressResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, ...brokerErrors },
+      },
+    },
+    async (request) => {
+      const actor = currentActor(request);
+      const { video } = await requireOwnStepVideo(app, actor.brokerId!, request.params.key, request.params.videoId);
+      if (video.source !== "upload") throw conflict("Use \"I've watched this video\" for this video.", "not_an_uploaded_video");
+      return recordStepVideoProgress(app.deps.db, {
+        brokerId: actor.brokerId!,
+        video,
+        watchedSeconds: request.body.watchedSeconds,
+        durationSeconds: request.body.durationSeconds,
+        now: app.deps.now(),
+      });
+    },
+  );
+
+  r.post(
+    "/v1/me/steps/:key/videos/:videoId/watched",
+    {
+      preHandler: requireBroker,
+      schema: {
+        tags: ["broker"],
+        summary: "Mark an embedded (YouTube, Loom or Vimeo) step video as watched",
+        params: videoParams,
+        response: { 200: stepVideoProgressResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, ...brokerErrors },
+      },
+    },
+    async (request) => {
+      const actor = currentActor(request);
+      const { video } = await requireOwnStepVideo(app, actor.brokerId!, request.params.key, request.params.videoId);
+      if (video.source !== "embed") throw conflict("Watch this video to the end; it's marked as watched automatically.", "not_an_embedded_video");
+      return markStepVideoWatched(app.deps.db, { brokerId: actor.brokerId!, videoId: video.id, now: app.deps.now() });
     },
   );
 
@@ -309,6 +396,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
         throw conflict("Your Sales Executive marks this step done after your one-on-one.", "admin_only_step");
       }
       if (row.key === CONTRACT_STEP_KEY) throw conflict("Sign your agreements on this page instead of uploading them.", "use_contract_signing");
+      await assertRequiredVideoWatched(app, row, actor.brokerId!);
       const questions = await loadStepQuestions(app.deps.db, row.stepId);
       if (questions.length > 0 && !isStepCheckPassed(questions, request.body.checkAnswers)) {
         throw conflict("Answer the quick check correctly before you send this step.", "check_not_passed");

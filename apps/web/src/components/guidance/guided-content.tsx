@@ -2,13 +2,14 @@
  * File: apps/web/src/components/guidance/guided-content.tsx
  * Purpose: The short layout every onboarding step and lesson uses (SPEC D28): a "What to do" card with 3 to 5 bullets
  * (and any buttons the step needs), the NEVER / WATCH / HOUSE RULE callouts as one-line boxes, and the manual's
- * original text in a collapsed "Read the full section" panel.
+ * original text in a collapsed "Read the full section" panel. A step can rename the panel (e.g. "Read along with the
+ * video" with "Transcript" on the right, for the CRM training transcript).
  *
  * Functions:
- * - GuidedContent({ todoItems, callouts, fullTextMd, inCard, children }): renders the three parts in that order; inCard drops the outer card frames when it sits inside a card already.
+ * - GuidedContent({ todoItems, callouts, fullTextMd, fullTextLabel, fullTextSource, inCard, children }): renders the three parts in that order; inCard drops the outer card frames when it sits inside a card already; fullTextLabel and fullTextSource rename the panel.
  * - CalloutBox({ kind, lines }): one box with the callout label and its lines; one line each when a kind repeats.
  * - groupCallouts(callouts): joins callouts of the same kind that follow each other, so five NEVERs share one box.
- * - FullSection({ markdown, inCard }): the collapsed panel with the manual's text.
+ * - FullSection({ markdown, label, source, inCard }): the collapsed panel with the manual's text (or a transcript), titled label with source on the right.
  */
 import type { GuidanceCallout } from "@bp/shared";
 import type { ReactNode } from "react";
@@ -49,13 +50,13 @@ export function CalloutBox({ kind, lines }: { kind: GuidanceCallout["kind"]; lin
   );
 }
 
-function FullSection({ markdown, inCard }: { markdown: string; inCard: boolean }) {
+function FullSection({ markdown, label, source, inCard }: { markdown: string; label: string; source: string; inCard: boolean }) {
   return (
     <details className={`group rounded-2xl border border-line ${inCard ? "bg-page" : "bg-white"}`}>
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-6 py-4 text-lg font-bold hover:bg-page focus-visible:outline-3 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
         <ChevronRightIcon className="size-5 shrink-0 text-brand transition-transform group-open:rotate-90" />
-        Read the full section
-        <span className="ml-auto hidden text-[15px] font-semibold text-muted sm:inline">From the manual</span>
+        {label}
+        <span className="ml-auto hidden text-[15px] font-semibold text-muted sm:inline">{source}</span>
       </summary>
       <div className="space-y-5 rounded-b-2xl border-t border-line bg-white px-6 py-6">
         <LessonBody markdown={markdown} />
@@ -68,12 +69,16 @@ export function GuidedContent({
   todoItems,
   callouts,
   fullTextMd,
+  fullTextLabel = "Read the full section",
+  fullTextSource = "From the manual",
   inCard = false,
   children,
 }: {
   todoItems: string[];
   callouts: GuidanceCallout[];
   fullTextMd: string;
+  fullTextLabel?: string;
+  fullTextSource?: string;
   inCard?: boolean;
   children?: ReactNode;
 }) {
@@ -100,7 +105,7 @@ export function GuidedContent({
           ))}
         </div>
       ) : null}
-      {fullTextMd.trim() ? <FullSection markdown={fullTextMd} inCard={inCard} /> : null}
+      {fullTextMd.trim() ? <FullSection markdown={fullTextMd} label={fullTextLabel} source={fullTextSource} inCard={inCard} /> : null}
     </div>
   );
 }

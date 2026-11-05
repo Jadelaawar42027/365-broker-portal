@@ -131,6 +131,8 @@ export const stepVideoViewSchema = z.object({
   provider: z.enum(VIDEO_PROVIDERS).nullable(),
   embedUrl: z.string().nullable(),
   playUrl: z.string().nullable(),
+  watched: z.boolean().describe("True once this broker has watched the video (90% of an upload, or marked watched for an embed)"),
+  watchedSeconds: z.number().int().describe("Furthest second of an uploaded video this broker has watched"),
 });
 export type StepVideoView = z.infer<typeof stepVideoViewSchema>;
 
@@ -146,6 +148,8 @@ export const stepDetailResponseSchema = stepSummarySchema.extend({
   instructionsMd: z.string(),
   guidance: guidanceViewSchema.nullable(),
   videos: z.array(stepVideoViewSchema),
+  videoRequired: z.boolean().describe("True when the step can't be finished until its video is watched (config.requireVideo)"),
+  videosWatched: z.boolean().describe("True when the step has a video and the broker has watched all of them"),
   checkQuestions: z.array(stepCheckQuestionViewSchema),
   videoUrl: z.string().nullable(),
   acceptedTypes: z.array(z.string()),
@@ -199,6 +203,12 @@ export const submitStepResponseSchema = z.object({
 
 export const stepCheckRequestSchema = z.object({ questionId: z.uuid(), optionId: z.uuid() });
 export const stepCheckResponseSchema = z.object({ correct: z.boolean(), explanation: z.string() });
+
+export const stepVideoProgressRequestSchema = z.object({
+  watchedSeconds: z.number().int().min(0).max(24 * 60 * 60),
+  durationSeconds: z.number().int().positive().max(24 * 60 * 60).optional(),
+});
+export const stepVideoProgressResponseSchema = z.object({ watched: z.boolean(), watchedSeconds: z.number().int() });
 export type StepCheckResponse = z.infer<typeof stepCheckResponseSchema>;
 
 export const downloadUrlResponseSchema = z.object({ url: z.string(), expiresAt: timestampSchema });

@@ -1,9 +1,12 @@
 /**
  * File: packages/db/src/seed/steps.ts
  * Purpose: The onboarding steps from docs/SPEC.md: the two "Start here" steps (step 0, Aj's portal walkthrough video, and
- * step 1, Aj's personal AI agent video; SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
+ * step 1, Aj's personal AI agent video; SPEC D30), then the 12 steps with copy taken from the mockups and the 365 Broker
  * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
- * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Upload
+ * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Step 10 is
+ * now "Log in to your 365 Yachts email" (no brand signature), and the old platform logins step is retired and split
+ * into CRM sign in and training (its video must be watched before it can be ticked; copy in crm-training.ts), BoatWizard
+ * sign in and YachtCloser sign in, steps 11 to 13 (SPEC D32, migration 0019). Upload
  * steps carry their own file-count limits (minFiles/maxFiles) and the bio its word limits; migration 0014 adds them to existing databases.
  * The DBPR confirmation is PDF only (migration 0015). Steps 7 to 9 use the licensing guides in
  * license-paths.ts: step 7's answer picks the guide steps 8 and 9 show, and "not sure" emails the admins (migration 0016).
@@ -12,6 +15,7 @@
  * - none
  */
 import { MAX_UPLOAD_BYTES, type StepConfig, type StepKind, type StepStage } from "@bp/shared";
+import { CRM_TRAINING_INTRO } from "./crm-training";
 import { DBPR_FILING_PATHS, LICENSE_BOND_PATHS, LICENSE_CHOICE_VALUES, LICENSE_CHOICES } from "./license-paths";
 
 export type StepSeed = {
@@ -273,49 +277,91 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     key: "email_signature",
     position: 10,
     stage: "your_tools",
-    title: "Activate your 365 email and install the brand signature",
-    shortTitle: "365 email + brand signature",
-    summary: "All client communication runs through your 365 email with the brand signature. Takes about 10 minutes.",
-    intro:
-      "House rule: anything that counts as a record goes through your 365 Yachts email with the brand signature. Texts and calls are fine, but never use personal email for client business.",
+    title: "Log in to your 365 Yachts email",
+    shortTitle: "Log in to your 365 email",
+    summary: "Sign in to the 365 Yachts email we made for you and pick your own password. Takes about 5 minutes.",
+    intro: "All your client email runs through your 365 Yachts address. Your email address and starting password are below.",
     kind: "confirm",
     needsApproval: false,
     instructionsMd: [
-      "1. Sign in to your 365 Yachts email with the details you received.",
-      "2. Install the 365 brand signature block with the logo.",
-      "3. Send yourself a test email to check the signature looks right.",
+      "1. Open Gmail and sign in with your 365 email and the starting password below.",
+      "2. Pick your own password when Google asks.",
+      "3. Tick the box once you're signed in.",
+    ].join("\n"),
+    acceptedTypes: [],
+    maxSizeBytes: MAX_UPLOAD_BYTES,
+    config: {
+      minutes: 5,
+      confirmLabel: "I've logged in to my 365 Yachts email",
+    },
+  },
+  {
+    key: "crm_login",
+    position: 11,
+    stage: "your_tools",
+    title: "CRM sign in and training",
+    shortTitle: "CRM sign in and training",
+    summary: "Watch Aj's CRM training, then sign in to GoHighLevel. Takes about 20 minutes.",
+    intro: CRM_TRAINING_INTRO,
+    kind: "confirm",
+    needsApproval: false,
+    instructionsMd: [
+      "1. Watch the CRM training video.",
+      "2. Sign in to GoHighLevel with the login details you received.",
+      "3. Tick the box once you're signed in.",
+    ].join("\n"),
+    acceptedTypes: [],
+    maxSizeBytes: MAX_UPLOAD_BYTES,
+    config: {
+      minutes: 20,
+      confirmLabel: "I've watched the CRM training and signed in to GoHighLevel",
+      fullTextLabel: "Read along with the video",
+      fullTextSource: "Transcript",
+      requireVideo: true,
+    },
+  },
+  {
+    key: "boatwizard_login",
+    position: 12,
+    stage: "your_tools",
+    title: "Sign in to BoatWizard",
+    shortTitle: "BoatWizard sign in",
+    summary: "Sign in to BoatWizard, the MLS, and run one practice search. Takes about 10 minutes.",
+    intro: "BoatWizard / YachtWorld is the MLS: listings, buyer searches and sold comps.",
+    kind: "confirm",
+    needsApproval: false,
+    instructionsMd: [
+      "1. Sign in to BoatWizard with the login details you received.",
+      "2. Run one practice search.",
+      "3. Tick the box once you've done it.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
       minutes: 10,
-      confirmLabel: "I've activated my 365 email and installed the brand signature",
+      confirmLabel: "I signed in to BoatWizard and ran one practice search",
     },
   },
   {
-    key: "platform_logins",
-    position: 11,
+    key: "yachtcloser_login",
+    position: 13,
     stage: "your_tools",
-    title: "Log in to BoatWizard, YachtCloser and GoHighLevel",
-    shortTitle: "BoatWizard, YachtCloser, GoHighLevel logins",
-    summary: "Log in to the three platforms you'll use every day and take one first action in each.",
-    intro: "These are the tools you sell with: the MLS, contracts and closing, and your CRM.",
-    kind: "checklist",
+    title: "Sign in to YachtCloser",
+    shortTitle: "YachtCloser sign in",
+    summary: "Sign in to YachtCloser and review a sample deal file. Takes about 10 minutes.",
+    intro: "YachtCloser handles contracts, e-signatures, deals and closing statements.",
+    kind: "confirm",
     needsApproval: false,
     instructionsMd: [
-      "1. BoatWizard / YachtWorld is the MLS: listings, buyer searches and sold comps.",
-      "2. YachtCloser handles contracts, e-signatures, deals and closing statements.",
-      "3. GoHighLevel is the CRM: leads, pipeline, follow-ups and campaigns.",
+      "1. Sign in to YachtCloser with the login details you received.",
+      "2. Open a sample deal file and look through it.",
+      "3. Tick the box once you've done it.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
-      minutes: 30,
-      items: [
-        { value: "boatwizard", label: "I logged in to BoatWizard and ran one practice search", videoUrl: null },
-        { value: "yachtcloser", label: "I logged in to YachtCloser and reviewed a sample deal file", videoUrl: null },
-        { value: "gohighlevel", label: "I logged in to GoHighLevel and started loading my contacts", videoUrl: null },
-      ],
+      minutes: 10,
+      confirmLabel: "I signed in to YachtCloser and reviewed a sample deal file",
     },
   },
 ];

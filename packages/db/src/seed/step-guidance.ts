@@ -7,11 +7,15 @@
  * The two "Start here" steps (SPEC D30) have no manual text: just bullets and one video slot each, step 0 for Aj's
  * platform walkthrough (Part 1) and step 1 for Aj's personal AI agent video (Part 2).
  * Steps 7 to 9 take their bullets and DBPR links from license-paths.ts, next to the step-by-step licensing guides.
+ * Step 10 is the 365 email login only (no brand signature). Steps 11 to 13 (SPEC D32) each have one video slot; step 11,
+ * CRM sign in and training, takes its bullets and its full text (the read-along transcript of Aj's video) from
+ * crm-training.ts.
  *
  * Functions:
  * - none
  */
 import type { GuidanceCallout } from "@bp/shared";
+import { CRM_TRAINING_TODO, CRM_TRAINING_TRANSCRIPT_MD } from "./crm-training";
 import { DBPR_FILING_TODO, DBPR_OFFICIAL_LINKS_MD, LICENSE_BOND_TODO, LICENSE_SITUATION_TODO } from "./license-paths";
 
 export type StepGuidanceSeed = {
@@ -53,7 +57,7 @@ const PLATFORM_TABLE = `## Platform credentials you will receive
 
 | Platform | What it is for | First action |
 |---|---|---|
-| 365 Yachts Email | All client communication. No personal email for client business, ever. | Install the 365 brand signature block with logo |
+| 365 Yachts Email | All client communication. No personal email for client business, ever. | Sign in and pick your own password |
 | BoatWizard / YachtWorld | MLS. Listing your inventory, searching for buyers, sold-boat comps. | Log in, run one practice search |
 | YachtCloser | Contracts, e-signature, listing agreements, deals, closing statements. | Log in, review a sample deal file |
 | GoHighLevel CRM | Leads, pipeline, follow-up tasks, campaigns. | Load your first 100 contacts |`;
@@ -199,38 +203,54 @@ ${FEES_WATCH_FULL}`,
   },
   email_signature: {
     todoItems: [
-      "Sign in to your 365 Yachts email.",
-      "Install the 365 brand signature with the logo.",
-      "Send yourself a test email to check it.",
+      "Open Gmail and sign in with your 365 email and the starting password below.",
+      "Google asks you to pick your own password. Choose one only you know.",
       "From now on, use this address for all client email.",
+      "Tick the box below once you're signed in.",
     ],
-    callouts: [{ kind: "HOUSE RULE", text: "All client email goes through your 365 address with the brand signature. Texts and calls are fine." }],
+    callouts: [{ kind: "HOUSE RULE", text: "All client email goes through your 365 address. Texts and calls are fine." }],
     fullTextMd: `${PLATFORM_TABLE}
 
 > [!HOUSE RULE]
-> All client communication runs through your 365 Yachts email address with the brand signature. This is a compliance and brand-consistency requirement, not a preference. Texts and calls are fine and encouraged — but anything that constitutes a record goes through the corporate account.
+> All client communication runs through your 365 Yachts email address. This is a compliance and brand-consistency requirement, not a preference. Texts and calls are fine and encouraged — but anything that constitutes a record goes through the corporate account.
 
 ## Week 1 checklist (Module 06)
 
-- 365 email active, brand signature installed`,
+- 365 email active`,
   },
-  platform_logins: {
+  crm_login: {
+    todoItems: CRM_TRAINING_TODO,
+    callouts: [{ kind: "HOUSE RULE", text: "Update the Broker outcome buttons after every contact. Shelly tracks your numbers from them." }],
+    videoSlots: ["CRM sign in and training"],
+    fullTextMd: CRM_TRAINING_TRANSCRIPT_MD,
+  },
+  boatwizard_login: {
     todoItems: [
-      "BoatWizard (the MLS): log in and run one practice search.",
-      "YachtCloser (contracts): log in and review a sample deal file.",
-      "GoHighLevel (the CRM): log in and start loading your contacts.",
-      "Aim for 100 contacts in the CRM by day seven.",
+      "Sign in to BoatWizard with the login details you received.",
+      "Run one practice search for a boat a client might want.",
+      "Look at a few sold comps to see recent prices.",
+      "Tick the box below once you've done it.",
     ],
     callouts: [],
-    videoSlots: ["GoHighLevel CRM walkthrough", "BoatWizard walkthrough", "YachtCloser walkthrough"],
+    videoSlots: ["BoatWizard walkthrough"],
     fullTextMd: `${PLATFORM_TABLE}
-
-## Week 1 checklist (Module 06)
-
-- Logged into BoatWizard, YachtCloser, and GoHighLevel
 
 ## Days 1–7 (Your first 90 days)
 
 **Get legal, get logged in, get loud** — Paperwork submitted, licensing started, all four platforms accessed. Build your contact list: everyone you know who owns a boat, works on boats, or is wealthy enough to buy one. Target 100 names in the CRM by day seven.`,
+  },
+  yachtcloser_login: {
+    todoItems: [
+      "Sign in to YachtCloser with the login details you received.",
+      "Open a sample deal file and look through it.",
+      "Tick the box below once you've done it.",
+    ],
+    callouts: [],
+    videoSlots: ["YachtCloser walkthrough"],
+    fullTextMd: `${PLATFORM_TABLE}
+
+## Week 1 checklist (Module 06)
+
+- Logged into BoatWizard, YachtCloser, and GoHighLevel`,
   },
 };
