@@ -8,13 +8,13 @@
  * Functions:
  * - InviteBrokerButton(): the button that opens the dialog.
  * - InviteDialog({ dialogRef }): the native <dialog> with the form, its submission and the link view.
- * - CopyLink({ url, phone, brokerName }): the invite link with a Copy button that confirms when copied, and "Send via WhatsApp" when a phone is given.
+ * - CopyLink({ url, phone, brokerName, note }): the invite link with a Copy button that confirms when copied, a line about how long it works, and "Send via WhatsApp" when a phone is given.
  */
 "use client";
 
 import { buildInviteWhatsAppLink, type CreateBrokerResponse } from "@bp/shared";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent, type RefObject } from "react";
+import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
 import { FormMessage } from "@/components/auth/form-message";
 import { Button, buttonClasses, LinkButton } from "@/components/ui/button";
 import { CloseIcon, PlusIcon, WhatsAppIcon } from "@/components/ui/icons";
@@ -35,16 +35,19 @@ export function InviteBrokerButton() {
   );
 }
 
-export function CopyLink({ url, phone = null, brokerName = "" }: { url: string; phone?: string | null; brokerName?: string }) {
+const BROKER_LINK_NOTE = "It stays the same until they create their account. Making a new link stops this one working.";
+
+export function CopyLink({ url, phone = null, brokerName = "", note = BROKER_LINK_NOTE }: { url: string; phone?: string | null; brokerName?: string; note?: string }) {
   const [copied, setCopied] = useState(false);
+  const inputId = useId();
   const whatsappUrl = phone ? buildInviteWhatsAppLink({ phone, brokerName, inviteUrl: url }) : null;
   return (
     <div className="space-y-2">
-      <label htmlFor="invite-link" className="block text-[15px] font-bold">
+      <label htmlFor={inputId} className="block text-[15px] font-bold">
         Invite link
       </label>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <input id="invite-link" readOnly value={url} onFocus={(event) => event.currentTarget.select()} className={`${inputClasses()} font-mono text-[15px]`} />
+        <input id={inputId} readOnly value={url} onFocus={(event) => event.currentTarget.select()} className={`${inputClasses()} font-mono text-[15px]`} />
         <Button
           variant="outline"
           className="shrink-0"
@@ -57,7 +60,7 @@ export function CopyLink({ url, phone = null, brokerName = "" }: { url: string; 
         </Button>
       </div>
       <p aria-live="polite" className="text-[15px] text-muted">
-        {copied ? "Copied. Paste it into WhatsApp or a text to the broker." : "It works for 7 days and only once. Making a new link stops this one working."}
+        {copied ? "Copied. Paste it into WhatsApp or a text to the broker." : note}
       </p>
       {whatsappUrl ? (
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses("whatsapp", "lg")}>

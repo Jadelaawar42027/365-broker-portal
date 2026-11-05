@@ -15,4 +15,4 @@ export {
   type StorageConfig,
   type StoredObjectInfo,
 } from "./storage";
-export { createAccountToken, hashToken } from "./tokens";
+export { createAccountToken, deriveAccountToken, hashToken } from "./tokens";

@@ -49,7 +49,7 @@ export function buildWhatsAppLink(input: { number: string | null | undefined; me
 export function buildInviteMessage(input: { brokerName: string; inviteUrl: string; senderName?: string | null }): string {
   const first = input.brokerName.trim().split(/\s+/)[0] || "there";
   const sender = input.senderName?.trim() ? ` It's ${input.senderName.trim()} from 365 Yachts.` : "";
-  return `Hi ${first}, welcome to 365 Yachts!${sender} Create your broker portal account here: ${input.inviteUrl} (the link works for 7 days).`;
+  return `Hi ${first}, welcome to 365 Yachts!${sender} Create your broker portal account here: ${input.inviteUrl}`;
 }
 
 export function buildInviteWhatsAppLink(input: { phone: string | null | undefined; brokerName: string; inviteUrl: string; senderName?: string | null }): string | null {

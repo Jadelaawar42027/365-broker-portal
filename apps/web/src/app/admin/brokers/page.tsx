@@ -3,7 +3,8 @@
  * Purpose: Screen 3b, every broker in one table: level, status, joined and onboarded dates, time with us, both commission splits (SPEC D29) and onboarding
  * progress, training progress and average best quiz score (from the broker_training_metrics view), the CRM phone and
  * small Google / GHL account status marks (phase H2), with search
- * (including persona text), status and level filters, CSV export and the invite button. After a broker is deleted it
+ * (including persona text), status and level filters, CSV export, the invite button and "Add an existing broker". The owner also gets a Remove button
+ * on each row, which deletes the broker for good after typing their name. After a broker is deleted it
  * confirms which one.
  *
  * Functions:
@@ -11,18 +12,21 @@
  * - statusTone(status): the pill colour for a broker status.
  * - capitalise(word): "active" → "Active", for levels and statuses.
  * - trainingLabel(training): "3 of 7 chapters", "All 7 chapters", or "—" before training has started.
+ * - hasAccount(accounts): true if the broker has a Google or GHL account that deleting them would leave behind.
  */
 import { formatTenure, todayInTimeZone, type BrokerListResponse, type BrokerStatus } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountStatusMarks } from "@/components/admin/account-status";
+import { AddExistingBrokerButton } from "@/components/admin/add-existing-dialog";
+import { RemoveBrokerButton } from "@/components/admin/delete-broker";
 import { BrokerFilters, ExportCsvButton } from "@/components/admin/broker-filters";
 import { InviteBrokerButton } from "@/components/admin/invite-dialog";
 import { FormMessage } from "@/components/auth/form-message";
 import { Avatar, ProgressBar } from "@/components/ui/misc";
 import { Pill, type PillTone } from "@/components/ui/pill";
 import { formatDate, formatPhone } from "@/lib/format";
-import { serverGet } from "@/lib/server-api";
+import { requireMe, serverGet } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Brokers · 365 Yachts admin" };
 
@@ -38,6 +42,11 @@ function trainingLabel(training: BrokerListResponse["brokers"][number]["training
   return `${training.chaptersPassed} of ${training.chaptersTotal} chapters`;
 }
 
+function hasAccount(accounts: BrokerListResponse["brokers"][number]["accounts"]): boolean {
+  if (!accounts) return false;
+  return [accounts.google, accounts.ghl].some((status) => status === "created" || status === "suspended");
+}
+
 function capitalise(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
@@ -50,6 +59,8 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
   const query = new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}), ...(level ? { level } : {}) });
   const { data } = await serverGet<BrokerListResponse>(`/v1/admin/brokers?${query.toString()}`);
   if (!data) throw new Error("Could not load brokers.");
+  const me = await requireMe();
+  const isOwner = me.user.role === "owner";
   const today = todayInTimeZone();
 
   return (
@@ -64,6 +75,7 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex flex-wrap gap-3">
           <ExportCsvButton rows={data.brokers} />
+          <AddExistingBrokerButton />
           <InviteBrokerButton />
         </div>
       </div>
@@ -95,12 +107,17 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
               <th scope="col" className="px-3 py-4">Avg. quiz</th>
               <th scope="col" className="px-3 py-4">CRM phone</th>
               <th scope="col" className="px-3 py-4">Accounts</th>
+              {isOwner ? (
+                <th scope="col" className="px-4 py-4">
+                  <span className="sr-only">Remove</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="text-base">
             {data.brokers.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-10 text-center text-lg text-muted">
+                <td colSpan={isOwner ? 14 : 13} className="px-4 py-10 text-center text-lg text-muted">
                   No brokers match. Try another search or filter.
                 </td>
               </tr>
@@ -139,6 +156,11 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
                     <td className="px-3 py-3">
                       <AccountStatusMarks accounts={row.accounts} />
                     </td>
+                    {isOwner ? (
+                      <td className="px-4 py-3 text-right">
+                        <RemoveBrokerButton brokerId={row.brokerId} brokerName={row.name} hasExternalAccounts={hasAccount(row.accounts)} />
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })

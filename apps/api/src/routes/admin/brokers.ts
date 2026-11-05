@@ -3,12 +3,15 @@
  * Purpose: Admin routes for managing brokers (3b, 3c): the filtered list (with training progress from the
  * broker_training_metrics view), inviting a new broker (name, E.164 phone, optional email, level and both commission
  * splits; the invite link is always returned so the admin can copy it or send it by WhatsApp, SPEC D29 and phase H2,
- * and the broker's Google Workspace and GoHighLevel accounts are queued for creation), a fresh invite link
- * on demand, the full profile with files, persona and commission history, editing level/status/dates, changing the
+ * and the broker's Google Workspace and GoHighLevel accounts are queued for creation), adding a broker who already works
+ * with 365 Yachts (their existing 365 email is linked instead of creating accounts, and when they are already onboarded every
+ * onboarding step is marked approved so only training is left), a fresh invite link on demand, the full profile with files,
+ * persona, commission history and the broker's invite link (the same link every time until they create their account),
+ * editing level/status/dates, changing the
  * commission split (a new history row; agreements not yet countersigned are voided so the broker signs again, and
  * signed ones return the Section 1.7 addendum warning, SPEC D31), deleting a broker and everything about them for good
  * (owner only, the broker's full name typed to confirm), the persona, resending an invite, sending a reset link and reminders.
- * Setting a broker to inactive deletes their sessions at once (SPEC D9), cancels open account set-up and queues suspending
+ * Setting a broker to inactive deletes their sessions at once (SPEC D9), ends their open invite link, cancels open account set-up and queues suspending
  * their Google account and deactivating their GHL user; reactivating queues unsuspending them (phase H2). The CRM phone
  * is edited here too. The list carries each broker's account status for the icons on 3b. Every change writes audit_log.
  *
@@ -19,8 +22,9 @@
  * - toHistoryEntry(row): shapes a commission_history row for the profile.
  */
 import { randomBytes } from "node:crypto";
-import { addCommissionChange, contractDocuments, voidOpenContracts, brokerMetrics, brokers, brokerTrainingMetrics, commissionHistoryFor, createBroker, currentCommission, sessions, users } from "@bp/db";
+import { addCommissionChange, approveAllSteps, contractDocuments, voidOpenContracts, brokerMetrics, brokers, brokerTrainingMetrics, commissionHistoryFor, createBroker, currentCommission, sessions, users } from "@bp/db";
 import {
+  addExistingBrokerRequestSchema,
   brokerListQuerySchema,
   commissionChangeRequestSchema,
   commissionChangeResponseSchema,
@@ -47,16 +51,17 @@ import {
   type ProvisioningSystem,
   type UpdateBrokerRequest,
 } from "@bp/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { badRequest, conflict, forbidden } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
-import { hasPasswordLogin, issueAccountToken } from "../../services/account-tokens";
+import { hasPasswordLogin, issueAccountToken, issueBrokerInviteToken, revokeOpenTokens } from "../../services/account-tokens";
 import { writeAudit } from "../../services/audit";
 import { deleteBrokerCompletely } from "../../services/broker-deletion";
+import { ensureBrokerInviteUrl, inviteUrl as inviteUrlFor, replaceBrokerInviteUrl } from "../../services/invite-links";
 import { countBrokersByStatus, listBrokerMetrics, loadBrokerWithUser, toBrokerListRow } from "../../services/brokers";
 import { inviteEmail, passwordResetEmail, reminderEmail, resignNeededEmail } from "../../services/emails";
 import { sendSafely } from "../../services/mailer";
@@ -162,7 +167,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           commissionChangedBy: actor.userId,
           commissionNote: "Set at invite",
         });
-        const issued = await issueAccountToken(tx, { userId: created.userId, purpose: "invite", createdBy: actor.userId, now });
+        const issued = await issueBrokerInviteToken(tx, { userId: created.userId, createdBy: actor.userId, now, secret: env.BETTER_AUTH_SECRET });
         await writeAudit(tx, {
           actorUserId: actor.userId,
           action: "broker.created",
@@ -181,11 +186,102 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         return { brokerId: created.brokerId, token: issued };
       });
       app.deps.wakeProvisioning();
-      const inviteUrl = webLink(env, `/invite/${token}`);
+      const inviteUrl = inviteUrlFor(env, token);
       if (request.body.email) {
         await sendSafely(mailer, request.log, [{ to: request.body.email, ...inviteEmail({ name: request.body.name, link: inviteUrl, support: supportContact(env) }) }]);
       }
       return reply.status(201).send({ brokerId, inviteUrl, phone: request.body.phone });
+    },
+  );
+
+  r.post(
+    "/v1/admin/brokers/existing",
+    {
+      schema: {
+        tags: ["admin"],
+        summary: "Add a broker who already works with 365 Yachts and return their sign-in link (no email is sent)",
+        body: addExistingBrokerRequestSchema,
+        response: { 201: createBrokerResponseSchema, 409: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const actor = currentActor(request);
+      const { db, env } = app.deps;
+      const now = app.deps.now();
+      const today = todayFor(now);
+      const body = request.body;
+      const emails = [body.email, body.corporateEmail].filter((value): value is string => Boolean(value)).map((value) => value.toLowerCase());
+      if (emails.length > 0) {
+        const [taken] = await db
+          .select({ id: users.id })
+          .from(users)
+          .leftJoin(brokers, eq(brokers.userId, users.id))
+          .where(or(inArray(users.email, emails), inArray(brokers.corporateEmail, emails)));
+        if (taken) throw conflict("Someone with this email already has an account.", "email_taken");
+      }
+      const onboarded = body.progress === "onboarded";
+      const onboardedAt = onboarded ? (body.onboardedAt ?? (today >= body.joinedAt ? today : body.joinedAt)) : null;
+      const status = onboarded ? "active" : "invited";
+      const corporateEmail = body.corporateEmail?.toLowerCase() ?? null;
+      const { brokerId, token } = await db.transaction(async (tx) => {
+        const created = await createBroker(tx, {
+          name: body.name,
+          email: emails[0] ?? placeholderEmail(randomBytes(9).toString("hex")),
+          phone: body.phone,
+          level: body.level,
+          status,
+          joinedAt: body.joinedAt,
+          onboardedAt,
+          inHouseSplit: body.inHouseSplit ?? null,
+          selfGeneratedSplit: body.selfGeneratedSplit ?? null,
+          commissionChangedBy: actor.userId,
+          commissionNote: body.inHouseSplit != null || body.selfGeneratedSplit != null ? "Set when added" : null,
+        });
+        await tx
+          .update(brokers)
+          .set({ corporateEmail, crmPhone: body.crmPhone ?? null, ...(onboarded ? { welcomeSeenAt: now } : {}) })
+          .where(eq(brokers.id, created.brokerId));
+        await writeAudit(tx, {
+          actorUserId: actor.userId,
+          action: "broker.created",
+          entityType: "broker",
+          entityId: created.brokerId,
+          after: {
+            source: "existing",
+            status,
+            level: body.level,
+            email: body.email ?? null,
+            corporateEmail,
+            phone: body.phone,
+            joinedAt: body.joinedAt,
+            onboardedAt,
+            inHouseSplit: body.inHouseSplit ?? null,
+            selfGeneratedSplit: body.selfGeneratedSplit ?? null,
+          },
+        });
+        if (onboarded) {
+          const approved = await approveAllSteps(tx, { brokerId: created.brokerId, reviewedBy: actor.userId, note: "Onboarded before the portal", now });
+          for (const step of approved) {
+            await writeAudit(tx, {
+              actorUserId: actor.userId,
+              action: "step.approved",
+              entityType: "broker_step",
+              entityId: step.brokerStepId,
+              before: { status: step.before },
+              after: { status: "approved", stepKey: step.stepKey, brokerId: created.brokerId, note: "Onboarded before the portal" },
+            });
+          }
+        }
+        if (corporateEmail) {
+          await enqueueForSystems(tx, { brokerId: created.brokerId, action: "link", integrations: app.deps.integrations, createdBy: actor.userId, now });
+        } else if (!onboarded) {
+          await enqueueForSystems(tx, { brokerId: created.brokerId, action: "create", integrations: app.deps.integrations, createdBy: actor.userId, now });
+        }
+        const issued = await issueBrokerInviteToken(tx, { userId: created.userId, createdBy: actor.userId, now, secret: env.BETTER_AUTH_SECRET });
+        return { brokerId: created.brokerId, token: issued };
+      });
+      app.deps.wakeProvisioning();
+      return reply.status(201).send({ brokerId, inviteUrl: inviteUrlFor(env, token), phone: body.phone });
     },
   );
 
@@ -200,8 +296,14 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
       },
     },
     async (request) => {
-      const { db } = app.deps;
+      const actor = currentActor(request);
+      const { db, env } = app.deps;
       const { broker, user } = await loadBrokerWithUser(db, request.params.id);
+      const hasLogin = await hasPasswordLogin(db, user.id);
+      const inviteUrl =
+        hasLogin || broker.status === "inactive"
+          ? null
+          : await ensureBrokerInviteUrl(db, { env, brokerId: broker.id, userId: user.id, actorUserId: actor.userId, now: app.deps.now() });
       const [metrics] = await db.select().from(brokerMetrics).where(eq(brokerMetrics.brokerId, broker.id));
       const [editor] = broker.personaUpdatedBy
         ? await db.select({ name: personaEditor.name }).from(personaEditor).where(eq(personaEditor.id, broker.personaUpdatedBy))
@@ -227,7 +329,8 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           selfGeneratedSplit: commission.selfGeneratedPct,
           corporateEmail: broker.corporateEmail,
           crmPhone: broker.crmPhone,
-          hasLogin: await hasPasswordLogin(db, user.id),
+          hasLogin,
+          inviteUrl,
         },
         metrics: {
           tenureDays: metrics?.tenureDays ?? 0,
@@ -304,6 +407,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         if (changes.status === "inactive") {
           const revoked = await tx.delete(sessions).where(eq(sessions.userId, broker.userId)).returning({ id: sessions.id });
           sessionsRevoked = revoked.length;
+          await revokeOpenTokens(tx, broker.userId, "invite", app.deps.now());
           await cancelOpenTasks(tx, { brokerId: broker.id, actions: ["create", "link", "unsuspend"], reason: "Cancelled: the broker was set to inactive." });
           provisioning = await enqueueForSystems(tx, { brokerId: broker.id, action: "suspend", integrations: app.deps.integrations, createdBy: actor.userId, now: app.deps.now(), systems: accountSystems(broker) });
         } else if (changes.status && broker.status === "inactive") {
@@ -384,7 +488,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     {
       schema: {
         tags: ["admin"],
-        summary: "Make a fresh invite link to send by hand (the old one stops working)",
+        summary: "Replace the broker's invite link with a new one (the old one stops working)",
         params: idParams,
         response: { 200: inviteLinkResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema },
       },
@@ -395,12 +499,10 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
       const { broker, user } = await loadBrokerWithUser(db, request.params.id);
       if (broker.status === "inactive") throw conflict("This broker is inactive.", "broker_inactive");
       if (await hasPasswordLogin(db, user.id)) throw conflict("This broker already created their account.", "already_signed_up");
-      const token = await db.transaction(async (tx) => {
-        const issued = await issueAccountToken(tx, { userId: user.id, purpose: "invite", createdBy: actor.userId, now: app.deps.now() });
-        await writeAudit(tx, { actorUserId: actor.userId, action: "broker.invite_link_created", entityType: "broker", entityId: broker.id });
-        return issued;
-      });
-      return { inviteUrl: webLink(env, `/invite/${token}`) };
+      const inviteUrl = await db.transaction((tx) =>
+        replaceBrokerInviteUrl(tx, { env, brokerId: broker.id, userId: user.id, actorUserId: actor.userId, now: app.deps.now() }),
+      );
+      return { inviteUrl };
     },
   );
 
@@ -465,7 +567,7 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
     {
       schema: {
         tags: ["admin"],
-        summary: "Email a fresh invite link (the old one stops working)",
+        summary: "Email the broker their invite link (the same link shown on their profile)",
         params: idParams,
         response: { 200: okResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema },
       },
@@ -479,16 +581,12 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
         throw conflict("This broker already created their account. Send a password reset link instead.", "already_signed_up");
       }
       if (isPlaceholderEmail(user.email)) {
-        throw conflict("This broker has no email yet. Copy a fresh invite link and send it to them instead.", "no_email");
+        throw conflict("This broker has no email yet. Copy their invite link and send it to them instead.", "no_email");
       }
-      const token = await db.transaction(async (tx) => {
-        const issued = await issueAccountToken(tx, { userId: user.id, purpose: "invite", createdBy: actor.userId, now: app.deps.now() });
-        await writeAudit(tx, { actorUserId: actor.userId, action: "broker.invite_resent", entityType: "broker", entityId: broker.id });
-        return issued;
-      });
-      await sendSafely(mailer, request.log, [
-        { to: user.email, ...inviteEmail({ name: user.name, link: webLink(env, `/invite/${token}`), support: supportContact(env) }) },
-      ]);
+      const input = { env, brokerId: broker.id, userId: user.id, actorUserId: actor.userId, now: app.deps.now() };
+      const link = (await ensureBrokerInviteUrl(db, input)) ?? (await db.transaction((tx) => replaceBrokerInviteUrl(tx, input)));
+      await writeAudit(db, { actorUserId: actor.userId, action: "broker.invite_resent", entityType: "broker", entityId: broker.id });
+      await sendSafely(mailer, request.log, [{ to: user.email, ...inviteEmail({ name: user.name, link, support: supportContact(env) }) }]);
       return { ok: true as const };
     },
   );

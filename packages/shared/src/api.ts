@@ -343,6 +343,29 @@ export const createBrokerResponseSchema = z.object({
 });
 export type CreateBrokerResponse = z.infer<typeof createBrokerResponseSchema>;
 
+export const EXISTING_BROKER_PROGRESS = ["onboarding", "onboarded"] as const;
+export type ExistingBrokerProgress = (typeof EXISTING_BROKER_PROGRESS)[number];
+
+export const addExistingBrokerRequestSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    phone: e164PhoneSchema,
+    email: emailSchema.optional().describe("The email they sign in with; leave out to use the 365 email"),
+    corporateEmail: emailSchema.optional().describe("Their existing 365 Yachts email; their Google and GoHighLevel accounts are looked up by it"),
+    crmPhone: e164PhoneSchema.optional(),
+    level: z.enum(BROKER_LEVELS),
+    joinedAt: isoDateSchema,
+    progress: z.enum(EXISTING_BROKER_PROGRESS).describe("onboarded: every onboarding step is marked approved and only training is left"),
+    onboardedAt: isoDateSchema.optional().describe("Used when progress is onboarded; defaults to today"),
+    inHouseSplit: commissionPctSchema.optional(),
+    selfGeneratedSplit: commissionPctSchema.optional(),
+  })
+  .refine((body) => !body.onboardedAt || body.onboardedAt >= body.joinedAt, {
+    message: "The onboarding date can't be before the joining date.",
+    path: ["onboardedAt"],
+  });
+export type AddExistingBrokerRequest = z.infer<typeof addExistingBrokerRequestSchema>;
+
 export const inviteLinkResponseSchema = z.object({ inviteUrl: z.string() });
 
 export const commissionHistoryEntrySchema = z.object({
@@ -410,6 +433,7 @@ export const brokerProfileResponseSchema = z.object({
     corporateEmail: z.string().nullable(),
     crmPhone: z.string().nullable(),
     hasLogin: z.boolean(),
+    inviteUrl: z.string().nullable().describe("The broker's sign-in link while they haven't created their account; it stays the same until replaced"),
   }),
   metrics: z.object({
     tenureDays: z.number().int(),

@@ -94,7 +94,7 @@ export default async function BrokerProfilePage({
         All brokers
       </Link>
 
-      {invited && broker.email ? <FormMessage tone="success">Invite sent to {broker.email}. The link works for 7 days.</FormMessage> : null}
+      {invited && broker.email ? <FormMessage tone="success">Invite sent to {broker.email}. The link below stays the same until they create their account.</FormMessage> : null}
 
       <section aria-labelledby="broker-name" className="rounded-2xl border border-line bg-white px-6 py-6">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">

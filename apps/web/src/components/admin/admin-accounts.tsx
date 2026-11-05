@@ -21,6 +21,8 @@ import { FieldLabel, inputClasses } from "@/components/ui/misc";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { CopyLink } from "./invite-dialog";
 
+const ADMIN_LINK_NOTE = "It works for 7 days and only once. Making a new link stops this one working.";
+
 export function AddAdminButton() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   return (
@@ -90,7 +92,7 @@ function AddAdminDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement 
       </div>
       {created ? (
         <div className="space-y-6 p-7">
-          <CopyLink url={created.inviteUrl} />
+          <CopyLink url={created.inviteUrl} note={ADMIN_LINK_NOTE} />
           <div className="flex justify-end">
             <Button onClick={close}>Done</Button>
           </div>
@@ -166,7 +168,7 @@ export function ResendAdminInvite({ adminId, name }: { adminId: string; name: st
             </h2>
             <p className="mt-1 text-base text-muted">We emailed them a fresh link. The old link no longer works.</p>
           </div>
-          {inviteUrl ? <CopyLink url={inviteUrl} /> : null}
+          {inviteUrl ? <CopyLink url={inviteUrl} note={ADMIN_LINK_NOTE} /> : null}
           <div className="flex justify-end">
             <Button onClick={() => dialogRef.current?.close()}>Done</Button>
           </div>

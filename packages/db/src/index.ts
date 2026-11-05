@@ -6,7 +6,7 @@
  * Functions:
  * - none
  */
-export { createBroker, type CreateBrokerInput } from "./brokers";
+export { approveAllSteps, createBroker, type CreateBrokerInput } from "./brokers";
 export { addCommissionChange, commissionHistoryFor, currentCommission, type CommissionChangeInput } from "./commission";
 export { voidOpenContracts } from "./contracts";
 export { findContractTemplatesDir, sha256 } from "./seed/contract-templates";

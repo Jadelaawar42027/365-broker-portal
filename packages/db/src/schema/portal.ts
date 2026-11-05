@@ -4,7 +4,7 @@
  * the agreements, SPEC D31, and the accounts provisioned for them in phase H2: corporate email, CRM phone, Google Workspace and
  * GoHighLevel user ids), their commission history (SPEC D29: one row per change of the two splits,
  * in-house leads % and self-generated deals %; the latest row is the current split; the older split columns on brokers
- * and commission_tier are kept but no longer used), account tokens (invites and resets, SPEC D8), the onboarding step
+ * and commission_tier are kept but no longer used), account tokens (invites and resets, SPEC D8; a broker invite has no expiry, so expires_at is null until it is replaced), the onboarding step
  * template (with its short guidance: What to do bullets, callouts and the manual's full text), each broker's progress rows, uploaded files (never overwritten), the audit log, and the provisioning tasks that create, suspend, unsuspend or link a broker's Google and GoHighLevel accounts (at most one open task per broker, system and action).
  *
  * Functions:
@@ -122,7 +122,7 @@ export const accountTokens = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     purpose: tokenPurposeEnum("purpose").notNull(),
     tokenHash: text("token_hash").notNull().unique(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     usedAt: timestamp("used_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt,
