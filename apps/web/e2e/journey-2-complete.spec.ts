@@ -18,7 +18,7 @@ test("a broker completes onboarding and becomes active", async ({ page, browser 
   await setUpCompanySignature(page);
   const broker = await createSignedInBroker(browser, name);
   await completeBrokerSteps(broker.page);
-  await expect(broker.page.getByText("You've sent in 12 of 12 steps and 6 are approved")).toBeVisible();
+  await expect(broker.page.getByText("You've sent in 14 of 14 steps and 8 are approved")).toBeVisible();
 
   for (let round = 0; round < 6; round += 1) {
     await page.goto("/admin/reviews");

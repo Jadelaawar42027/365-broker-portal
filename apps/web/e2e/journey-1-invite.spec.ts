@@ -25,7 +25,7 @@ test("admin invites a broker who creates their account", async ({ page, browser 
   await acceptInvite(broker, email);
   await expect(broker.getByRole("heading", { level: 1 })).toContainText("Nina");
   await expect(broker.getByText("YOUR NEXT STEP · STEP 0")).toBeVisible();
-  await expect(broker.getByText("You've sent in 0 of 12 steps")).toBeVisible();
+  await expect(broker.getByText("You've sent in 0 of 14 steps")).toBeVisible();
 
   const link = new URL(await latestLink(email, "invite"));
   await broker.goto(link.pathname);

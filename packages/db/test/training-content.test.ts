@@ -103,10 +103,12 @@ describe("onboarding step guidance", () => {
     for (const callout of all) expect(callout.text.length).toBeLessThanOrEqual(120);
   });
 
-  it("adds empty video slots on steps 0, 1, 8 and 11", () => {
+  it("adds empty video slots on steps 0, 1, 8, 11, 12 and 13", () => {
     expect(STEP_GUIDANCE.start_here!.videoSlots).toEqual(["Part 1: Aj walks you through the platform"]);
     expect(STEP_GUIDANCE.ai_agent!.videoSlots).toEqual(["Part 2: Introducing Your Personal AI Agent"]);
-    expect(STEP_GUIDANCE.platform_logins!.videoSlots).toEqual(["GoHighLevel CRM walkthrough", "BoatWizard walkthrough", "YachtCloser walkthrough"]);
+    expect(STEP_GUIDANCE.crm_login!.videoSlots).toEqual(["CRM sign in and training"]);
+    expect(STEP_GUIDANCE.boatwizard_login!.videoSlots).toEqual(["BoatWizard walkthrough"]);
+    expect(STEP_GUIDANCE.yachtcloser_login!.videoSlots).toEqual(["YachtCloser walkthrough"]);
     expect(STEP_GUIDANCE.dbpr_filing!.videoSlots).toEqual(["How to file your DBPR application"]);
   });
 

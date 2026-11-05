@@ -1,7 +1,8 @@
 /**
  * File: apps/api/test/broker-steps.int.test.ts
  * Purpose: Integration tests for a broker's own onboarding routes: the checklist and next step (SPEC D1), step detail,
- * every kind of answer (text, choice, confirm, checklist, admin-only), and the direct upload flow with versions kept on
+ * every kind of answer in use (text, choice, confirm, admin-only; the retired platform logins checklist can't be opened),
+ * and the direct upload flow with versions kept on
  * resubmission. Storage is a real SeaweedFS container; uploads go to real presigned URLs.
  *
  * Functions:
@@ -28,12 +29,12 @@ beforeAll(async () => {
 afterAll(() => ctx?.close());
 
 describe("GET /v1/me/steps", () => {
-  it("lists all 12 steps with step 0 (Start here) as the next step and step 1 the AI agent", async () => {
+  it("lists all 14 steps with step 0 (Start here) as the next step and step 1 the AI agent", async () => {
     const response = await ctx.call("GET", "/v1/me/steps", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.steps).toHaveLength(12);
-    expect(body.progress).toEqual({ total: 12, approved: 0, sent: 0 });
+    expect(body.steps).toHaveLength(14);
+    expect(body.progress).toEqual({ total: 14, approved: 0, sent: 0 });
     expect(body.nextStepKey).toBe("start_here");
     expect(body.steps[0]).toMatchObject({ key: "start_here", stageTitle: "Start here", label: "Do this next", tone: "info", isNext: true });
     expect(body.steps[1]).toMatchObject({ key: "ai_agent", stageTitle: "Start here", label: "Coming up", isNext: false });
@@ -47,7 +48,7 @@ describe("GET /v1/me/steps/:key", () => {
     const response = await ctx.call("GET", "/v1/me/steps/w9", { cookie: broker.cookie });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body).toMatchObject({ key: "w9", position: 6, totalSteps: 12, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
+    expect(body).toMatchObject({ key: "w9", position: 6, totalSteps: 14, canSubmit: true, acceptedTypes: ["application/pdf", "image/jpeg", "image/png"] });
     expect(body.config.templateLink.url).toMatch(/irs\.gov/);
     expect(body.config.reviewChecklist).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("Tax ID filled in");
@@ -90,19 +91,18 @@ describe("answer steps", () => {
     expect(detail).toMatchObject({ canSubmit: false, formData: { choice: "transfer" }, attempts: 1 });
   });
 
-  it("completes the email confirmation and the platform checklist", async () => {
+  it("completes the 365 email login and the BoatWizard and YachtCloser sign-ins", async () => {
     expect((await ctx.call("POST", "/v1/me/steps/email_signature/submit", { cookie: broker.cookie, body: { formData: { confirmed: false } } })).statusCode).toBe(400);
     expect((await ctx.call("POST", "/v1/me/steps/email_signature/submit", { cookie: broker.cookie, body: { formData: { confirmed: true } } })).json().status).toBe("approved");
-    const partial = await ctx.call("POST", "/v1/me/steps/platform_logins/submit", {
-      cookie: broker.cookie,
-      body: { formData: { checked: ["boatwizard"] } },
-    });
-    expect(partial.statusCode).toBe(400);
-    const full = await ctx.call("POST", "/v1/me/steps/platform_logins/submit", {
-      cookie: broker.cookie,
-      body: { formData: { checked: ["boatwizard", "yachtcloser", "gohighlevel"] } },
-    });
-    expect(full.json().status).toBe("approved");
+    for (const key of ["boatwizard_login", "yachtcloser_login"]) {
+      expect((await ctx.call("POST", `/v1/me/steps/${key}/submit`, { cookie: broker.cookie, body: { formData: { confirmed: true } } })).json().status, key).toBe("approved");
+    }
+  });
+
+  it("has no platform logins step any more: it can't be opened or submitted", async () => {
+    expect((await ctx.call("GET", "/v1/me/steps/platform_logins", { cookie: broker.cookie })).statusCode).toBe(404);
+    const response = await ctx.call("POST", "/v1/me/steps/platform_logins/submit", { cookie: broker.cookie, body: { formData: { checked: ["boatwizard"] } } });
+    expect(response.statusCode).toBe(404);
   });
 
   it("has no commission step any more: it can't be opened or submitted", async () => {

@@ -11,7 +11,8 @@
  * - fillInviteForm(dialog, name, email): fills the invite dialog: name, phone, optional email, junior, in-house leads 40%, self-generated deals 60%.
  * - inviteBroker(page, name, email): as a signed-in admin, invites a broker with an email and returns their profile URL.
  * - acceptInvite(page, email, password): opens the invite link from the outbox and creates the account.
- * - createSignedInBroker(browser, name): uses a separate admin session to invite a broker, then accepts the invite in a new context; returns that broker's page and email.
+ * - createSignedInBroker(browser, name): uses a separate admin session to make sure step 11 has its training video and invite a broker, then accepts the invite in a new context; returns that broker's page and email.
+ * - ensureCrmTrainingVideo(admin): as a signed-in admin, puts a Loom link in step 11's empty video slot, so brokers can unlock it with "I've watched this video" (Loom can't be tracked, and tests can't play YouTube).
  * - testFile(name): a small PDF, or a plain 600 x 600 PNG (the headshot minimum), for setInputFiles.
  * - pngOfSize(width, height): builds a valid single-colour PNG of that size.
  * - pngChunk(type, data): one PNG chunk with its length and CRC.
@@ -20,7 +21,7 @@
  * - answerStep(page, stepKey, fill): opens a step, runs fill() on the page and clicks the send button.
  * - signAgreements(page): opens and reads both agreements on step 3, checks the details, signs by typed name and waits for the signed state.
  * - setUpCompanySignature(page): as the signed-in company signer, stores an authorized signature so new agreements are countersigned automatically.
- * - completeBrokerSteps(page): does all 12 steps a broker does themselves (ticking steps 0 and 1, signing the agreements, passing step 9's deposit check).
+ * - completeBrokerSteps(page): does all 14 steps a broker does themselves (ticking steps 0 and 1, signing the agreements, passing step 9's deposit check, marking the step 11 video watched).
  */
 import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
@@ -98,11 +99,24 @@ export async function acceptInvite(page: Page, email: string, password = BROKER_
   await page.waitForURL("**/app");
 }
 
+export const CRM_TRAINING_LOOM = "https://www.loom.com/share/0123456789abcdef0123456789abcdef";
+
+export async function ensureCrmTrainingVideo(admin: Page): Promise<void> {
+  const response = await admin.request.get("/v1/admin/steps/crm_login");
+  expect(response.status()).toBe(200);
+  const { videos } = (await response.json()) as { videos: { id: string; source: string | null }[] };
+  const slot = videos[0]!;
+  if (slot.source !== null) return;
+  const saved = await admin.request.put(`/v1/admin/step-videos/${slot.id}/embed`, { data: { url: CRM_TRAINING_LOOM } });
+  expect(saved.status()).toBe(200);
+}
+
 export async function createSignedInBroker(browser: Browser, name: string, options: { viewport?: { width: number; height: number } } = {}) {
   const email = uniqueEmail(name.split(" ")[0]!.toLowerCase());
   const adminContext = await browser.newContext();
   const admin = await adminContext.newPage();
   await signIn(admin, OWNER.email, OWNER.password);
+  await ensureCrmTrainingVideo(admin);
   const profileUrl = await inviteBroker(admin, name, email);
   await adminContext.close();
   const brokerContext = await browser.newContext(options.viewport ? { viewport: options.viewport, isMobile: true, hasTouch: true } : {});
@@ -203,10 +217,13 @@ export async function completeBrokerSteps(page: Page): Promise<void> {
   await answerStep(page, "license_situation", (p) => p.getByLabel(/I already have a Florida yacht & ship license/).check());
   await uploadStep(page, "dbpr_filing", "dbpr-confirmation.pdf");
   await uploadStep(page, "license_bond", "license-and-bond.pdf", DEPOSIT_ANSWER);
-  await answerStep(page, "email_signature", (p) => p.getByLabel(/activated my 365 email/).check());
-  await answerStep(page, "platform_logins", async (p) => {
-    await p.getByLabel(/BoatWizard/).check();
-    await p.getByLabel(/YachtCloser/).check();
-    await p.getByLabel(/GoHighLevel/).check();
+  await answerStep(page, "email_signature", (p) => p.getByLabel(/logged in to my 365 Yachts email/).check());
+  await answerStep(page, "crm_login", async (p) => {
+    await p.getByRole("button", { name: "I've watched this video" }).click();
+    const confirm = p.getByLabel(/watched the CRM training/);
+    await expect(confirm).toBeEnabled();
+    await confirm.check();
   });
+  await answerStep(page, "boatwizard_login", (p) => p.getByLabel(/signed in to BoatWizard/).check());
+  await answerStep(page, "yachtcloser_login", (p) => p.getByLabel(/signed in to YachtCloser/).check());
 }

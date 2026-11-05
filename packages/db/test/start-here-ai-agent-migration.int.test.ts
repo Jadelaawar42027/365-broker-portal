@@ -1,7 +1,8 @@
 /**
  * File: packages/db/test/start-here-ai-agent-migration.int.test.ts
  * Purpose: Integration tests on a real Postgres container for migration 0018 (SPEC D30): starting from the database as
- * it was after migration 0017 (11 steps, both of Aj's videos on step 0), it adds step 1 "ai_agent", moves every later
+ * it was after migration 0017 (no step 1, both of Aj's videos on step 0; built from today's seed, so the last steps are
+ * already the D32 ones), it adds step 1 "ai_agent", moves every later
  * step up one number, moves the Part 2 video slot (with its video) to the new step, puts step 0's copy back to one
  * video, renumbers the licensing copy, gives every broker a todo row, leaves admin-edited copy alone, and changes
  * nothing when run again.
@@ -91,11 +92,12 @@ afterAll(async () => {
 });
 
 describe("migration 0018: the AI agent video becomes step 1", () => {
-  it("starts from the post-0017 state: 11 steps, both videos on step 0", async () => {
+  it("starts from the post-0017 state: no step 1, both videos on step 0", async () => {
     const rows = await testDb.db.select().from(onboardingSteps).orderBy(asc(onboardingSteps.position));
     expect(rows.map((row) => [row.position, row.key])).toEqual([
       [0, "start_here"], [1, "photo_id"], [2, "contract_nda"], [3, "bio"], [4, "headshot"], [5, "w9"],
-      [6, "license_situation"], [7, "dbpr_filing"], [8, "license_bond"], [9, "email_signature"], [10, "platform_logins"],
+      [6, "license_situation"], [7, "dbpr_filing"], [8, "license_bond"], [9, "email_signature"], [10, "crm_login"],
+      [11, "boatwizard_login"], [12, "yachtcloser_login"],
     ]);
     const startHere = (await stepByKey("start_here"))!;
     expect(await testDb.db.select().from(stepVideos).where(eq(stepVideos.stepId, startHere.id))).toHaveLength(2);
@@ -106,7 +108,8 @@ describe("migration 0018: the AI agent video becomes step 1", () => {
     const rows = await testDb.db.select().from(onboardingSteps).orderBy(asc(onboardingSteps.position));
     expect(rows.map((row) => [row.position, row.key])).toEqual([
       [0, "start_here"], [1, "ai_agent"], [2, "photo_id"], [3, "contract_nda"], [4, "bio"], [5, "headshot"], [6, "w9"],
-      [7, "license_situation"], [8, "dbpr_filing"], [9, "license_bond"], [10, "email_signature"], [11, "platform_logins"],
+      [7, "license_situation"], [8, "dbpr_filing"], [9, "license_bond"], [10, "email_signature"], [11, "crm_login"],
+      [12, "boatwizard_login"], [13, "yachtcloser_login"],
     ]);
     expect(rows[1]).toMatchObject({
       stage: "start_here",
@@ -164,7 +167,7 @@ describe("migration 0018: the AI agent video becomes step 1", () => {
 
   it("writes audit rows for each change", async () => {
     const actions = (await testDb.db.select({ action: auditLog.action }).from(auditLog)).map((row) => row.action);
-    expect(actions.filter((action) => action === "step.position_changed")).toHaveLength(10);
+    expect(actions.filter((action) => action === "step.position_changed")).toHaveLength(12);
     expect(actions).toEqual(expect.arrayContaining(["step.created", "step.video_moved", "step.copy_updated", "step.guidance_updated", "step.config_updated"]));
     expect(actions).not.toContain("step.video_slot_added");
   });

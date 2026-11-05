@@ -10,8 +10,8 @@
  * - loadStepVideos(db, stepId): the step's video slots in order.
  * - toBrokerStepVideo(deps, video, progress): a video slot as the broker sees it, with a short-lived play link for uploads and whether this broker has watched it.
  * - loadStepVideoProgress(db, brokerId, videoIds): this broker's progress on those videos, as a map from video id.
- * - recordStepVideoProgress(db, input): stores the furthest second watched of an uploaded video and marks it watched at 90%; returns { watched, watchedSeconds }.
- * - markStepVideoWatched(db, input): marks an embedded video watched (the broker's "I've watched this video"); returns { watched, watchedSeconds }.
+ * - recordStepVideoProgress(db, input): stores the furthest second watched of an uploaded, YouTube or Vimeo video and marks it watched at 90%; returns { watched, watchedSeconds }.
+ * - markStepVideoWatched(db, input): marks a Loom video watched (the broker's "I've watched this video"); returns { watched, watchedSeconds }.
  * - loadStepQuestions(db, stepId): the step's knowledge-check questions with their options (including which is correct).
  * - toBrokerCheckQuestion(question): a question without correctness, for the broker's step page.
  * - stepVideoKey(stepId, fileName): a fresh storage key for an uploaded step video.

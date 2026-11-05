@@ -121,7 +121,7 @@ describe("runImport", () => {
     const { input } = loadImportFolder(dir, UPLOAD_KEYS);
     const summary = await runImport(testDb.db, memoryStorage(), input!, { dryRun: true });
     expect(summary).toMatchObject({ created: ["jane@example.com", "john@example.com", "alex@example.com"], filesUploaded: 2, personasSet: 1 });
-    expect(summary.stepsApproved).toBe(12 + 2 + 12);
+    expect(summary.stepsApproved).toBe(14 + 2 + 14);
     expect(await testDb.db.select().from(users).where(eq(users.email, "jane@example.com"))).toHaveLength(0);
     expect(stored.size).toBe(0);
   });
@@ -133,7 +133,7 @@ describe("runImport", () => {
     expect(summary.withoutLogin).toEqual(["jane@example.com", "john@example.com"]);
 
     const jane = await stepsFor("jane@example.com");
-    expect(jane).toHaveLength(12);
+    expect(jane).toHaveLength(14);
     expect(jane.every((step) => step.status === "approved" && step.note === "imported")).toBe(true);
     const [janeBroker] = await testDb.db
       .select()

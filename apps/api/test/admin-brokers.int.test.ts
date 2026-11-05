@@ -48,7 +48,7 @@ describe("GET /v1/admin/overview", () => {
         brokerId: daniel.brokerId,
         name: "Daniel Reyes",
         approved: 0,
-        total: 12,
+        total: 14,
         nextStep: { key: "start_here", shortTitle: "Start here: portal walkthrough", status: "todo" },
         waitingOnUs: true,
         stuckDays: null,
@@ -73,7 +73,7 @@ describe("GET /v1/admin/brokers", () => {
   it("lists brokers with counts, onboarding first", async () => {
     const body = (await ctx.call("GET", "/v1/admin/brokers", { cookie: owner })).json();
     expect(body.counts).toMatchObject({ total: 4, active: 2, onboarding: 1, inactive: 1 });
-    expect(body.brokers[0]).toMatchObject({ name: "Daniel Reyes", status: "onboarding", stepsTotal: 12, stepsWaitingReview: 1 });
+    expect(body.brokers[0]).toMatchObject({ name: "Daniel Reyes", status: "onboarding", stepsTotal: 14, stepsWaitingReview: 1 });
     expect(body.brokers.find((row: { name: string }) => row.name === "Kevin Osei")).toMatchObject({ daysToOnboard: 9, onboardedAt: "2026-08-27" });
   });
 
@@ -131,8 +131,8 @@ describe("profile and edits", () => {
     const body = response.json();
     expect(body.broker).toMatchObject({ name: "Daniel Reyes", email: "daniel@example.com", status: "onboarding", hasLogin: true, inHouseSplit: null, selfGeneratedSplit: null });
     expect(body.broker).not.toHaveProperty("commissionTier");
-    expect(body.metrics).toMatchObject({ stepsApproved: 0, stepsTotal: 12 });
-    expect(body.steps).toHaveLength(12);
+    expect(body.metrics).toMatchObject({ stepsApproved: 0, stepsTotal: 14 });
+    expect(body.steps).toHaveLength(14);
     expect(body.steps.map((step: { key: string }) => step.key)).not.toContain("commission_tier");
     expect(body.steps[0].key).toBe("start_here");
     expect(body.steps.find((step: { key: string }) => step.key === "photo_id")).toMatchObject({ key: "photo_id", status: "submitted", label: "Waiting for approval", files: [expect.objectContaining({ fileName: "id.png", version: 1 })] });
