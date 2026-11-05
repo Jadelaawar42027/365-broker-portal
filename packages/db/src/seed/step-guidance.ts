@@ -4,7 +4,8 @@
  * 365 Broker Onboarding Manual: 3 to 5 plain "What to do" bullets, one-line NEVER / WATCH / HOUSE RULE callouts, the
  * manual's original text for the "Read the full section" panel, empty video slots, and the optional knowledge check.
  * Bond and fee figures stay in the full text only, next to the manual's WATCH that they change.
- * Step 0 "Start here" (SPEC D30) has no manual text: just bullets and the slot for Shelly's portal walkthrough video.
+ * Step 0 "Start here" (SPEC D30) has no manual text: just bullets and the slots for Aj's two videos
+ * (Part 1 the platform walkthrough, Part 2 the personal AI agent).
  * Steps 6 to 8 take their bullets and DBPR links from license-paths.ts, next to the step-by-step licensing guides.
  *
  * Functions:
@@ -60,15 +61,15 @@ const PLATFORM_TABLE = `## Platform credentials you will receive
 export const STEP_GUIDANCE: Readonly<Record<string, StepGuidanceSeed>> = {
   start_here: {
     todoItems: [
-      "Watch the walkthrough video above.",
+      "Watch both videos above: Aj walks you through the platform, then introduces your personal AI agent.",
       "Your checklist always shows the next step to do.",
       "Open a step, follow What to do, then send it in.",
       "Stuck? Tap Message Shelly on WhatsApp on any step.",
-      "Tick the box below once you've watched it.",
+      "Tick the box below once you've watched both.",
     ],
     callouts: [],
     fullTextMd: "",
-    videoSlots: ["How to use the 365 portal"],
+    videoSlots: ["Part 1: Aj walks you through the platform", "Part 2: Introducing Your Personal AI Agent"],
   },
   photo_id: {
     todoItems: [

@@ -1,6 +1,6 @@
 /**
  * File: packages/db/src/seed/steps.ts
- * Purpose: The onboarding steps from docs/SPEC.md: step 0 "Start here" (a portal walkthrough video, SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
+ * Purpose: The onboarding steps from docs/SPEC.md: step 0 "Start here" (Aj's two videos: the portal walkthrough and the personal AI agent, SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
  * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
  * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Upload
  * steps carry their own file-count limits (minFiles/maxFiles) and the bio its word limits; migration 0014 adds them to existing databases.
@@ -40,13 +40,14 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     stage: "start_here",
     title: "Start here: how the 365 portal works",
     shortTitle: "Start here: portal walkthrough",
-    summary: "Watch a short walkthrough of the portal before you begin. Takes about 10 minutes.",
-    intro: "Shelly shows you around the portal: your checklist, sending each step, getting help, and what happens after.",
+    summary: "Watch two short videos from Aj before you begin: the portal walkthrough and your personal AI agent. Takes about 10 minutes.",
+    intro: "Aj walks you through the platform: your checklist, sending each step, getting help, and what happens after. Then Aj introduces your personal AI agent.",
     kind: "confirm",
     needsApproval: false,
     instructionsMd: [
-      "1. Watch the walkthrough video.",
-      "2. Tick the box to say you've watched it.",
+      "1. Watch Part 1: Aj walks you through the platform.",
+      "2. Watch Part 2: Aj introduces your personal AI agent.",
+      "3. Tick the box to say you've watched both.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
