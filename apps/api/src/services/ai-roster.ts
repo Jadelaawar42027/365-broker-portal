@@ -4,6 +4,7 @@
  * deleted broker is deactivated there, through the bot's roster API (POST and DELETE /api/brokers). It does nothing
  * unless AI_ROSTER_SYNC_ENABLED is "true" and the bot's URL and secret are set, so test accounts never reach the bot.
  * A failed call never fails the portal request; it is logged and recorded in audit_log as roster.add_failed or roster.remove_failed.
+ * The removal row keeps no name or phone, because deleting a broker removes their personal details.
  *
  * Functions:
  * - rosterTarget(env): the bot's URL and secret when syncing is switched on and configured, otherwise null.
@@ -77,6 +78,6 @@ export async function removeBrokerFromAiRoster(deps: RosterDeps, log: FastifyBas
     action: ok ? "roster.removed" : "roster.remove_failed",
     entityType: "broker",
     entityId: broker.brokerId,
-    after: { phone, name: broker.name, status: result.status, ...(result.status === 404 ? { notOnRoster: true } : {}), ...(ok ? {} : { error: result.error }) },
+    after: { status: result.status, ...(result.status === 404 ? { notOnRoster: true } : {}), ...(ok ? {} : { error: result.error }) },
   });
 }

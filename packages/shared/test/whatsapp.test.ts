@@ -2,13 +2,22 @@
  * File: packages/shared/test/whatsapp.test.ts
  * Purpose: Tests for the WhatsApp support link (SPEC D13): message wording, URL encoding, and hiding the button
  * when the number is missing or invalid; and the "Start chat with AI agent" link on step 1, which always goes to the
- * 365 Yachts AI with a hello message.
+ * 365 Yachts AI with a hello message; and the invite message an admin sends a broker, which has no time limit in it.
  *
  * Functions:
  * - none
  */
 import { describe, expect, it } from "vitest";
-import { buildAiAgentMessage, buildAiAgentWhatsAppLink, buildSupportMessage, buildWhatsAppLink, DEFAULT_SUPPORT_CONTACT, normalizeWhatsAppNumber } from "../src/whatsapp";
+import {
+  buildAiAgentMessage,
+  buildAiAgentWhatsAppLink,
+  buildInviteMessage,
+  buildInviteWhatsAppLink,
+  buildSupportMessage,
+  buildWhatsAppLink,
+  DEFAULT_SUPPORT_CONTACT,
+  normalizeWhatsAppNumber,
+} from "../src/whatsapp";
 
 describe("buildSupportMessage", () => {
   it("names the broker and the step", () => {
@@ -59,5 +68,19 @@ describe("the AI agent chat link", () => {
     const link = buildAiAgentWhatsAppLink({ brokerName: "Daniel Reyes" });
     expect(link).toMatch(new RegExp(`^https://wa\\.me/${DEFAULT_SUPPORT_CONTACT.whatsappNumber}\\?text=`));
     expect(new URL(link!).searchParams.get("text")).toBe("Hey 365 Yachts AI, it's Daniel Reyes. I'm new here and doing my onboarding.");
+  });
+});
+
+describe("buildInviteMessage", () => {
+  it("greets the broker by first name and ends with the link, with no time limit", () => {
+    const message = buildInviteMessage({ brokerName: "Charlie Seitz", inviteUrl: "https://portal.example/invite/abc", senderName: "Aj" });
+    expect(message).toBe("Hi Charlie, welcome to 365 Yachts! It's Aj from 365 Yachts. Create your broker portal account here: https://portal.example/invite/abc");
+    expect(message).not.toMatch(/days/);
+  });
+
+  it("opens WhatsApp to the broker's phone with the message filled in", () => {
+    const link = buildInviteWhatsAppLink({ phone: "+1 615 948 3641", brokerName: "Charlie Seitz", inviteUrl: "https://portal.example/invite/abc" });
+    expect(link).toMatch(/^https:\/\/wa\.me\/16159483641\?text=/);
+    expect(decodeURIComponent(link!.split("text=")[1]!)).toContain("https://portal.example/invite/abc");
   });
 });

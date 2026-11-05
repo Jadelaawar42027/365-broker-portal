@@ -1,7 +1,8 @@
 /**
  * File: packages/shared/test/api-contract.test.ts
  * Purpose: Tests for the HTTP contract schemas: response schemas drop fields they don't list (the persona-leak
- * guard), and request schemas enforce the rules the screens rely on (including the two required commission splits).
+ * guard), and request schemas enforce the rules the screens rely on (including the two required commission splits, and
+ * adding an existing broker, whose splits are optional and whose onboarding date can't be before the joining date).
  *
  * Functions:
  * - none
@@ -9,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptInviteRequestSchema,
+  addExistingBrokerRequestSchema,
   brokerListQuerySchema,
   commissionChangeRequestSchema,
   createBrokerRequestSchema,
@@ -103,5 +105,22 @@ describe("request schemas", () => {
     expect(submitStepRequestSchema.safeParse({ files: Array(6).fill(file) }).success).toBe(false);
     expect(brokerListQuerySchema.safeParse({ status: "active", level: "senior", search: " vet " }).data?.search).toBe("vet");
     expect(brokerListQuerySchema.safeParse({ status: "retired" }).success).toBe(false);
+  });
+});
+
+describe("addExistingBrokerRequestSchema", () => {
+  const base = { name: "Charlie Seitz", phone: "+1 615 948 3641", level: "senior", joinedAt: "2026-11-05", progress: "onboarded" };
+
+  it("accepts an existing broker without emails or splits, and normalises the phone", () => {
+    const parsed = addExistingBrokerRequestSchema.parse(base);
+    expect(parsed).toMatchObject({ phone: "+16159483641", progress: "onboarded" });
+    expect(parsed.inHouseSplit).toBeUndefined();
+  });
+
+  it("refuses an onboarding date before the joining date, an unknown progress and a bad split", () => {
+    expect(addExistingBrokerRequestSchema.safeParse({ ...base, onboardedAt: "2026-11-01" }).success).toBe(false);
+    expect(addExistingBrokerRequestSchema.safeParse({ ...base, progress: "done" }).success).toBe(false);
+    expect(addExistingBrokerRequestSchema.safeParse({ ...base, inHouseSplit: 101 }).success).toBe(false);
+    expect(addExistingBrokerRequestSchema.safeParse({ ...base, onboardedAt: "2026-11-05", inHouseSplit: 40 }).success).toBe(true);
   });
 });

@@ -36,7 +36,7 @@ function printSummary(summary: ImportSummary, dryRun: boolean): void {
   console.log(`Corporate emails or CRM phones ${verb} set: ${summary.accountsUpdated}`);
   if (summary.linksQueued > 0) console.log(`Account links ${verb} queued: ${summary.linksQueued} (the api links them within a minute; see each profile's Accounts panel)`);
   if (summary.withoutLogin.length > 0) {
-    console.log(`\n${summary.withoutLogin.length} broker(s) can't sign in yet. Open each profile in /admin and click "Resend invite":`);
+    console.log(`\n${summary.withoutLogin.length} broker(s) can't sign in yet. Open each profile in /admin and send them the sign-in link shown there:`);
     for (const email of summary.withoutLogin) console.log(`  - ${email}`);
   }
   for (const warning of summary.warnings) console.warn(`Warning: ${warning}`);

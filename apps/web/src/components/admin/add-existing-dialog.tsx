@@ -207,7 +207,7 @@ function AddExistingDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEleme
               {PROGRESS_CHOICES.map((choice) => (
                 <label
                   key={choice.value}
-                  className="flex min-h-[52px] cursor-pointer items-start gap-3 rounded-xl border border-[#cdd5e1] px-4 py-3 has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+                  className="grid min-h-[52px] cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 rounded-xl border border-[#cdd5e1] px-4 py-3 has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
                 >
                   <input
                     type="radio"
@@ -217,10 +217,8 @@ function AddExistingDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEleme
                     onChange={() => setProgress(choice.value)}
                     className="mt-1 size-4 shrink-0 accent-brand"
                   />
-                  <span>
-                    <span className="block text-[17px] font-semibold">{choice.title}</span>
-                    <span className="block text-[15px] text-muted">{choice.detail}</span>
-                  </span>
+                  <span className="text-[17px] font-semibold">{choice.title}</span>
+                  <span className="col-start-2 text-[15px] text-muted">{choice.detail}</span>
                 </label>
               ))}
             </div>

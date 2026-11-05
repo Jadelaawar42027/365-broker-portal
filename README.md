@@ -72,15 +72,30 @@ To start again from a clean slate: `docker compose down -v`, then `docker compos
 | `pnpm admin:invite -- --name "…" --email …` | Creates an admin account and prints the invite link |
 | `pnpm storage:cors` | Allows the web app to upload straight to the bucket (once per bucket) |
 
+## Adding brokers from the admin panel
+
+On **Brokers** (`/admin/brokers`):
+
+- **Invite a new broker** is for someone starting from zero. They get an invite email (when you give an email), their Google and GoHighLevel accounts are created, and they work through every onboarding step.
+- **Add an existing broker** is for someone who already works with 365 Yachts. Enter their name, phone, 365 email (their existing Google and GoHighLevel accounts are looked up by it, nothing new is created), level, joining date and, optionally, their splits. Choose **Onboarding done** to mark every onboarding step approved so only training is left, or **Still onboarding**. No email is sent; you get their sign-in link to share.
+- **Sign-in link:** until a broker creates their password, their profile shows their sign-in link with **Copy link** and **Send via WhatsApp**. It is the same link every time and has no time limit. It stops working once they use it, when you click **Replace link**, or when you set them to Inactive. **Email the invite** emails that same link. Admin invite links still expire after 7 days.
+- **Remove** (owner only, on each row) deletes a broker and everything stored about them for good, after you type their name. If someone only left, set them to Inactive on their profile instead.
+
 ## Importing your current brokers
 
 1. Create `data/import/` (it is gitignored and never leaves your machine).
-2. Copy `docs/templates/brokers-import-example.csv` to `data/import/brokers.csv` and fill one row per broker. Columns: `name, email, phone, level (junior/senior), status (invited/onboarding/active/inactive), joined_at, onboarded_at, left_at, commission_tier`. Dates as `2026-03-11` or `3/11/2026`.
+2. Copy `docs/templates/brokers-import-example.csv` to `data/import/brokers.csv` and fill one row per broker. Columns: `name, email, phone, level (junior/senior), status (invited/onboarding/active/inactive), joined_at, onboarded_at, left_at, commission_tier`, plus the optional `in_house_split`, `self_generated_split`, `corporate_email` and `crm_phone`. Dates as `2026-03-11` or `3/11/2026`.
 3. Optional personas: `data/import/personas/<email>.md`, following `docs/templates/persona-template.md`.
 4. Optional paperwork: `data/import/files/<email>/<step key>.pdf` (or `.jpg` / `.png`), for example `w9.pdf`, `photo_id.jpg`, `contract_nda-page2.pdf`. Step keys: `photo_id`, `contract_nda`, `headshot`, `w9`, `dbpr_filing`, `license_bond`.
-5. Run `pnpm import:brokers -- --dry-run`. It checks every row and file first and imports nothing if anything is wrong, with line numbers. Then run `pnpm import:brokers`.
+5. Run `pnpm import:brokers -- --dry-run`. It checks every row and file first and imports nothing if anything is wrong, with line numbers. Then run `pnpm import:brokers`. Add `--link` to look up each broker's Google and GoHighLevel accounts by their `corporate_email`, and `--dir <folder>` to read the files from somewhere other than `data/import/`.
 
-The import matches brokers by email, never deletes anyone, and is safe to run again. Active brokers get every step marked approved with the note "imported" and never see the "welcome aboard" screen. Imported brokers have no password: open each profile in `/admin` and click **Resend invite**.
+The import matches brokers by email, never deletes anyone, and is safe to run again. Active brokers get every step marked approved with the note "imported" and never see the "welcome aboard" screen. Imported brokers have no password yet: open each profile in `/admin` and send them the sign-in link shown there.
+
+To import into production, see "Run once" in [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## 365 Yachts AI roster sync
+
+The portal can keep the 365 Yachts AI's roster (the people the WhatsApp bot recognises) in step: a broker you invite or add is added to the roster, and a broker you delete is deactivated there. The bot texts new roster entries a welcome message, so this is **off** unless the api has `AI_ROSTER_SYNC_ENABLED=true`, together with `AI_ROSTER_API_URL` (the bot's address) and `AI_ROSTER_API_SECRET` (the bot's `ROSTER_API_SECRET`). Leave it off while making test accounts. A roster failure never blocks the portal; it is recorded in the activity log as `roster.add_failed` or `roster.remove_failed`. Setting a broker to Inactive and the command-line import do not change the roster.
 
 ## Deploying
 

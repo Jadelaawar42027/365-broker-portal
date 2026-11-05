@@ -5,7 +5,7 @@
  * read the emails that were sent.
  *
  * Functions:
- * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none) and returns the context object.
+ * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none, and any extra environment variables) and returns the context object.
  * - call(method, url, options): sends a request through app.inject with the portal's Origin header; returns the response.
  * - login(email, password): signs in through Better Auth and returns the session cookie.
  * - createBroker(input): creates a broker (and, unless invited, a password login) directly in the database; returns ids, email and a signed-in cookie.
@@ -38,7 +38,9 @@ export const PASSWORD = "broker-password-123";
 
 type CallOptions = { cookie?: string; body?: unknown; headers?: Record<string, string>; rawBody?: Buffer };
 
-export async function createTestContext(options: { uploadMode?: "direct" | "proxy"; supportNumber?: string; integrations?: Integrations } = {}) {
+export async function createTestContext(
+  options: { uploadMode?: "direct" | "proxy"; supportNumber?: string; integrations?: Integrations; env?: Record<string, string> } = {},
+) {
   const database = await startTestDatabase();
   await seedDatabase(database.db, { owner: OWNER });
   const s3 = inject("s3");
@@ -55,6 +57,7 @@ export async function createTestContext(options: { uploadMode?: "direct" | "prox
     STORAGE_UPLOAD_MODE: options.uploadMode ?? "direct",
     SUPPORT_CONTACT_NAME: "Shelly",
     SUPPORT_WHATSAPP_NUMBER: options.supportNumber ?? "15614459241",
+    ...options.env,
   });
   const storage = createS3Storage({
     endpoint: s3.endpoint,

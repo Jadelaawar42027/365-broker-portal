@@ -131,13 +131,13 @@ pnpm storage:cors
 
 ## 6. One-off tasks from your laptop
 
-These run locally against production using the Postgres service's public connection string: **Postgres → Variables → `DATABASE_PUBLIC_URL`**. Paste it only into your terminal, never into a file in the repo.
+These run locally against production using the Postgres service's public connection string: **Postgres → Variables → `DATABASE_PUBLIC_URL`**. It only exists once the database has a public address: **Postgres → Settings → Networking → TCP Proxy** on port `5432` (turn it off again afterwards if you like). Paste it only into your terminal, never into a file in the repo. With the Railway CLI linked to the project you can skip the copying: `railway run --service Postgres -- sh -c 'DATABASE_URL="$DATABASE_PUBLIC_URL" pnpm import:brokers -- --dry-run'`.
 
 | Task | Command |
 | --- | --- |
 | Add an admin (Shelly, Max) | `DATABASE_URL=<DATABASE_PUBLIC_URL> WEB_ORIGIN=https://<web domain> pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` (prints the invite link to send them) |
 | Read-only login for Metabase / Sheets / the bot | `DATABASE_URL=<DATABASE_PUBLIC_URL> METRICS_READER_PASSWORD=<16+ chars> pnpm db:metrics-user`. It can read only the `broker_metrics` view. The migration needs a Postgres user that may `CREATE ROLE`; Railway's default `postgres` user can. |
-| Import existing brokers | Put the files in `data/import/` (README), then `DATABASE_URL=<DATABASE_PUBLIC_URL> S3_ENDPOINT=… S3_REGION=… S3_BUCKET=… S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… pnpm import:brokers -- --dry-run`, check the summary, then run it again without `--dry-run`. Imported brokers have no password yet: open each profile and click **Resend invite**. |
+| Import existing brokers | Put the files in `data/import/` (README), then `DATABASE_URL=<DATABASE_PUBLIC_URL> S3_ENDPOINT=… S3_REGION=… S3_BUCKET=… S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… pnpm import:brokers -- --dry-run`, check the summary, then run it again without `--dry-run`. Imported brokers have no password yet: open each profile and send them the sign-in link shown there (Copy link or Send via WhatsApp). |
 
 ## 7. The contract & NDA template
 

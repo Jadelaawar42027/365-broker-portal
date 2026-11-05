@@ -35,7 +35,8 @@ describe("email wording", () => {
     const email = inviteEmail({ name: "Daniel Reyes", link: "http://x/invite/t", support });
     expect(email.text).toContain("Welcome aboard, Daniel.");
     expect(email.text).toContain("https://wa.me/15614459241");
-    expect(email.text).toContain("7 days");
+    expect(email.text).toContain("the link keeps working until you've created it");
+    expect(email.text).not.toContain("7 days");
   });
 
   it("falls back to replying by email without a WhatsApp number", () => {
@@ -48,6 +49,7 @@ describe("email wording", () => {
       "Reminder: your 365 onboarding",
     );
     expect(adminInviteEmail({ name: "Shelly M", link: "l", invitedBy: "Aj" }).text).toContain("Aj added you");
+    expect(adminInviteEmail({ name: "Shelly M", link: "l", invitedBy: "Aj" }).text).toContain("the link works for 7 days");
     expect(onboardingCompleteAdminEmail({ brokerName: "Dan Smith", link: "l" }).subject).toBe("Dan Smith finished onboarding");
   });
 });

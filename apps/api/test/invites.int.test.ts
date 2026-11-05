@@ -1,7 +1,9 @@
 /**
  * File: apps/api/test/invites.int.test.ts
  * Purpose: Integration tests for inviting brokers and admins: the invite email, opening and accepting the link,
- * keeping the phone the admin entered (the invite page doesn't ask again), single use, expiry, resending, duplicate emails, the two required commission splits (SPEC D27), and the owner-only admin invite (SPEC D7, D8).
+ * keeping the phone the admin entered (the invite page doesn't ask again), single use, a broker's link having no time limit
+ * (resending emails the same link; making a new one replaces it), admin links still expiring after 7 days, duplicate emails,
+ * the two required commission splits (SPEC D27), and the owner-only admin invite (SPEC D7, D8).
  *
  * Functions:
  * - none
@@ -127,26 +129,43 @@ describe("inviting a broker", () => {
   });
 });
 
-describe("invite expiry and resending", () => {
-  it("expires after 7 days and a resent link replaces the old one", async () => {
+describe("invite links and resending", () => {
+  it("a broker's link has no time limit, resending emails the same link, and a new link replaces it", async () => {
     const created = await ctx.call("POST", "/v1/admin/brokers", {
       cookie: owner,
       body: { name: "Marisol Vega", phone: "+15615550177", email: "marisol@example.com", level: "senior", inHouseSplit: 50, selfGeneratedSplit: 70 },
     });
     const brokerId = created.json().brokerId;
     const firstToken = ctx.linkToken(ctx.emailsTo("marisol@example.com")[0]!, "invite");
+    expect(created.json().inviteUrl).toBe(`http://localhost:3000/invite/${firstToken}`);
 
-    ctx.setNow(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000));
-    const expired = await ctx.call("GET", `/v1/invites/${firstToken}`);
-    expect(expired.statusCode).toBe(410);
-    expect(expired.json().error).toBe("link_expired");
+    ctx.setNow(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
+    expect((await ctx.call("GET", `/v1/invites/${firstToken}`)).statusCode).toBe(200);
     ctx.setNow(null);
 
     expect((await ctx.call("POST", `/v1/admin/brokers/${brokerId}/resend-invite`, { cookie: owner })).statusCode).toBe(200);
-    const secondToken = ctx.linkToken(ctx.emailsTo("marisol@example.com")[1]!, "invite");
-    expect(secondToken).not.toBe(firstToken);
+    const resentToken = ctx.linkToken(ctx.emailsTo("marisol@example.com")[1]!, "invite");
+    expect(resentToken).toBe(firstToken);
+    const profile = (await ctx.call("GET", `/v1/admin/brokers/${brokerId}`, { cookie: owner })).json();
+    expect(profile.broker).toMatchObject({ hasLogin: false, inviteUrl: `http://localhost:3000/invite/${firstToken}` });
+
+    const replaced = await ctx.call("POST", `/v1/admin/brokers/${brokerId}/invite-link`, { cookie: owner });
+    const newToken = (replaced.json().inviteUrl as string).split("/").pop()!;
+    expect(newToken).not.toBe(firstToken);
     expect((await ctx.call("GET", `/v1/invites/${firstToken}`)).statusCode).toBe(410);
-    expect((await ctx.call("GET", `/v1/invites/${secondToken}`)).statusCode).toBe(200);
+    expect((await ctx.call("GET", `/v1/invites/${newToken}`)).statusCode).toBe(200);
+    const after = (await ctx.call("GET", `/v1/admin/brokers/${brokerId}`, { cookie: owner })).json();
+    expect(after.broker.inviteUrl).toBe(`http://localhost:3000/invite/${newToken}`);
+  });
+
+  it("an admin's invite link still expires after 7 days", async () => {
+    expect((await ctx.call("POST", "/v1/admin/admins", { cookie: owner, body: { name: "Max Sereda", email: "max@example.com" } })).statusCode).toBe(201);
+    const token = ctx.linkToken(ctx.emailsTo("max@example.com")[0]!, "invite");
+    ctx.setNow(new Date(Date.now() + 8 * 24 * 60 * 60 * 1000));
+    const expired = await ctx.call("GET", `/v1/invites/${token}`);
+    expect(expired.statusCode).toBe(410);
+    expect(expired.json().error).toBe("link_expired");
+    ctx.setNow(null);
   });
 });
 

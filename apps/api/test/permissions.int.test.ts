@@ -34,6 +34,7 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["GET", "/v1/admin/metrics"],
     ["GET", "/v1/admin/brokers"],
     ["POST", "/v1/admin/brokers", { name: "New Person", phone: "+15615550100", email: "new@example.com", level: "junior", inHouseSplit: 40, selfGeneratedSplit: 60 }],
+    ["POST", "/v1/admin/brokers/existing", { name: "Old Hand", phone: "+15615550109", level: "senior", joinedAt: "2026-11-05", progress: "onboarded" }],
     ["POST", `/v1/admin/brokers/${brokerId}/commission`, { inHouseSplit: 50, selfGeneratedSplit: 70 }],
     ["POST", `/v1/admin/brokers/${brokerId}/invite-link`],
     ["GET", `/v1/admin/brokers/${brokerId}`],
