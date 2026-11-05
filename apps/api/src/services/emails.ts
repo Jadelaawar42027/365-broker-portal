@@ -41,7 +41,7 @@ export function inviteEmail(input: { name: string; link: string; support: Suppor
       "",
       "Getting set up takes about a week. We give you one step at a time, so you always know exactly what to do next.",
       "",
-      `Create your account here (the link works for ${INVITE_TTL_DAYS} days):`,
+      "Create your account here (the link keeps working until you've created it):",
       input.link,
       "",
       signOff(input.support),

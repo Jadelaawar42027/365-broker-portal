@@ -7,8 +7,8 @@
  *
  * Functions:
  * - BrokerControls({ broker, today, hasAccounts }): renders the menus and actions; with provisioned accounts, the inactive confirmation says they will be suspended.
- * - AccountActions({ broker }): the buttons that fit the broker's current state, each confirming in place; a broker who hasn't signed up can be sent a fresh invite link by hand (always) or by email (when they have one, SPEC D29).
- * - makeInviteLink(): asks the API for a fresh invite link and shows it with Copy and Send via WhatsApp.
+ * - AccountActions({ broker }): the buttons that fit the broker's current state, each confirming in place; while a broker hasn't signed up, their invite link is always shown with Copy and Send via WhatsApp, and can be emailed (when they have an email, SPEC D29) or replaced.
+ * - replaceInviteLink(): asks for confirmation, then has the API replace the invite link (the old one stops working) and shows the new one.
  * - patch(body): sends the change to the API and refreshes the page.
  */
 "use client";
@@ -91,14 +91,18 @@ export function BrokerControls({ broker, today, hasAccounts = false }: { broker:
 }
 
 export function AccountActions({ broker }: { broker: Broker }) {
+  const router = useRouter();
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [replacedUrl, setReplacedUrl] = useState<string | null>(null);
+  const inviteUrl = replacedUrl ?? broker.inviteUrl;
 
-  async function makeInviteLink() {
+  async function replaceInviteLink() {
+    if (inviteUrl && !window.confirm(`Make a new link for ${broker.name}? The current link stops working, so send them the new one.`)) return;
     setMessage(null);
     try {
       const { inviteUrl: url } = await apiRequest<{ inviteUrl: string }>(`/v1/admin/brokers/${broker.id}/invite-link`, { method: "POST", body: {} });
-      setInviteUrl(url);
+      setReplacedUrl(url);
+      router.refresh();
     } catch (caught) {
       setMessage({ tone: "error", text: caught instanceof ApiError ? caught.message : "That didn't work. Try again." });
     }
@@ -117,6 +121,12 @@ export function AccountActions({ broker }: { broker: Broker }) {
   if (broker.status === "inactive") return null;
   return (
     <div className="flex flex-col gap-3">
+      {!broker.hasLogin && inviteUrl ? (
+        <div className="max-w-[640px] rounded-xl border border-line bg-white px-5 py-4">
+          <p className="mb-3 text-[15px] text-muted">{broker.name} hasn&apos;t created their account yet. Send them this link to sign in for the first time.</p>
+          <CopyLink url={inviteUrl} phone={broker.phone} brokerName={broker.name} />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
         {broker.hasLogin ? (
           <Button variant="outline" onClick={() => run(`/v1/admin/brokers/${broker.id}/reset-password`, `Reset link emailed to ${broker.email}.`)}>
@@ -125,23 +135,18 @@ export function AccountActions({ broker }: { broker: Broker }) {
         ) : (
           <>
             {broker.email ? (
-              <Button variant="outline" onClick={() => run(`/v1/admin/brokers/${broker.id}/resend-invite`, `New invite emailed to ${broker.email}.`)}>
-                Resend invite
+              <Button variant="outline" onClick={() => run(`/v1/admin/brokers/${broker.id}/resend-invite`, `Invite link emailed to ${broker.email}.`)}>
+                Email the invite
               </Button>
             ) : null}
-            <Button variant="outline" onClick={() => void makeInviteLink()}>
-              Make a new invite link
+            <Button variant="outline" onClick={() => void replaceInviteLink()}>
+              {inviteUrl ? "Replace link" : "Make an invite link"}
             </Button>
           </>
         )}
         {broker.status === "onboarding" ? <RemindButton brokerId={broker.id} variant="button" /> : null}
       </div>
       {message ? <FormMessage tone={message.tone}>{message.text}</FormMessage> : null}
-      {inviteUrl ? (
-        <div className="max-w-[640px] rounded-xl border border-line bg-white px-5 py-4">
-          <CopyLink url={inviteUrl} phone={broker.phone} brokerName={broker.name} />
-        </div>
-      ) : null}
     </div>
   );
 }

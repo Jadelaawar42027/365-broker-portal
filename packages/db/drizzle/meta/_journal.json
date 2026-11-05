@@ -148,6 +148,13 @@
       "when": 1793897846302,
       "tag": "0020_step_video_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793906466137,
+      "tag": "0021_invite_links_without_expiry",
+      "breakpoints": true
     }
   ]
 }

@@ -115,7 +115,7 @@ describe("seed", () => {
     const token = link.url.split("/").pop()!;
     const [row] = await testDb.db.select().from(accountTokens).where(eq(accountTokens.tokenHash, hashToken(token)));
     expect(row?.purpose).toBe("invite");
-    expect(row?.expiresAt.toISOString()).toBe("2026-10-24T16:00:00.000Z");
+    expect(row?.expiresAt?.toISOString()).toBe("2026-10-24T16:00:00.000Z");
     expect(row?.usedAt).toBeNull();
   });
 
