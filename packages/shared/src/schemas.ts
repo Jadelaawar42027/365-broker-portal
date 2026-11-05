@@ -3,7 +3,10 @@
  * Purpose: Zod schemas shared by the API (request validation, OpenAPI) and the web app (form validation):
  * the domain enums, ISO dates, step configuration, and the answer a broker sends for each kind of step. A step's config
  * can hold "paths": a guide per answer of an earlier choice step (config.paths.fromStep), so steps 8 and 9 show the
- * licensing route the broker picked at step 7; and "alertChoices": answers that email the admins (e.g. "I need help").
+ * licensing route the broker picked at step 7; "alertChoices": answers that email the admins (e.g. "I need help"); and
+ * "fullTextLabel" / "fullTextSource": the wording of the collapsed full-text panel, e.g. "Read along with the video" and
+ * "Transcript" on the CRM training step instead of "Read the full section" and "From the manual"; and "requireVideo":
+ * the step can't be finished until the broker has watched its video (SPEC D32).
  *
  * Functions:
  * - formDataSchemaForStep(step): returns the Zod schema for the form_data a broker submits on that step (text with character and word limits, choice, confirm, checklist limited to the step's own items; empty for upload and admin steps).
@@ -75,6 +78,9 @@ export const stepConfigSchema = z
     minutes: z.number().int().positive().optional(),
     paths: stepPathsSchema.optional(),
     alertChoices: z.array(z.string().min(1)).optional(),
+    fullTextLabel: z.string().min(1).max(80).optional(),
+    fullTextSource: z.string().min(1).max(40).optional(),
+    requireVideo: z.boolean().optional(),
   })
   .strict();
 export type StepPath = z.infer<typeof stepPathSchema>;

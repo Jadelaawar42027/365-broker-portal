@@ -134,6 +134,20 @@
       "when": 1793896438475,
       "tag": "0018_start_here_ai_agent_step",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793897548452,
+      "tag": "0019_final_onboarding_steps",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793897846302,
+      "tag": "0020_step_video_progress",
+      "breakpoints": true
     }
   ]
 }

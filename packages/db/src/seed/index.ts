@@ -1,6 +1,6 @@
 /**
  * File: packages/db/src/seed/index.ts
- * Purpose: Seeds a database with the 12 onboarding steps (and their short guidance, video slots and knowledge check
+ * Purpose: Seeds a database with the 14 onboarding steps (and their short guidance, video slots and knowledge check
  * while a step has none yet), the owner account, the training chapters from the manual
  * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
  * users and chapters are left alone.
@@ -334,7 +334,9 @@ async function seedKevin(tx: Transaction, context: SampleContext) {
     bio: { text: SAMPLE_BIO },
     license_situation: { choice: "new" },
     email_signature: { confirmed: true },
-    platform_logins: { checked: ["boatwizard", "yachtcloser", "gohighlevel"] },
+    crm_login: { confirmed: true },
+    boatwizard_login: { confirmed: true },
+    yachtcloser_login: { confirmed: true },
   };
   for (const seed of ONBOARDING_STEP_SEEDS) {
     const day = addDays(joinedAt, Math.max(0, Math.min(9, Math.floor((seed.position - 1) * 0.9))));

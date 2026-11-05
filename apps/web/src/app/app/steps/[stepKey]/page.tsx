@@ -5,9 +5,11 @@
  * answer form (with the knowledge check, if any), and a side column with "What happens next" and the WhatsApp help
  * button. Steps without guidance yet show their numbered instructions instead. Sent-back, waiting and finished steps
  * explain their state instead of showing the form. Step 3 shows the agreement signing flow instead of an upload form
- * (SPEC D31). Step 10 (365 email) shows the broker's corporate email and "Reveal my temporary password" (phase H2). Steps with
+ * (SPEC D31). Step 10 (365 email login) shows the broker's corporate email and starting password (phase H2). Steps with
  * config.paths (8 and 9) show the step-by-step guide for the licensing route the broker picked at step 7. Step 1 (the
- * AI agent) shows a "Start chat with AI agent" button that opens WhatsApp with a hello message ready to send.
+ * AI agent) shows a "Start chat with AI agent" button that opens WhatsApp with a hello message ready to send. A step's
+ * config can rename the full-text panel, e.g. "Read along with the video" for the CRM training transcript (step 11),
+ * and a step with config.requireVideo (step 11) tracks the video and keeps the confirm box locked until it's watched.
  *
  * Functions:
  * - StepPage({ params }): loads the step and renders it.
@@ -163,14 +165,20 @@ export default async function StepPage({ params }: { params: Promise<{ stepKey: 
 
           {accounts ? <CorporateEmailCard accounts={accounts} supportName={supportName} /> : null}
 
-          <StepVideos stepKey={step.key} videos={step.videos} />
+          <StepVideos stepKey={step.key} videos={step.videos} trackWatching={step.videoRequired && step.canSubmit} />
 
           {step.key === AI_AGENT_STEP_KEY ? <AiAgentChat brokerName={me.user.name} /> : null}
 
           <StepPathGuide step={step} supportName={supportName} />
 
           {step.guidance ? (
-            <GuidedContent todoItems={step.guidance.todoItems} callouts={step.guidance.callouts} fullTextMd={step.guidance.fullTextMd}>
+            <GuidedContent
+              todoItems={step.guidance.todoItems}
+              callouts={step.guidance.callouts}
+              fullTextMd={step.guidance.fullTextMd}
+              fullTextLabel={step.config.fullTextLabel}
+              fullTextSource={step.config.fullTextSource}
+            >
               {hasStepLinks(step) ? <StepLinks step={step} /> : null}
             </GuidedContent>
           ) : (
