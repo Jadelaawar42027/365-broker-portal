@@ -1,9 +1,10 @@
 /**
  * File: apps/web/e2e/journey-8-step-guidance.spec.ts
  * Purpose: The short onboarding-step layout (SPEC D28) end to end. An admin edits a step's What to do bullets and its
- * sub-header, and puts a YouTube link in one of step 11's video slots; the broker sees the videos first (with "on its
- * way" placeholders for the empty slots), the new sub-header, the bullets, the callouts and the manual's text behind
- * "Read the full section"; step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
+ * sub-header, and puts a YouTube link in step 12's (BoatWizard) video slot; the broker sees the video first, the new
+ * sub-header, the bullets, the callouts and the manual's text behind "Read the full section"; step 11 (CRM training)
+ * keeps its confirm box locked until its video is marked watched and shows the transcript behind "Read along with the
+ * video" (SPEC D32); step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
  * send button stays disabled until the deposit question is answered correctly, after a wrong try with its explanation.
  *
  * Functions:
@@ -20,17 +21,17 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await page.goto("/admin/steps");
   await expect(page).toHaveURL(/\/admin\/steps\/start_here$/);
   const steps = page.getByRole("navigation", { name: "Onboarding steps" });
-  await steps.getByRole("link", { name: /BoatWizard, YachtCloser, GoHighLevel/ }).click();
-  await expect(page.getByRole("heading", { name: "Log in to BoatWizard, YachtCloser and GoHighLevel" })).toBeVisible();
-  await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(3);
+  await steps.getByRole("link", { name: /BoatWizard sign in/ }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to BoatWizard" })).toBeVisible();
+  await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(1);
   await page.getByLabel("YouTube, Loom or Vimeo link for BoatWizard walkthrough").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await page.getByRole("listitem").filter({ hasText: "BoatWizard walkthrough" }).getByRole("button", { name: "Use this link" }).click();
-  await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(2);
+  await expect(page.getByText("Empty. Brokers see it as “On its way”.")).toHaveCount(0);
 
   await steps.getByRole("link", { name: /365 email/ }).click();
-  await expect(page.getByRole("heading", { name: "Activate your 365 email and install the brand signature" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Log in to your 365 Yachts email" })).toBeVisible();
   const todo = page.getByLabel("What to do · one bullet per line");
-  await todo.fill(`${await todo.inputValue()}\nAsk Shelly if the signature looks wrong.`);
+  await todo.fill(`${await todo.inputValue()}\nAsk Shelly if you can't sign in.`);
   await page.getByRole("button", { name: "Save guidance" }).click();
   await expect(page.getByText("Saved. Brokers see the change now.")).toBeVisible();
   await page.getByRole("button", { name: "Edit titles" }).click();
@@ -43,19 +44,30 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await broker.context.route(VIDEO_HOSTS, (route) => route.abort());
   const brokerPage = broker.page;
 
-  await brokerPage.goto("/app/steps/platform_logins");
+  await brokerPage.goto("/app/steps/boatwizard_login");
   const videos = brokerPage.getByRole("region", { name: "Videos for this step" });
   await expect(videos.locator("iframe[title='Video: BoatWizard walkthrough']")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/);
-  await expect(videos.getByText("On its way", { exact: true })).toHaveCount(2);
-  await expect(videos.getByText("GoHighLevel CRM walkthrough")).toBeVisible();
+  await expect(videos.getByText("On its way", { exact: true })).toHaveCount(0);
   await expect(brokerPage.getByRole("heading", { name: "What to do" })).toBeVisible();
-  await expect(brokerPage.getByText("Aim for 100 contacts in the CRM by day seven.")).toBeVisible();
-  await expect(brokerPage.getByText("Load your first 100 contacts")).toBeHidden();
+  await expect(brokerPage.getByText("Run one practice search for a boat a client might want.")).toBeVisible();
+  await expect(brokerPage.getByText(/Target 100 names in the CRM by day seven/)).toBeHidden();
   await brokerPage.getByText("Read the full section").click();
-  await expect(brokerPage.getByText("Load your first 100 contacts")).toBeVisible();
+  await expect(brokerPage.getByText(/Target 100 names in the CRM by day seven/)).toBeVisible();
+
+  await brokerPage.goto("/app/steps/crm_login");
+  await expect(brokerPage.getByText("Step 11 of 14 · Your tools")).toBeVisible();
+  const crmConfirm = brokerPage.getByLabel(/watched the CRM training/);
+  await expect(brokerPage.getByText("Watch the whole video above first. This box unlocks once you've watched it.")).toBeVisible();
+  await expect(crmConfirm).toBeDisabled();
+  await expect(brokerPage.getByRole("button", { name: "Mark this step done" })).toBeDisabled();
+  await brokerPage.getByText("Read along with the video").click();
+  await expect(brokerPage.getByRole("heading", { name: "Broker outcomes: how we track your leads" })).toBeVisible();
+  await brokerPage.getByRole("button", { name: "I've watched this video" }).click();
+  await expect(crmConfirm).toBeEnabled();
+  await expect(brokerPage.getByText("Watched", { exact: true })).toBeVisible();
 
   await brokerPage.goto("/app/steps/email_signature");
-  await expect(brokerPage.getByText("Ask Shelly if the signature looks wrong.")).toBeVisible();
+  await expect(brokerPage.getByText("Ask Shelly if you can't sign in.")).toBeVisible();
   await expect(brokerPage.getByText("Your 365 email is where every client record lives.")).toBeVisible();
   await expect(brokerPage.getByText("HOUSE RULE", { exact: true }).first()).toBeVisible();
 
@@ -87,6 +99,6 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(send).toBeEnabled();
   await send.click();
   await brokerPage.waitForURL("**/app");
-  await expect(brokerPage.getByText("You've sent in 1 of 12 steps")).toBeVisible();
+  await expect(brokerPage.getByText("You've sent in 1 of 14 steps")).toBeVisible();
   await broker.context.close();
 });

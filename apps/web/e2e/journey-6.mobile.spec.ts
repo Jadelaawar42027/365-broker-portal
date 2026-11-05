@@ -14,8 +14,8 @@ test("a broker completes their steps on a phone", async ({ browser }) => {
   const broker = await createSignedInBroker(browser, "Lena Park", { viewport: { width: 390, height: 844 } });
   const page = broker.page;
   await completeBrokerSteps(page);
-  await expect(page.getByText("You've sent in 12 of 12 steps")).toBeVisible();
-  for (const path of ["/app", "/app/steps/ai_agent", "/app/steps/w9", "/app/help", "/app/training"]) {
+  await expect(page.getByText("You've sent in 14 of 14 steps")).toBeVisible();
+  for (const path of ["/app", "/app/steps/ai_agent", "/app/steps/w9", "/app/steps/crm_login", "/app/help", "/app/training"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${path} scrolls sideways`).toBeLessThanOrEqual(0);

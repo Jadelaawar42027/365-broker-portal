@@ -20,7 +20,7 @@ let marisol: Awaited<ReturnType<TestContext["createBroker"]>>;
 
 const ALL_BUT_LAST = [
   "start_here", "ai_agent", "photo_id", "contract_nda", "bio", "headshot", "w9", "license_situation",
-  "dbpr_filing", "license_bond", "email_signature",
+  "dbpr_filing", "license_bond", "email_signature", "crm_login", "boatwizard_login",
 ];
 
 beforeAll(async () => {
@@ -46,7 +46,7 @@ describe("review queue", () => {
     expect(response.json()).toMatchObject({
       status: "submitted",
       position: 4,
-      totalSteps: 12,
+      totalSteps: 14,
       stageTitle: "Paperwork",
       step: { key: "bio", shortTitle: "Professional bio" },
       broker: { name: "Daniel Reyes", firstName: "Daniel" },
@@ -113,12 +113,12 @@ describe("mark done and finishing onboarding", () => {
   it("has no commission step left to mark done", async () => {
     const steps = (await ctx.call("GET", `/v1/admin/brokers/${daniel.brokerId}`, { cookie: owner })).json().steps;
     expect(steps.map((step: { key: string }) => step.key)).not.toContain("commission_tier");
-    expect(steps.at(-1).key).toBe("platform_logins");
+    expect(steps.at(-1).key).toBe("yachtcloser_login");
   });
 
   it("marking the last step done makes the broker active and notifies broker and admins", async () => {
     await ctx.setStepStatus(daniel.brokerId, ALL_BUT_LAST, "approved");
-    const id = await ctx.stepId(daniel.brokerId, "platform_logins");
+    const id = await ctx.stepId(daniel.brokerId, "yachtcloser_login");
     const response = await ctx.call("POST", `/v1/admin/broker-steps/${id}/mark-done`, {
       cookie: owner,
       body: { note: "Checked on a call." },
@@ -142,7 +142,7 @@ describe("mark done and finishing onboarding", () => {
 
   it("approving a regular last step through the review screen also activates the broker", async () => {
     const tom = await ctx.createBroker({ name: "Tom Halvorsen", email: "tom@example.com" });
-    await ctx.setStepStatus(tom.brokerId, [...ALL_BUT_LAST.filter((key) => key !== "w9"), "platform_logins"], "approved");
+    await ctx.setStepStatus(tom.brokerId, [...ALL_BUT_LAST.filter((key) => key !== "w9"), "yachtcloser_login"], "approved");
     await ctx.setStepStatus(tom.brokerId, ["w9"], "submitted");
     const id = await ctx.stepId(tom.brokerId, "w9");
     const response = await ctx.call("POST", `/v1/admin/broker-steps/${id}/approve`, { cookie: owner });

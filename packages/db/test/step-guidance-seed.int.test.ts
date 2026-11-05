@@ -2,7 +2,7 @@
  * File: packages/db/test/step-guidance-seed.int.test.ts
  * Purpose: Integration tests on a real Postgres container for seeding the onboarding steps' short guidance (SPEC D28):
  * every step gets its What to do bullets, callouts and full text (except the two Start here steps, which have no
- * manual text); steps 0 and 1 get one video slot each, step 11 three empty slots and step 8 one;
+ * manual text) and step 11 its read-along CRM transcript; steps 0, 1, 8, 11, 12 and 13 get one video slot each;
  * step 9 gets the deposit knowledge check; running the seed again adds nothing; an admin's edits are never overwritten;
  * and a step that already exists without guidance (as in production) is filled on the next run.
  *
@@ -32,8 +32,8 @@ afterAll(async () => {
 });
 
 describe("step guidance seed", () => {
-  it("gives all 12 steps their bullets, and every step after the two Start here steps its full text", async () => {
-    expect(firstGuided).toBe(12);
+  it("gives all 14 steps their bullets, and every step after the two Start here steps its full text", async () => {
+    expect(firstGuided).toBe(14);
     const rows = await testDb.db.select().from(onboardingSteps).orderBy(asc(onboardingSteps.position));
     const [startHere, aiAgent, ...manualSteps] = rows;
     expect(startHere!.key).toBe("start_here");
@@ -57,13 +57,18 @@ describe("step guidance seed", () => {
     expect(aiAgent.map((video) => video.title)).toEqual(["Part 2: Introducing Your Personal AI Agent"]);
   });
 
-  it("adds the empty video slots on steps 11 and 8", async () => {
-    const platform = await testDb.db.select().from(stepVideos).where(eq(stepVideos.stepId, await stepId("platform_logins"))).orderBy(asc(stepVideos.position));
-    expect(platform.map((video) => [video.title, video.source])).toEqual([
-      ["GoHighLevel CRM walkthrough", null],
-      ["BoatWizard walkthrough", null],
-      ["YachtCloser walkthrough", null],
-    ]);
+  it("adds one empty video slot to each of steps 11 to 13, and one on step 8", async () => {
+    for (const [key, title] of [
+      ["crm_login", "CRM sign in and training"],
+      ["boatwizard_login", "BoatWizard walkthrough"],
+      ["yachtcloser_login", "YachtCloser walkthrough"],
+    ] as const) {
+      const slots = await testDb.db.select().from(stepVideos).where(eq(stepVideos.stepId, await stepId(key))).orderBy(asc(stepVideos.position));
+      expect(slots.map((video) => [video.title, video.source]), key).toEqual([[title, null]]);
+    }
+    const [crm] = await testDb.db.select().from(onboardingSteps).where(eq(onboardingSteps.key, "crm_login"));
+    expect(crm!.config).toMatchObject({ requireVideo: true, fullTextLabel: "Read along with the video", fullTextSource: "Transcript" });
+    expect(crm!.fullTextMd).toContain("## Broker outcomes: how we track your leads");
     const dbpr = await testDb.db.select().from(stepVideos).where(eq(stepVideos.stepId, await stepId("dbpr_filing")));
     expect(dbpr.map((video) => video.title)).toEqual(["How to file your DBPR application"]);
   });

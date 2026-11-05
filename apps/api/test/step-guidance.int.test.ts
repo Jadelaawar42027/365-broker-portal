@@ -3,7 +3,9 @@
  * Purpose: Integration tests for the short step and lesson layout (SPEC D28) on a real Postgres container: brokers get
  * a step's guidance, video slots and knowledge-check questions without the answers; checking an answer returns right
  * or wrong with the explanation; a step with a check can't be sent until every answer is right; uploaded step videos
- * play through short-lived links; the two Start here steps each have their own video slot; and admins edit a step's
+ * play through short-lived links; the two Start here steps each have their own video slot; step 11 (CRM training)
+ * can't be finished until its video is watched (YouTube and uploads tracked to 90%, Loom by "I've watched this
+ * video"), with progress kept per broker and only for the step's own videos; and admins edit a step's
  * titles (title, sub-header, short title, summary), guidance, video slots and questions (validated, capped at 3,
  * audited). Lessons return and save their What to do bullets and callouts.
  *
@@ -60,27 +62,93 @@ describe("a broker's step page", () => {
     expect(aiAgent.videos.map((video: { title: string }) => video.title)).toEqual(["Part 2: Introducing Your Personal AI Agent"]);
   });
 
-  it("lists step 11's three empty video slots in order", async () => {
-    const body = (await ctx.call("GET", "/v1/me/steps/platform_logins", { cookie: broker.cookie })).json();
-    expect(body.videos.map((video: { title: string; source: string | null; playUrl: string | null }) => [video.title, video.source, video.playUrl])).toEqual([
-      ["GoHighLevel CRM walkthrough", null, null],
-      ["BoatWizard walkthrough", null, null],
-      ["YachtCloser walkthrough", null, null],
-    ]);
-    expect(body.checkQuestions).toEqual([]);
+  it("gives steps 11 to 13 one empty video slot each", async () => {
+    for (const [key, title] of [
+      ["crm_login", "CRM sign in and training"],
+      ["boatwizard_login", "BoatWizard walkthrough"],
+      ["yachtcloser_login", "YachtCloser walkthrough"],
+    ] as const) {
+      const body = (await ctx.call("GET", `/v1/me/steps/${key}`, { cookie: broker.cookie })).json();
+      expect(body.videos.map((video: { title: string; source: string | null; playUrl: string | null }) => [video.title, video.source, video.playUrl]), key).toEqual([[title, null, null]]);
+      expect(body.checkQuestions, key).toEqual([]);
+    }
   });
 
   it("plays an uploaded step video through a short-lived link", async () => {
     const [slot] = await ctx.db.select().from(stepVideos).where(eq(stepVideos.title, "BoatWizard walkthrough"));
     await ctx.db.update(stepVideos).set({ source: "upload", provider: "upload", storageKey: `onboarding/steps/${slot!.stepId}/videos/abc-bw.mp4`, fileName: "bw.mp4" }).where(eq(stepVideos.id, slot!.id));
-    const body = (await ctx.call("GET", "/v1/me/steps/platform_logins", { cookie: broker.cookie })).json();
-    expect(body.videos[1].playUrl).toMatch(/^https?:\/\//);
-    const fresh = await ctx.call("GET", `/v1/me/steps/platform_logins/videos/${slot!.id}/url`, { cookie: broker.cookie });
+    const body = (await ctx.call("GET", "/v1/me/steps/boatwizard_login", { cookie: broker.cookie })).json();
+    expect(body.videos[0].playUrl).toMatch(/^https?:\/\//);
+    const fresh = await ctx.call("GET", `/v1/me/steps/boatwizard_login/videos/${slot!.id}/url`, { cookie: broker.cookie });
     expect(fresh.statusCode).toBe(200);
     expect(fresh.json().url).toMatch(/X-Amz-Expires=300/);
     const empty = (await ctx.db.select().from(stepVideos).where(eq(stepVideos.title, "YachtCloser walkthrough")))[0]!;
-    expect((await ctx.call("GET", `/v1/me/steps/platform_logins/videos/${empty.id}/url`, { cookie: broker.cookie })).statusCode).toBe(404);
+    expect((await ctx.call("GET", `/v1/me/steps/yachtcloser_login/videos/${empty.id}/url`, { cookie: broker.cookie })).statusCode).toBe(404);
     expect((await ctx.call("GET", `/v1/me/steps/w9/videos/${slot!.id}/url`, { cookie: broker.cookie })).statusCode).toBe(404);
+  });
+});
+
+describe("step 11 needs its video watched", () => {
+  async function crmSlotId(): Promise<string> {
+    const [slot] = await ctx.db.select({ id: stepVideos.id }).from(stepVideos).where(eq(stepVideos.title, "CRM sign in and training"));
+    return slot!.id;
+  }
+
+  async function finishCrm(cookie: string) {
+    return ctx.call("POST", "/v1/me/steps/crm_login/submit", { cookie, body: { formData: { confirmed: true } } });
+  }
+
+  it("shows the read-along transcript and refuses to finish while the video slot is empty", async () => {
+    const step = (await ctx.call("GET", "/v1/me/steps/crm_login", { cookie: broker.cookie })).json();
+    expect(step).toMatchObject({ videoRequired: true, videosWatched: false, config: { requireVideo: true, fullTextLabel: "Read along with the video", fullTextSource: "Transcript" } });
+    expect(step.guidance.fullTextMd).toContain("## Conversations");
+    const response = await finishCrm(broker.cookie);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toBe("video_not_ready");
+  });
+
+  it("tracks a YouTube video and unlocks the step at 90% watched", async () => {
+    const slotId = await crmSlotId();
+    expect((await ctx.call("PUT", `/v1/admin/step-videos/${slotId}/embed`, { cookie: owner, body: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })).statusCode).toBe(200);
+    expect((await finishCrm(broker.cookie)).json().error).toBe("video_not_watched");
+    expect((await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/watched`, { cookie: broker.cookie })).json().error).toBe("video_tracked_automatically");
+    const progress = (seconds: number) =>
+      ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: broker.cookie, body: { watchedSeconds: seconds, durationSeconds: 300 } });
+    expect((await progress(100)).json()).toEqual({ watched: false, watchedSeconds: 100 });
+    expect((await progress(50)).json()).toEqual({ watched: false, watchedSeconds: 100 });
+    expect((await finishCrm(broker.cookie)).json().error).toBe("video_not_watched");
+    expect((await progress(270)).json()).toEqual({ watched: true, watchedSeconds: 270 });
+    const step = (await ctx.call("GET", "/v1/me/steps/crm_login", { cookie: broker.cookie })).json();
+    expect(step).toMatchObject({ videosWatched: true, videos: [expect.objectContaining({ watched: true, watchedSeconds: 270 })] });
+    expect((await finishCrm(broker.cookie)).json().status).toBe("approved");
+  });
+
+  it("keeps progress per broker", async () => {
+    const other = await ctx.createBroker({ name: "Second Broker", email: "second-crm@example.com" });
+    const step = (await ctx.call("GET", "/v1/me/steps/crm_login", { cookie: other.cookie })).json();
+    expect(step).toMatchObject({ videosWatched: false, videos: [expect.objectContaining({ watched: false, watchedSeconds: 0 })] });
+    expect((await finishCrm(other.cookie)).json().error).toBe("video_not_watched");
+  });
+
+  it("uses \"I've watched this video\" for a Loom video, whose player can't report watch time", async () => {
+    const slotId = await crmSlotId();
+    expect((await ctx.call("PUT", `/v1/admin/step-videos/${slotId}/embed`, { cookie: owner, body: { url: "https://www.loom.com/share/0123456789abcdef0123456789abcdef" } })).statusCode).toBe(200);
+    const loomBroker = await ctx.createBroker({ name: "Loom Broker", email: "loom-crm@example.com" });
+    const progress = await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/progress`, { cookie: loomBroker.cookie, body: { watchedSeconds: 10 } });
+    expect(progress.json().error).toBe("video_not_trackable");
+    expect((await ctx.call("POST", `/v1/me/steps/crm_login/videos/${slotId}/watched`, { cookie: loomBroker.cookie })).json()).toEqual({ watched: true, watchedSeconds: 0 });
+    expect((await finishCrm(loomBroker.cookie)).json().status).toBe("approved");
+  });
+
+  it("only records progress on the step's own videos", async () => {
+    const slotId = await crmSlotId();
+    const response = await ctx.call("POST", `/v1/me/steps/w9/videos/${slotId}/progress`, { cookie: broker.cookie, body: { watchedSeconds: 10 } });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("doesn't need a video on steps without requireVideo", async () => {
+    const step = (await ctx.call("GET", "/v1/me/steps/boatwizard_login", { cookie: broker.cookie })).json();
+    expect(step.videoRequired).toBe(false);
   });
 });
 
@@ -120,12 +188,13 @@ describe("the knowledge check", () => {
 });
 
 describe("the admin step editor", () => {
-  it("lists the 12 steps with their guidance, video slots and checks", async () => {
+  it("lists the 14 steps with their guidance, video slots and checks", async () => {
     const body = (await ctx.call("GET", "/v1/admin/steps", { cookie: owner })).json();
-    expect(body.steps).toHaveLength(12);
+    expect(body.steps).toHaveLength(14);
     expect(body.steps[0]).toMatchObject({ key: "start_here", emptyVideoSlots: 1, checkQuestionCount: 0 });
     expect(body.steps[1]).toMatchObject({ key: "ai_agent", position: 1, emptyVideoSlots: 1, checkQuestionCount: 0 });
-    expect(body.steps.find((step: { key: string }) => step.key === "platform_logins")).toMatchObject({ videoCount: 1, emptyVideoSlots: 2, checkQuestionCount: 0 });
+    expect(body.steps.find((step: { key: string }) => step.key === "boatwizard_login")).toMatchObject({ videoCount: 1, emptyVideoSlots: 0, checkQuestionCount: 0 });
+    expect(body.steps.find((step: { key: string }) => step.key === "yachtcloser_login")).toMatchObject({ videoCount: 0, emptyVideoSlots: 1, checkQuestionCount: 0 });
     expect(body.steps.find((step: { key: string }) => step.key === "license_bond")).toMatchObject({ checkQuestionCount: 1 });
     const detail = (await ctx.call("GET", "/v1/admin/steps/license_bond", { cookie: owner })).json();
     expect(detail.questions[0].options.filter((option: { isCorrect: boolean }) => option.isCorrect)).toHaveLength(1);

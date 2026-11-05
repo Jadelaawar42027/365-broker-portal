@@ -9,7 +9,7 @@
  * their own steps.
  *
  * Functions:
- * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/videos/:videoId/progress (uploaded videos), POST /v1/me/steps/:key/videos/:videoId/watched (embedded videos), POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url (at most UPLOAD_LINKS_PER_HOUR per step) and POST /v1/me/steps/:key/submit (an answer step that can't be sent now is refused before its answer is checked; upload steps must send between the step's minFiles and maxFiles).
+ * - registerBrokerStepRoutes(app): mounts GET /v1/me/steps, GET /v1/me/steps/:key, GET /v1/me/steps/:key/template-url, GET /v1/me/steps/:key/videos/:videoId/url, POST /v1/me/steps/:key/videos/:videoId/progress (uploaded, YouTube and Vimeo videos), POST /v1/me/steps/:key/videos/:videoId/watched (Loom videos, which can't report watch time), POST /v1/me/steps/:key/check, POST /v1/me/steps/:key/upload-url (at most UPLOAD_LINKS_PER_HOUR per step) and POST /v1/me/steps/:key/submit (an answer step that can't be sent now is refused before its answer is checked; upload steps must send between the step's minFiles and maxFiles).
  * - requireOwnStep(app, brokerId, key): loads the broker's own step by key or throws 404.
  * - requireOwnStepVideo(app, brokerId, key, videoId): loads the broker's own step and one of its video slots, or throws 404.
  * - loadWatchedVideos(app, brokerId, stepId): the step's videos as the broker sees them, with whether each one is watched.
@@ -21,6 +21,7 @@
 import { brokers, users } from "@bp/db";
 import {
   areStepVideosWatched,
+  canTrackEmbed,
   CONTRACT_STEP_KEY,
   countProgress,
   hasVideoContent,
@@ -285,7 +286,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       preHandler: requireBroker,
       schema: {
         tags: ["broker"],
-        summary: "Video watch heartbeat for an uploaded step video: furthest second watched (watched at 90%)",
+        summary: "Video watch heartbeat for an uploaded, YouTube or Vimeo step video: furthest second watched (watched at 90%)",
         params: videoParams,
         body: stepVideoProgressRequestSchema,
         response: { 200: stepVideoProgressResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, ...brokerErrors },
@@ -294,7 +295,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const { video } = await requireOwnStepVideo(app, actor.brokerId!, request.params.key, request.params.videoId);
-      if (video.source !== "upload") throw conflict("Use \"I've watched this video\" for this video.", "not_an_uploaded_video");
+      if (video.source !== "upload" && !canTrackEmbed(video.provider)) throw conflict("Use \"I've watched this video\" for this video.", "video_not_trackable");
       return recordStepVideoProgress(app.deps.db, {
         brokerId: actor.brokerId!,
         video,
@@ -311,7 +312,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
       preHandler: requireBroker,
       schema: {
         tags: ["broker"],
-        summary: "Mark an embedded (YouTube, Loom or Vimeo) step video as watched",
+        summary: "Mark a Loom step video as watched (its player can't report watch time)",
         params: videoParams,
         response: { 200: stepVideoProgressResponseSchema, 404: errorResponseSchema, 409: errorResponseSchema, ...brokerErrors },
       },
@@ -319,7 +320,7 @@ export function registerBrokerStepRoutes(app: FastifyInstance): void {
     async (request) => {
       const actor = currentActor(request);
       const { video } = await requireOwnStepVideo(app, actor.brokerId!, request.params.key, request.params.videoId);
-      if (video.source !== "embed") throw conflict("Watch this video to the end; it's marked as watched automatically.", "not_an_embedded_video");
+      if (video.source !== "embed" || canTrackEmbed(video.provider)) throw conflict("Watch this video to the end; it's marked as watched automatically.", "video_tracked_automatically");
       return markStepVideoWatched(app.deps.db, { brokerId: actor.brokerId!, videoId: video.id, now: app.deps.now() });
     },
   );
