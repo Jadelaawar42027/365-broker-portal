@@ -1,7 +1,7 @@
 /**
  * File: packages/shared/src/status-labels.ts
  * Purpose: The words and colour tone of each step's status pill, shared by the broker checklist (1b) and
- * the admin onboarding record (3c) so both say the same thing (SPEC D3). Step 2's agreements wait for a
+ * the admin onboarding record (3c) so both say the same thing (SPEC D3). Step 3's agreements wait for a
  * countersignature rather than an approval (SPEC D31).
  *
  * Functions:

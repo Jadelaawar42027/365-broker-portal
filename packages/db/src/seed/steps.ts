@@ -1,11 +1,12 @@
 /**
  * File: packages/db/src/seed/steps.ts
- * Purpose: The onboarding steps from docs/SPEC.md: step 0 "Start here" (Aj's two videos: the portal walkthrough and the personal AI agent, SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
+ * Purpose: The onboarding steps from docs/SPEC.md: the two "Start here" steps (step 0, Aj's portal walkthrough video, and
+ * step 1, Aj's personal AI agent video; SPEC D30), then the 10 steps with copy taken from the mockups and the 365 Broker
  * Onboarding Manual (Module 01 Week One Setup, Module 02 Licensing). Seeded once; admins can edit them later. The old
  * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Upload
  * steps carry their own file-count limits (minFiles/maxFiles) and the bio its word limits; migration 0014 adds them to existing databases.
- * The DBPR confirmation is PDF only (migration 0015). Steps 6 to 8 use the licensing guides in
- * license-paths.ts: step 6's answer picks the guide steps 7 and 8 show, and "not sure" emails the admins (migration 0016).
+ * The DBPR confirmation is PDF only (migration 0015). Steps 7 to 9 use the licensing guides in
+ * license-paths.ts: step 7's answer picks the guide steps 8 and 9 show, and "not sure" emails the admins (migration 0016).
  *
  * Functions:
  * - none
@@ -40,22 +41,39 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     stage: "start_here",
     title: "Start here: how the 365 portal works",
     shortTitle: "Start here: portal walkthrough",
-    summary: "Watch two short videos from Aj before you begin: the portal walkthrough and your personal AI agent. Takes about 10 minutes.",
-    intro: "Aj walks you through the platform: your checklist, sending each step, getting help, and what happens after. Then Aj introduces your personal AI agent.",
+    summary: "Watch Aj's short walkthrough of the portal before you begin. Takes about 10 minutes.",
+    intro: "Aj walks you through the platform: your checklist, sending each step, getting help, and what happens after.",
     kind: "confirm",
     needsApproval: false,
     instructionsMd: [
       "1. Watch Part 1: Aj walks you through the platform.",
-      "2. Watch Part 2: Aj introduces your personal AI agent.",
-      "3. Tick the box to say you've watched both.",
+      "2. Tick the box to say you've watched it.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: { minutes: 10, confirmLabel: "I've watched the walkthrough" },
   },
   {
-    key: "photo_id",
+    key: "ai_agent",
     position: 1,
+    stage: "start_here",
+    title: "Introducing your personal AI agent",
+    shortTitle: "Start here: your personal AI agent",
+    summary: "Watch Aj introduce your personal AI agent. Takes about 5 minutes.",
+    intro: "Part 2 of Start here: Aj introduces your personal AI agent.",
+    kind: "confirm",
+    needsApproval: false,
+    instructionsMd: [
+      "1. Watch Part 2: Aj introduces your personal AI agent.",
+      "2. Tick the box to say you've watched it.",
+    ].join("\n"),
+    acceptedTypes: [],
+    maxSizeBytes: MAX_UPLOAD_BYTES,
+    config: { minutes: 5, confirmLabel: "I've watched the AI agent video" },
+  },
+  {
+    key: "photo_id",
+    position: 2,
     stage: "paperwork",
     title: "Upload photo ID / driver's license",
     shortTitle: "Photo ID / driver's license",
@@ -79,7 +97,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "contract_nda",
-    position: 2,
+    position: 3,
     stage: "paperwork",
     title: "Review and sign your agreements",
     shortTitle: "Broker Agreement & NDA",
@@ -101,7 +119,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "bio",
-    position: 3,
+    position: 4,
     stage: "paperwork",
     title: "Write your professional bio",
     shortTitle: "Professional bio",
@@ -128,7 +146,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "headshot",
-    position: 4,
+    position: 5,
     stage: "paperwork",
     title: "Upload a professional headshot",
     shortTitle: "Professional headshot",
@@ -153,7 +171,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "w9",
-    position: 5,
+    position: 6,
     stage: "paperwork",
     title: "Upload your W-9",
     shortTitle: "W-9",
@@ -178,12 +196,12 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "license_situation",
-    position: 6,
+    position: 7,
     stage: "florida_license",
     title: "Tell us your license situation (new, transfer or not yet licensed)",
     shortTitle: "License situation",
     summary: "One question so we can guide you through the right licensing path. Takes 1 minute.",
-    intro: "Florida requires a yacht and ship license to sell any used vessel over 32 feet. Tell us where you stand, and steps 7 and 8 will show you exactly what to do.",
+    intro: "Florida requires a yacht and ship license to sell any used vessel over 32 feet. Tell us where you stand, and steps 8 and 9 will show you exactly what to do.",
     kind: "choice",
     needsApproval: false,
     instructionsMd: [
@@ -200,7 +218,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "dbpr_filing",
-    position: 7,
+    position: 8,
     stage: "florida_license",
     title: "File your DBPR application or license transfer",
     shortTitle: "DBPR application / transfer",
@@ -227,7 +245,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "license_bond",
-    position: 8,
+    position: 9,
     stage: "florida_license",
     title: "Upload your license & surety bond copy",
     shortTitle: "License & surety bond copy",
@@ -253,7 +271,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "email_signature",
-    position: 9,
+    position: 10,
     stage: "your_tools",
     title: "Activate your 365 email and install the brand signature",
     shortTitle: "365 email + brand signature",
@@ -276,7 +294,7 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
   },
   {
     key: "platform_logins",
-    position: 10,
+    position: 11,
     stage: "your_tools",
     title: "Log in to BoatWizard, YachtCloser and GoHighLevel",
     shortTitle: "BoatWizard, YachtCloser, GoHighLevel logins",

@@ -2,8 +2,8 @@
  * File: apps/api/src/routes/admin/reviews.ts
  * Purpose: Reviewing a broker's submission (3d): the detail with files and checklist and its place in the queue,
  * approve, send back with a required note, and "mark done" (the admin override, SPEC D2). Approving the last step
- * activates the broker and notifies everyone. Step 2's agreements (SPEC D31) can't be approved here while they wait
- * for a countersignature, and sending step 2 back voids its open documents so the broker signs again.
+ * activates the broker and notifies everyone. Step 3's agreements (SPEC D31) can't be approved here while they wait
+ * for a countersignature, and sending step 3 back voids its open documents so the broker signs again.
  *
  * Functions:
  * - registerAdminReviewRoutes(app): mounts GET /v1/admin/broker-steps/:id and its approve, send-back and mark-done actions.

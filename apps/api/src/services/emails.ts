@@ -182,7 +182,7 @@ export function contractsSignedEmail(input: { brokerName: string; fullySigned: b
         text: [
           `Hi ${firstName(input.brokerName)},`,
           "",
-          "Your Broker Agreement and NDA are signed by you and by 365 Yachts. Both signed copies are attached, and you can download them any time from step 2 of your onboarding:",
+          "Your Broker Agreement and NDA are signed by you and by 365 Yachts. Both signed copies are attached, and you can download them any time from step 3 of your onboarding:",
           input.link,
           "",
           "365 Yachts",

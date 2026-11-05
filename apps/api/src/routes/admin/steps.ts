@@ -1,7 +1,8 @@
 /**
  * File: apps/api/src/routes/admin/steps.ts
  * Purpose: Admin routes for the onboarding-step editor (SPEC D28): list the active steps, read one step with its
- * guidance, video slots and knowledge check, edit the guidance (What to do, callouts, full text), manage video slots
+ * guidance, video slots and knowledge check, edit its titles (title, sub-header, short title, summary) and guidance
+ * (What to do, callouts, full text), manage video slots
  * (add, rename, remove, set an embed link, upload an MP4 straight to the bucket in parts, clear the video), and add,
  * edit or delete up to 3 knowledge-check questions. Every change writes audit_log.
  *
@@ -11,6 +12,7 @@
  * - requireStepVideo(app, id): loads a step video slot by id or throws 404.
  * - requireStepQuestion(app, id): loads a knowledge-check question by id or throws 404.
  * - stepRow(step, videos, questionCount): the list/detail summary of a step.
+ * - definedFields(body, keys): the subset of body keys that were sent, for a partial update.
  * - replaceStepOptions(tx, questionId, options): saves a question's options, keeping the ids of options that stay.
  */
 import { onboardingSteps, stepQuestionOptions, stepQuestions, stepVideos, type DbOrTx } from "@bp/db";
@@ -70,6 +72,10 @@ async function requireStepQuestion(app: FastifyInstance, id: string) {
   const [question] = await app.deps.db.select().from(stepQuestions).where(eq(stepQuestions.id, id));
   if (!question) throw notFound("That question doesn't exist.");
   return question;
+}
+
+function definedFields<T extends Record<string, unknown>, K extends keyof T>(body: T, keys: readonly K[]): Partial<Pick<T, K>> {
+  return Object.fromEntries(keys.filter((key) => body[key] !== undefined).map((key) => [key, body[key]])) as Partial<Pick<T, K>>;
 }
 
 function stepRow(step: StepRecord, videos: StepVideoRow[], questionCount: number): AdminStepListRow {
@@ -135,6 +141,7 @@ export function registerAdminStepRoutes(app: FastifyInstance): void {
         step: {
           ...stepRow(step, videos, questions.length),
           intro: step.intro,
+          summary: step.summary,
           todoItems: step.todoItems ?? [],
           callouts: step.callouts ?? [],
           fullTextMd: step.fullTextMd ?? "",
@@ -156,26 +163,28 @@ export function registerAdminStepRoutes(app: FastifyInstance): void {
 
   r.patch(
     "/v1/admin/steps/:key",
-    { schema: { tags: ["admin"], summary: "Edit a step's What to do bullets, callouts or full manual text", params: keyParams, body: updateStepGuidanceRequestSchema, response: { 200: okResponseSchema, ...errors } } },
+    { schema: { tags: ["admin"], summary: "Edit a step's titles (title, sub-header, short title, summary), What to do bullets, callouts or full manual text", params: keyParams, body: updateStepGuidanceRequestSchema, response: { 200: okResponseSchema, ...errors } } },
     async (request) => {
       const actor = currentActor(request);
       const step = await requireStep(app, request.params.key);
-      const body = request.body;
-      const changes = {
-        ...(body.todoItems ? { todoItems: body.todoItems } : {}),
-        ...(body.callouts ? { callouts: body.callouts } : {}),
-        ...(body.fullTextMd !== undefined ? { fullTextMd: body.fullTextMd } : {}),
-      };
+      const copyChanges = definedFields(request.body, ["title", "shortTitle", "intro", "summary"] as const);
+      const guidanceChanges = definedFields(request.body, ["todoItems", "callouts", "fullTextMd"] as const);
       await app.deps.db.transaction(async (tx) => {
-        await tx.update(onboardingSteps).set(changes).where(eq(onboardingSteps.id, step.id));
-        await writeAudit(tx, {
-          actorUserId: actor.userId,
-          action: "step.guidance_updated",
-          entityType: "onboarding_step",
-          entityId: step.id,
-          before: Object.fromEntries(Object.keys(changes).map((key) => [key, step[key as keyof StepRecord]])),
-          after: changes,
-        });
+        await tx.update(onboardingSteps).set({ ...copyChanges, ...guidanceChanges }).where(eq(onboardingSteps.id, step.id));
+        for (const [action, changes] of [
+          ["step.copy_updated", copyChanges],
+          ["step.guidance_updated", guidanceChanges],
+        ] as const) {
+          if (Object.keys(changes).length === 0) continue;
+          await writeAudit(tx, {
+            actorUserId: actor.userId,
+            action,
+            entityType: "onboarding_step",
+            entityId: step.id,
+            before: Object.fromEntries(Object.keys(changes).map((key) => [key, step[key as keyof StepRecord]])),
+            after: changes,
+          });
+        }
       });
       return { ok: true as const };
     },

@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/components/broker/corporate-email-card.tsx
- * Purpose: The "Your 365 email" card on step 9 (phase H2). When the Workspace account is ready it shows the address
+ * Purpose: The "Your 365 email" card on step 10 (phase H2). When the Workspace account is ready it shows the address
  * and a numbered "How to log in to Gmail" list: open Gmail, the email, and the password (the starting password the
  * account was made with, or one just revealed), each with Copy; Google asks for a new password at first sign-in.
  * "Get a new temporary password" resets the Google password at that moment and shows it once (up to 3 a day). When the

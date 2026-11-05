@@ -1,6 +1,6 @@
 /**
  * File: packages/shared/src/contracts.ts
- * Purpose: Contract signing on onboarding step 2 (SPEC D31): the two documents every broker signs, their statuses,
+ * Purpose: Contract signing on onboarding step 3 (SPEC D31): the two documents every broker signs, their statuses,
  * the exact e-sign consent and company authorization wording (stored with every signature), Eastern-time contract
  * dates, the field-map shape of a template, and the HTTP contract for the broker signing flow, the company signature
  * and the admin contract actions.

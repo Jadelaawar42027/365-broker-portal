@@ -1,11 +1,11 @@
 /**
  * File: packages/db/src/contracts.ts
  * Purpose: Database rules for contract documents shared by the API and the importer (SPEC D31). Voiding marks every
- * open document of a broker (not yet countersigned) as voided, keeps it for the record, resets onboarding step 2 to
+ * open document of a broker (not yet countersigned) as voided, keeps it for the record, resets onboarding step 3 to
  * "to do" when it wasn't approved yet, and writes audit_log rows. Fully signed documents are never voided this way.
  *
  * Functions:
- * - voidOpenContracts(tx, input): voids a broker's pending and broker-signed documents and resets step 2 (unless resetStep is false); returns how many were voided and whether any had been signed by the broker.
+ * - voidOpenContracts(tx, input): voids a broker's pending and broker-signed documents and resets step 3 (unless resetStep is false); returns how many were voided and whether any had been signed by the broker.
  */
 import { CONTRACT_STEP_KEY } from "@bp/shared";
 import { and, eq, inArray } from "drizzle-orm";

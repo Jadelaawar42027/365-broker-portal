@@ -1,7 +1,7 @@
 /**
  * File: packages/db/src/seed/license-paths.ts
- * Purpose: The Florida licensing guides for steps 6 to 8, written so someone who has never done it can follow them:
- * the step 6 answers (each one clearly different), and for steps 7 and 8 one numbered guide per answer, shown to the
+ * Purpose: The Florida licensing guides for steps 7 to 9, written so someone who has never done it can follow them:
+ * the step 7 answers (each one clearly different), and for steps 8 and 9 one numbered guide per answer, shown to the
  * broker for the route they picked. Facts come from Chapter 326 Florida Statutes (s. 326.004) and DBPR's Yacht and
  * Ship pages and help answers, checked October 2026: Form YS 6000-1, the $10,000 salesperson bond, the $551 listed
  * fee, Livescan ORI FL921900Z, the Change Form with its $100 listed fee, and the temporary 90-day license.
@@ -24,7 +24,7 @@ export const LICENSE_SITUATION_TODO = [
   "Licensed with another Florida brokerage? Pick the second.",
   "Not sure? Pick the third and we'll message you.",
   "A Florida real estate license doesn't count.",
-  "Your answer sets what you see in steps 7 and 8.",
+  "Your answer sets what you see in steps 8 and 9.",
 ];
 
 const LINKS = {
@@ -42,7 +42,7 @@ const NEW_LICENSE_FILING = `Most new brokers are here. It takes about an hour of
 
 1. **Message Shelly first.** Ask her for 365 Yachts Inc.'s employing broker details: company name, address and DBPR license number. You'll copy them onto the application in step 5.
 2. **Buy a $10,000 surety bond.** A bond is a guarantee you buy from a bond company. It is not money you hand to DBPR. Search online for "Florida yacht salesperson bond", or ask any insurance agent. Tell them it's for a **Florida yacht and ship salesperson license (Chapter 326)**. You pay a small part of the $10,000, depending on your credit. As a new licensee you get a **paper original with a raised seal**. Keep it safe: you'll mail it to DBPR.
-3. **Scan the bond to PDF before you mail it.** You'll need the copy in step 8. ${SCAN_TIP}
+3. **Scan the bond to PDF before you mail it.** You'll need the copy in step 9. ${SCAN_TIP}
 4. **Get your fingerprints taken (Livescan).** Pick a location from the [FDLE list of Livescan providers](${LINKS.livescan}) and bring your photo ID. Tell them it's for a **Chapter 326 yacht and ship license** and give them **ORI number FL921900Z** (the DBPR Yacht and Ship section). A wrong ORI means DBPR never gets your results. Keep the receipt. Fingerprints must be less than 6 months old when DBPR receives your application.
 5. **Fill in the application: DBPR Form YS 6000-1.** Download it from the [DBPR Yacht and Ship forms page](${LINKS.forms}). Choose **Salesperson**: a broker license needs a salesperson license plus sales experience first. Enter 365 Yachts Inc. as your employing broker, using the details from Shelly. Sign and date it.
 6. **Pay the fee.** DBPR lists **$551** (application plus fingerprint processing). Amounts change, so check the form or the [licensing page](${LINKS.licensing}) for the current fee and how to pay.
@@ -50,7 +50,7 @@ const NEW_LICENSE_FILING = `Most new brokers are here. It takes about an hour of
 8. **Message Shelly the day you send it.**
 9. **Upload your proof below.** Scan your signed application and your fingerprint receipt into one PDF and upload it. ${SCAN_TIP}
 
-**What happens next:** DBPR issues a **temporary 90-day license** while the FBI background check runs, then your permanent two-year license. You'll upload your license and bond copy in step 8.`;
+**What happens next:** DBPR issues a **temporary 90-day license** while the FBI background check runs, then your permanent two-year license. You'll upload your license and bond copy in step 9.`;
 
 const TRANSFER_FILING = `You already hold a Florida yacht & ship license with another brokerage. Moving it to 365 is paperwork only. Do these in order.
 
@@ -71,10 +71,10 @@ const NOT_SURE_FILING = `No problem. We've let the team know, and Shelly will me
 4. **Only have a real estate license?** That doesn't count. Selling used boats over 32 feet needs a separate yacht and ship license, so you need a new one.
 5. **Still unsure?** Wait for Shelly's message, or tap Message Shelly on WhatsApp now.`;
 
-const NEW_LICENSE_COPIES = `Do this once DBPR has issued your license. The temporary 90-day license is fine. It can take a little while after step 7, so this step will wait for you.
+const NEW_LICENSE_COPIES = `Do this once DBPR has issued your license. The temporary 90-day license is fine. It can take a little while after step 8, so this step will wait for you.
 
 1. **Get a copy of your license.** If DBPR sent it to you, scan it to PDF. If it went to 365 Yachts, message Shelly: she can upload it for you. Or go to [MyFloridaLicense.com](${LINKS.verify}), choose **Verify a License**, search your name, open your license, then use **Print** and **Save as PDF**.
-2. **Find the bond copy you scanned** before you mailed the original in step 7. No copy? Ask your bond company to email you one.
+2. **Find the bond copy you scanned** before you mailed the original in step 8. No copy? Ask your bond company to email you one.
 3. **Check both.** Your name and license number must be easy to read.
 4. **Upload them below.** One PDF with both is fine, or separate files. Clear phone photos work too.
 5. **When your permanent license arrives**, message Shelly so she can update your file.`;
@@ -86,7 +86,7 @@ const TRANSFER_COPIES = `Do this once DBPR shows your license under 365 Yachts.
 3. **Get a copy of your current bond.** Ask your bond company to email one if you don't have it.
 4. **Upload both below.** One PDF with both is fine, or separate files.`;
 
-const NOT_SURE_COPIES = `Finish step 7 with Shelly first. Once you know whether you're getting a new license or moving one, open the matching guide below and follow it.`;
+const NOT_SURE_COPIES = `Finish step 8 with Shelly first. Once you know whether you're getting a new license or moving one, open the matching guide below and follow it.`;
 
 const NEW_HEADING = "Applying for a new salesperson license";
 const TRANSFER_HEADING = "Moving your license to 365";

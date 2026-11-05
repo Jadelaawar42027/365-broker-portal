@@ -127,6 +127,13 @@
       "when": 1793882267267,
       "tag": "0017_start_here_ai_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793896438475,
+      "tag": "0018_start_here_ai_agent_step",
+      "breakpoints": true
     }
   ]
 }

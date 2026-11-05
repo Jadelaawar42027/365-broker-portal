@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/components/broker/step-path-guide.tsx
- * Purpose: The step-by-step guide for the broker's own situation on steps whose config has "paths" (steps 7 and 8
- * follow the licensing route picked at step 6). The matching guide is shown open; the other routes sit behind
+ * Purpose: The step-by-step guide for the broker's own situation on steps whose config has "paths" (steps 8 and 9
+ * follow the licensing route picked at step 7). The matching guide is shown open; the other routes sit behind
  * "Other situations" in case the broker picked the wrong one. Before the earlier step is answered, it asks the broker
  * to answer it first and shows every route collapsed.
  *

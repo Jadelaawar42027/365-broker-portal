@@ -1,13 +1,13 @@
 /**
  * File: apps/web/src/components/contracts/contract-signing.tsx
- * Purpose: Step 2 for the broker (SPEC D31): "Broker Agreement" and "NDA" cards, each with a live preview of the
+ * Purpose: Step 3 for the broker (SPEC D31): "Broker Agreement" and "NDA" cards, each with a live preview of the
  * document filled with their details; a short form (mailing address, Florida license number, confirm phone and email);
  * the e-sign consent; one signature pad for both documents. Sign is enabled only when both documents have been opened.
  * Afterwards it shows the signed copies to download, or that they're waiting for the countersignature, plus any
  * earlier (voided) versions.
  *
  * Functions:
- * - ContractSigning({ data }): the whole step 2 area.
+ * - ContractSigning({ data }): the whole step 3 area.
  * - DocumentCard({ document, previewUrl, opened, onOpened }): one document card with its preview toggle.
  * - SignedDocuments({ documents, title }): the list of documents with their download buttons.
  * - DownloadVersion({ documentId, version, label, admin }): a button that fetches a 5-minute link (from the broker or admin route) and opens it.

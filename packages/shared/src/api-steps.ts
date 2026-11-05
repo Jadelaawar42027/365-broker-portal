@@ -1,8 +1,8 @@
 /**
  * File: packages/shared/src/api-steps.ts
- * Purpose: The HTTP contract for the admin onboarding-step editor (SPEC D28): the step list, one step with its guidance
- * (What to do, callouts, full manual text), its video slots and its knowledge-check questions, and the request bodies
- * for editing each of them. Only admin routes use these schemas; correct answers never appear in broker responses.
+ * Purpose: The HTTP contract for the admin onboarding-step editor (SPEC D28): the step list, one step with its titles
+ * (title, sub-header, short title, summary), guidance (What to do, callouts, full manual text), its video slots and its
+ * knowledge-check questions, and the request bodies for editing each of them. Only admin routes use these schemas; correct answers never appear in broker responses.
  *
  * Functions:
  * - none
@@ -52,6 +52,7 @@ export type AdminStepQuestion = z.infer<typeof adminStepQuestionSchema>;
 export const adminStepDetailResponseSchema = z.object({
   step: adminStepListRowSchema.extend({
     intro: z.string(),
+    summary: z.string(),
     todoItems: z.array(z.string()),
     callouts: z.array(guidanceCalloutSchema),
     fullTextMd: z.string(),
@@ -66,6 +67,10 @@ export const updateStepGuidanceRequestSchema = z
     todoItems: todoItemsSchema.optional(),
     callouts: calloutsSchema.optional(),
     fullTextMd: z.string().max(40000).optional(),
+    title: z.string().trim().min(2, "Give the step a title.").max(160).optional(),
+    shortTitle: z.string().trim().min(2, "Give the step a short title.").max(80).optional(),
+    intro: z.string().trim().min(1, "Write a sub-header.").max(600).optional(),
+    summary: z.string().trim().min(1, "Write a summary.").max(300).optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: "Send at least one field to change." });
 export type UpdateStepGuidanceRequest = z.infer<typeof updateStepGuidanceRequestSchema>;

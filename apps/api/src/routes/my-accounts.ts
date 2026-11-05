@@ -1,6 +1,6 @@
 /**
  * File: apps/api/src/routes/my-accounts.ts
- * Purpose: The broker's own 365 email on step 9 (phase H2): whether the Workspace account is ready, and "Reveal my
+ * Purpose: The broker's own 365 email on step 10 (phase H2): whether the Workspace account is ready, and "Reveal my
  * temporary password", which resets the Google password at that moment (change at next login) and returns it once.
  * Only the signed-in broker can reveal, only for their own account, at most 3 times per Florida day; each reveal writes
  * audit_log without the password. Responses are never cached and the password is never stored or logged.

@@ -1,6 +1,6 @@
 /**
  * File: apps/api/src/routes/contracts.ts
- * Purpose: The routes a broker uses to sign their agreements on onboarding step 2 (SPEC D31): their documents and the
+ * Purpose: The routes a broker uses to sign their agreements on onboarding step 3 (SPEC D31): their documents and the
  * details that go into them, a live PDF preview of each document (which records that they opened it), signing both
  * with one signature, and short-lived download links for their own signed copies. A broker only ever reaches their
  * own documents. After signing, the broker gets the final PDFs by email, or the company signer is told to countersign.
@@ -92,7 +92,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
     "/v1/me/contracts",
     {
       preHandler: requireBroker,
-      schema: { tags: ["broker"], summary: "The broker's agreements on step 2, the details that go into them, and every earlier version", response: { 200: myContractsResponseSchema, ...brokerErrors } },
+      schema: { tags: ["broker"], summary: "The broker's agreements on step 3, the details that go into them, and every earlier version", response: { 200: myContractsResponseSchema, ...brokerErrors } },
     },
     async (request) => {
       const actor = currentActor(request);

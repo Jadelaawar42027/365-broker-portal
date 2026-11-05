@@ -2,8 +2,8 @@
  * File: packages/shared/src/schemas.ts
  * Purpose: Zod schemas shared by the API (request validation, OpenAPI) and the web app (form validation):
  * the domain enums, ISO dates, step configuration, and the answer a broker sends for each kind of step. A step's config
- * can hold "paths": a guide per answer of an earlier choice step (config.paths.fromStep), so steps 7 and 8 show the
- * licensing route the broker picked at step 6; and "alertChoices": answers that email the admins (e.g. "I need help").
+ * can hold "paths": a guide per answer of an earlier choice step (config.paths.fromStep), so steps 8 and 9 show the
+ * licensing route the broker picked at step 7; and "alertChoices": answers that email the admins (e.g. "I need help").
  *
  * Functions:
  * - formDataSchemaForStep(step): returns the Zod schema for the form_data a broker submits on that step (text with character and word limits, choice, confirm, checklist limited to the step's own items; empty for upload and admin steps).

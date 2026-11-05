@@ -1,6 +1,6 @@
 /**
  * File: apps/api/src/services/contracts/service.ts
- * Purpose: Contract signing on onboarding step 2 (SPEC D31). Builds each document's values from the broker's record,
+ * Purpose: Contract signing on onboarding step 3 (SPEC D31). Builds each document's values from the broker's record,
  * keeps one open document per template, renders live previews, and runs signing: the broker's signature goes on both
  * documents, every version (unsigned, broker-signed, final with certificate) is stored privately with its SHA-256,
  * and the company signature is applied automatically when Shelly has authorized it (otherwise the step waits for her
@@ -25,8 +25,8 @@
  * - linkFinalFiles(tx, brokerStepId, documents): points each document at the step file holding its final PDF.
  * - signAgreements(deps, input): the broker signs both documents; returns whether they're fully signed, the final PDFs and whether onboarding completed.
  * - countersignAgreements(deps, input): the company signer countersigns both broker-signed documents.
- * - voidAndReissue(deps, input): voids every current document (even fully signed ones) and resets step 2 so the broker signs again.
- * - markSignedOutside(deps, input): records an already-signed copy uploaded by an admin (an accepted file type and size, signed no later than today) and approves step 2 when both documents are covered.
+ * - voidAndReissue(deps, input): voids every current document (even fully signed ones) and resets step 3 so the broker signs again.
+ * - markSignedOutside(deps, input): records an already-signed copy uploaded by an admin (an accepted file type and size, signed no later than today) and approves step 3 when both documents are covered.
  * - decodePng(dataUrl): the PNG bytes of a data URL, checked to be a real PNG.
  */
 import { randomUUID } from "node:crypto";
@@ -562,7 +562,7 @@ export async function markSignedOutside(
 ) {
   const { db } = deps;
   const now = deps.now();
-  if (!input.storageKey.startsWith(storageKeyPrefix(input.brokerId, CONTRACT_STEP_KEY))) throw badRequest("That upload doesn't belong to this broker's step 2.", "upload_not_for_step");
+  if (!input.storageKey.startsWith(storageKeyPrefix(input.brokerId, CONTRACT_STEP_KEY))) throw badRequest("That upload doesn't belong to this broker's step 3.", "upload_not_for_step");
   if (input.signedOn > todayFor(now)) throw badRequest("The signing date can't be in the future.", "invalid_dates");
   const stored = await deps.storage.headObject(input.storageKey);
   if (!stored || stored.sizeBytes <= 0) throw badRequest("The file didn't finish uploading. Try again.", "upload_missing");

@@ -3,7 +3,7 @@
  * Purpose: The routes a broker uses for their own onboarding (screens 1b and 1c): the checklist, one step's detail
  * (with its short guidance, video slots and knowledge-check questions, never their answers), the template download, a
  * fresh play link for an uploaded step video, checking one knowledge-check answer, getting an upload target, and
- * submitting a step (refused until every knowledge-check answer is correct, SPEC D28; step 2 is signed through the
+ * submitting a step (refused until every knowledge-check answer is correct, SPEC D28; step 3 is signed through the
  * contract routes instead, SPEC D31). A broker can only ever reach
  * their own steps.
  *

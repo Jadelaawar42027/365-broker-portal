@@ -1,6 +1,6 @@
 /**
  * File: packages/db/src/seed/index.ts
- * Purpose: Seeds a database with the 10 onboarding steps (and their short guidance, video slots and knowledge check
+ * Purpose: Seeds a database with the 12 onboarding steps (and their short guidance, video slots and knowledge check
  * while a step has none yet), the owner account, the training chapters from the manual
  * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
  * users and chapters are left alone.
@@ -8,7 +8,7 @@
  * Functions:
  * - seedDatabase(db, options): runs the whole seed in one transaction (including loading new or changed contract templates from docs/templates/contracts unless contractTemplates is false) (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
  * - seedSteps(tx, refresh): inserts missing onboarding steps (or overwrites them when refresh is true); returns inserted and updated counts.
- * - addMissingBrokerSteps(tx): gives every existing broker a todo row for any active step they don't have yet (e.g. step 0 "Start here", SPEC D30); returns how many rows were added.
+ * - addMissingBrokerSteps(tx): gives every existing broker a todo row for any active step they don't have yet (e.g. the "Start here" steps 0 and 1, SPEC D30); returns how many rows were added.
  * - addPasswordLogin(tx, userId, password): creates the Better Auth credential account holding the hashed password.
  * - ensureOwner(tx, owner): creates the owner user and login if the email is new; returns the owner id and whether it was created.
  * - loadStepIds(tx): returns a map from step key to onboarding step id.

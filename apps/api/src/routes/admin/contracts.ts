@@ -223,7 +223,7 @@ export function registerAdminContractRoutes(app: FastifyInstance): void {
     {
       schema: {
         tags: ["admin", "files"],
-        summary: "Record a copy of an agreement signed outside the portal (upload it first with the step 2 upload URL)",
+        summary: "Record a copy of an agreement signed outside the portal (upload it first with the step 3 upload URL)",
         params: outsideParams,
         body: signedOutsideRequestSchema,
         response: { 200: okResponseSchema, ...errors },
