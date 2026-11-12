@@ -2,7 +2,9 @@
  * File: packages/db/test/step-guidance-seed.int.test.ts
  * Purpose: Integration tests on a real Postgres container for seeding the onboarding steps' short guidance (SPEC D28):
  * every step gets its What to do bullets, callouts and full text (except the two Start here steps, which have no
- * manual text) and step 11 its read-along CRM transcript; steps 0, 1, 8, 11, 12 and 13 get one video slot each;
+ * manual text), step 11 its read-along CRM transcript and steps 12 and 13 their BoatWizard and YachtCloser training
+ * read-alongs (SPEC D35, D36);
+ * steps 0, 1, 8, 11, 12 and 13 get one video slot each;
  * step 9 gets the deposit knowledge check; running the seed again adds nothing; an admin's edits are never overwritten;
  * and a step that already exists without guidance (as in production) is filled on the next run.
  *
@@ -69,6 +71,14 @@ describe("step guidance seed", () => {
     const [crm] = await testDb.db.select().from(onboardingSteps).where(eq(onboardingSteps.key, "crm_login"));
     expect(crm!.config).toMatchObject({ requireVideo: true, fullTextLabel: "Read along with the video", fullTextSource: "Transcript" });
     expect(crm!.fullTextMd).toContain("## Broker outcomes: how we track your leads");
+    const [boatWizard] = await testDb.db.select().from(onboardingSteps).where(eq(onboardingSteps.key, "boatwizard_login"));
+    expect(boatWizard!.config).toMatchObject({ minutes: 20, fullTextLabel: "Read along with the video", fullTextSource: "From the video" });
+    expect(boatWizard!.callouts!.map((callout) => callout.kind)).toEqual(["HOUSE RULE", "NEVER", "WATCH"]);
+    expect(boatWizard!.fullTextMd).toContain("## Job 3: Price it");
+    const [yachtCloser] = await testDb.db.select().from(onboardingSteps).where(eq(onboardingSteps.key, "yachtcloser_login"));
+    expect(yachtCloser!.config).toMatchObject({ minutes: 20, fullTextLabel: "Read along with the video", fullTextSource: "From the video" });
+    expect(yachtCloser!.callouts!.map((callout) => callout.kind)).toEqual(["HOUSE RULE", "NEVER", "WATCH"]);
+    expect(yachtCloser!.fullTextMd).toContain("## Part 3: Survey to close");
     const dbpr = await testDb.db.select().from(stepVideos).where(eq(stepVideos.stepId, await stepId("dbpr_filing")));
     expect(dbpr.map((video) => video.title)).toEqual(["How to file your DBPR application"]);
   });

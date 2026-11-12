@@ -2,8 +2,8 @@
  * File: apps/web/e2e/journey-8-step-guidance.spec.ts
  * Purpose: The short onboarding-step layout (SPEC D28) end to end. An admin edits a step's What to do bullets and its
  * sub-header, and uploads an MP4 to step 12's (BoatWizard) video slot (step video slots take MP4s only, no links,
- * SPEC D34); the broker sees the video first, the new sub-header, the bullets, the callouts and the manual's text
- * behind "Read the full section"; step 11 (CRM training) keeps its confirm box locked until its video has been
+ * SPEC D34); the broker sees the video first, the bullets, and the step-by-step BoatWizard training behind "Read
+ * along with the video" (SPEC D35), and step 13's YachtCloser training the same way (SPEC D36); on step 10 the new sub-header, the callouts and the manual's text; step 11 (CRM training) keeps its confirm box locked until its video has been
  * watched to the end and shows the transcript behind "Read along with the video" (SPEC D32); step 1 offers "Start chat with AI agent" to the 365 Yachts AI on WhatsApp; and on step 9 the
  * send button stays disabled until the deposit question is answered correctly, after a wrong try with its explanation.
  *
@@ -51,10 +51,16 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(videos.locator("iframe")).toHaveCount(0);
   await expect(videos.getByText("On its way", { exact: true })).toHaveCount(0);
   await expect(brokerPage.getByRole("heading", { name: "What to do" })).toBeVisible();
-  await expect(brokerPage.getByText("Run one practice search for a boat a client might want.")).toBeVisible();
-  await expect(brokerPage.getByText(/Target 100 names in the CRM by day seven/)).toBeHidden();
-  await brokerPage.getByText("Read the full section").click();
-  await expect(brokerPage.getByText(/Target 100 names in the CRM by day seven/)).toBeVisible();
+  await expect(brokerPage.getByText("Find it: search the MLS for co-brokerage boats; send three at most.")).toBeVisible();
+  await expect(brokerPage.getByRole("heading", { name: "Job 3: Price it" })).toBeHidden();
+  await brokerPage.getByText("Read along with the video").click();
+  await expect(brokerPage.getByRole("heading", { name: "Job 3: Price it" })).toBeVisible();
+  await expect(brokerPage.getByRole("heading", { name: "Worked example: a 27-foot Conch" })).toBeVisible();
+
+  await brokerPage.goto("/app/steps/yachtcloser_login");
+  await expect(brokerPage.getByText("Deals: buyer signs first, then seller; change terms only by amendment.")).toBeVisible();
+  await brokerPage.getByText("Read along with the video").click();
+  await expect(brokerPage.getByRole("heading", { name: "Part 3: Survey to close" })).toBeVisible();
 
   await brokerPage.goto("/app/steps/crm_login");
   await expect(brokerPage.getByText("Step 11 of 14 · Your tools")).toBeVisible();
@@ -73,6 +79,9 @@ test("admins edit step guidance and videos; brokers read it and pass the knowled
   await expect(brokerPage.getByText("Ask Shelly if you can't sign in.")).toBeVisible();
   await expect(brokerPage.getByText("Your 365 email is where every client record lives.")).toBeVisible();
   await expect(brokerPage.getByText("HOUSE RULE", { exact: true }).first()).toBeVisible();
+  await expect(brokerPage.getByRole("heading", { name: "Week 1 checklist (Module 06)" })).toBeHidden();
+  await brokerPage.getByText("Read the full section").click();
+  await expect(brokerPage.getByRole("heading", { name: "Week 1 checklist (Module 06)" })).toBeVisible();
 
   await brokerPage.goto("/app/steps/ai_agent");
   await expect(brokerPage.getByText("Step 1 of 12 · Start here")).toBeVisible();

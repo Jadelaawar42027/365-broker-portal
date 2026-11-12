@@ -6,7 +6,9 @@
  * step 11 (commission_tier) is retired by migration 0005: commission splits are now set at invite (SPEC D27). Step 10 is
  * now "Log in to your 365 Yachts email" (no brand signature), and the old platform logins step is retired and split
  * into CRM sign in and training (its video must be watched before it can be ticked; copy in crm-training.ts), BoatWizard
- * sign in and YachtCloser sign in, steps 11 to 13 (SPEC D32, migration 0019). Upload
+ * sign in and YachtCloser sign in, steps 11 to 13 (SPEC D32, migration 0019). Step 12 carries the BoatWizard Mastery
+ * training: its copy and read-along are in boatwizard-training.ts (SPEC D35, migration 0023); step 13 carries the
+ * YachtCloser training, with its copy in yachtcloser-training.ts (SPEC D36, migration 0024). Upload
  * steps carry their own file-count limits (minFiles/maxFiles) and the bio its word limits; migration 0014 adds them to existing databases.
  * The DBPR confirmation is PDF only (migration 0015). Steps 7 to 9 use the licensing guides in
  * license-paths.ts: step 7's answer picks the guide steps 8 and 9 show, and "not sure" emails the admins (migration 0016).
@@ -15,8 +17,10 @@
  * - none
  */
 import { MAX_UPLOAD_BYTES, type StepConfig, type StepKind, type StepStage } from "@bp/shared";
+import { BOATWIZARD_TRAINING_INTRO } from "./boatwizard-training";
 import { CRM_TRAINING_INTRO } from "./crm-training";
 import { DBPR_FILING_PATHS, LICENSE_BOND_PATHS, LICENSE_CHOICE_VALUES, LICENSE_CHOICES } from "./license-paths";
+import { YACHTCLOSER_TRAINING_INTRO } from "./yachtcloser-training";
 
 export type StepSeed = {
   key: string;
@@ -326,20 +330,22 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     stage: "your_tools",
     title: "Sign in to BoatWizard",
     shortTitle: "BoatWizard sign in",
-    summary: "Sign in to BoatWizard, the MLS, and run one practice search. Takes about 10 minutes.",
-    intro: "BoatWizard / YachtWorld is the MLS: listings, buyer searches and sold comps.",
+    summary: "Watch the BoatWizard training, then sign in and run one practice search. Takes about 20 minutes.",
+    intro: BOATWIZARD_TRAINING_INTRO,
     kind: "confirm",
     needsApproval: false,
     instructionsMd: [
-      "1. Sign in to BoatWizard with the login details you received.",
-      "2. Run one practice search.",
-      "3. Tick the box once you've done it.",
+      "1. Watch the BoatWizard training video.",
+      "2. Sign in to BoatWizard with the login details you received.",
+      "3. Run one practice search, then tick the box.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
-      minutes: 10,
-      confirmLabel: "I signed in to BoatWizard and ran one practice search",
+      minutes: 20,
+      confirmLabel: "I've watched the training, signed in to BoatWizard and run one practice search",
+      fullTextLabel: "Read along with the video",
+      fullTextSource: "From the video",
     },
   },
   {
@@ -348,20 +354,22 @@ export const ONBOARDING_STEP_SEEDS: readonly StepSeed[] = [
     stage: "your_tools",
     title: "Sign in to YachtCloser",
     shortTitle: "YachtCloser sign in",
-    summary: "Sign in to YachtCloser and review a sample deal file. Takes about 10 minutes.",
-    intro: "YachtCloser handles contracts, e-signatures, deals and closing statements.",
+    summary: "Watch the YachtCloser training, then sign in and review a sample deal file. Takes about 20 minutes.",
+    intro: YACHTCLOSER_TRAINING_INTRO,
     kind: "confirm",
     needsApproval: false,
     instructionsMd: [
-      "1. Sign in to YachtCloser with the login details you received.",
-      "2. Open a sample deal file and look through it.",
-      "3. Tick the box once you've done it.",
+      "1. Watch the YachtCloser training video.",
+      "2. Sign in to YachtCloser with the login details you received.",
+      "3. Open a sample deal file and look through it, then tick the box.",
     ].join("\n"),
     acceptedTypes: [],
     maxSizeBytes: MAX_UPLOAD_BYTES,
     config: {
-      minutes: 10,
-      confirmLabel: "I signed in to YachtCloser and reviewed a sample deal file",
+      minutes: 20,
+      confirmLabel: "I've watched the training, signed in to YachtCloser and reviewed a sample deal file",
+      fullTextLabel: "Read along with the video",
+      fullTextSource: "From the video",
     },
   },
 ];

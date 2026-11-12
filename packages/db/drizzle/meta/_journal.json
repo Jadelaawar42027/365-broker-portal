@@ -162,6 +162,20 @@
       "when": 1793913810070,
       "tag": "0022_step_videos_mp4_only",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794508252954,
+      "tag": "0023_boatwizard_training",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794508592336,
+      "tag": "0024_yachtcloser_training",
+      "breakpoints": true
     }
   ]
 }

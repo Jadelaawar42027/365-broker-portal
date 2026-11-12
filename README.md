@@ -85,6 +85,8 @@ On **Brokers** (`/admin/brokers`):
 
 Step videos are set in **Admin → Onboarding steps** and are MP4 uploads only (up to 1 GB, sent straight to the bucket). Uploads give the portal the video's real length, so on a step that needs its video watched (step 11, CRM training) the broker has to play 90% of it before the step unlocks; skipping ahead doesn't count. Training lessons can still use a YouTube, Loom or Vimeo link.
 
+Three steps teach a tool from a training video and carry a written version under **Read along with the video**: step 11 (CRM training, the transcript), step 12 (BoatWizard Mastery, the video's steps written out: list it, find it, price it) and step 13 (YachtCloser: the listing agreement, a co-broker deal through a counter offer, then survey to close). Upload the MP4s to the "BoatWizard walkthrough" and "YachtCloser walkthrough" slots; steps 12 and 13 don't require watching them. The bullets, callouts and read-along text can be edited in **Admin → Onboarding steps**; the panel's name, the minutes and the confirm box wording are set in code.
+
 ## Importing your current brokers
 
 1. Create `data/import/` (it is gitignored and never leaves your machine).

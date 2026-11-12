@@ -9,14 +9,18 @@
  * Steps 7 to 9 take their bullets and DBPR links from license-paths.ts, next to the step-by-step licensing guides.
  * Step 10 is the 365 email login only (no brand signature). Steps 11 to 13 (SPEC D32) each have one video slot; step 11,
  * CRM sign in and training, takes its bullets and its full text (the read-along transcript of Aj's video) from
- * crm-training.ts.
+ * crm-training.ts; step 12, Sign in to BoatWizard, takes its bullets, callouts and full text (the step-by-step read-along
+ * of the BoatWizard Mastery video, SPEC D35) from boatwizard-training.ts; step 13, Sign in to YachtCloser, the same from
+ * yachtcloser-training.ts (SPEC D36).
  *
  * Functions:
  * - none
  */
 import type { GuidanceCallout } from "@bp/shared";
+import { BOATWIZARD_TRAINING_CALLOUTS, BOATWIZARD_TRAINING_READ_ALONG_MD, BOATWIZARD_TRAINING_TODO } from "./boatwizard-training";
 import { CRM_TRAINING_TODO, CRM_TRAINING_TRANSCRIPT_MD } from "./crm-training";
 import { DBPR_FILING_TODO, DBPR_OFFICIAL_LINKS_MD, LICENSE_BOND_TODO, LICENSE_SITUATION_TODO } from "./license-paths";
+import { YACHTCLOSER_TRAINING_CALLOUTS, YACHTCLOSER_TRAINING_READ_ALONG_MD, YACHTCLOSER_TRAINING_TODO } from "./yachtcloser-training";
 
 export type StepGuidanceSeed = {
   todoItems: string[];
@@ -225,32 +229,15 @@ ${FEES_WATCH_FULL}`,
     fullTextMd: CRM_TRAINING_TRANSCRIPT_MD,
   },
   boatwizard_login: {
-    todoItems: [
-      "Sign in to BoatWizard with the login details you received.",
-      "Run one practice search for a boat a client might want.",
-      "Look at a few sold comps to see recent prices.",
-      "Tick the box below once you've done it.",
-    ],
-    callouts: [],
+    todoItems: BOATWIZARD_TRAINING_TODO,
+    callouts: BOATWIZARD_TRAINING_CALLOUTS,
     videoSlots: ["BoatWizard walkthrough"],
-    fullTextMd: `${PLATFORM_TABLE}
-
-## Days 1–7 (Your first 90 days)
-
-**Get legal, get logged in, get loud** — Paperwork submitted, licensing started, all four platforms accessed. Build your contact list: everyone you know who owns a boat, works on boats, or is wealthy enough to buy one. Target 100 names in the CRM by day seven.`,
+    fullTextMd: BOATWIZARD_TRAINING_READ_ALONG_MD,
   },
   yachtcloser_login: {
-    todoItems: [
-      "Sign in to YachtCloser with the login details you received.",
-      "Open a sample deal file and look through it.",
-      "Tick the box below once you've done it.",
-    ],
-    callouts: [],
+    todoItems: YACHTCLOSER_TRAINING_TODO,
+    callouts: YACHTCLOSER_TRAINING_CALLOUTS,
     videoSlots: ["YachtCloser walkthrough"],
-    fullTextMd: `${PLATFORM_TABLE}
-
-## Week 1 checklist (Module 06)
-
-- Logged into BoatWizard, YachtCloser, and GoHighLevel`,
+    fullTextMd: YACHTCLOSER_TRAINING_READ_ALONG_MD,
   },
 };

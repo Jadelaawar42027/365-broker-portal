@@ -4,7 +4,9 @@
  * measured", whose lessons have 3 to 5 short bullets and callouts, whose 8 to 25 questions are well formed and tied to a
  * lesson, with an 80% pass mark and no disputed co-broke figures; Volume Two parts are empty. Steps: every onboarding
  * step has guidance in the short layout, every NEVER and WATCH from Modules 01 and 02 is kept, the video slots and the
- * step 9 knowledge check are in place, and no bond or fee figure appears outside the full text.
+ * step 9 knowledge check are in place, no bond or fee figure appears outside the full text, and step 12 carries the
+ * BoatWizard Mastery read-along (list it, find it, price it) and step 13 the YachtCloser read-along (listing agreement,
+ * co-broker deal, survey to close) behind "Read along with the video" (SPEC D35, D36).
  *
  * Functions:
  * - calloutKinds(blocks): every callout kind used in a parsed lesson, including nested ones.
@@ -110,6 +112,50 @@ describe("onboarding step guidance", () => {
     expect(STEP_GUIDANCE.boatwizard_login!.videoSlots).toEqual(["BoatWizard walkthrough"]);
     expect(STEP_GUIDANCE.yachtcloser_login!.videoSlots).toEqual(["YachtCloser walkthrough"]);
     expect(STEP_GUIDANCE.dbpr_filing!.videoSlots).toEqual(["How to file your DBPR application"]);
+  });
+
+  it("gives step 12 the BoatWizard training summary, callouts and step-by-step read-along", () => {
+    const guidance = STEP_GUIDANCE.boatwizard_login!;
+    const seed = ONBOARDING_STEP_SEEDS.find((step) => step.key === "boatwizard_login")!;
+    expect(seed.config).toMatchObject({ minutes: 20, fullTextLabel: "Read along with the video", fullTextSource: "From the video" });
+    expect(seed.config.confirmLabel).toMatch(/signed in to BoatWizard/);
+    expect(seed.config.requireVideo).toBeUndefined();
+    expect(guidance.callouts.map((callout) => callout.kind)).toEqual(["HOUSE RULE", "NEVER", "WATCH"]);
+    const headings = parseLessonMarkdown(guidance.fullTextMd).flatMap((block) => (block.type === "heading" ? [`${block.level}:${block.text}`] : []));
+    expect(headings.filter((heading) => heading.startsWith("2:"))).toEqual([
+      "2:The short version",
+      "2:Signing in",
+      "2:The three tabs you'll use",
+      "2:Job 1: List it",
+      "2:Job 2: Find it",
+      "2:Job 3: Price it",
+      "2:Wrap-up",
+    ]);
+    expect(headings).toContain("3:Worked example: a 27-foot Conch");
+    expect(calloutKinds(parseLessonMarkdown(guidance.fullTextMd))).toEqual(["HOUSE RULE", "NEVER"]);
+    expect(guidance.fullTextMd).toContain("yachtworld.com/research/member-access");
+    expect(guidance.fullTextMd).toContain("bring it to Shelly for review");
+  });
+
+  it("gives step 13 the YachtCloser training summary, callouts and step-by-step read-along", () => {
+    const guidance = STEP_GUIDANCE.yachtcloser_login!;
+    const seed = ONBOARDING_STEP_SEEDS.find((step) => step.key === "yachtcloser_login")!;
+    expect(seed.config).toMatchObject({ minutes: 20, fullTextLabel: "Read along with the video", fullTextSource: "From the video" });
+    expect(seed.config.confirmLabel).toMatch(/signed in to YachtCloser/);
+    expect(seed.config.requireVideo).toBeUndefined();
+    expect(guidance.callouts.map((callout) => callout.kind)).toEqual(["HOUSE RULE", "NEVER", "WATCH"]);
+    const blocks = parseLessonMarkdown(guidance.fullTextMd);
+    const headings = blocks.flatMap((block) => (block.type === "heading" && block.level === 2 ? [block.text] : []));
+    expect(headings).toEqual([
+      "The short version",
+      "The contract set",
+      "Part 1: The listing agreement",
+      "Part 2: An offer on another firm's listing",
+      "Part 3: Survey to close",
+      "Wrap-up",
+    ]);
+    expect(calloutKinds(blocks)).toEqual(["NEVER", "HOUSE RULE", "HOUSE RULE", "WATCH", "NEVER", "NEVER"]);
+    expect(guidance.fullTextMd).toContain("walk Shelly through it");
   });
 
   it("puts the deposit question on step 9 only, within the 3-question limit", () => {
