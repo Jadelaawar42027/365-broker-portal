@@ -59,14 +59,12 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
       const coach = requireCoach(app);
       const weeks = await coach.weeks();
       const week = pickWeek(weeks, request.query.week);
-      const weekEnd = week ? new Date(Date.parse(week.weekStart) + 7 * DAY) : app.deps.now();
-      const [snapshots, portalBrokers, callsReviewed, excusesToConfirm] = await Promise.all([
+      const [snapshots, portalBrokers, excusesToConfirm] = await Promise.all([
         week ? coach.snapshots(week.weekStart) : Promise.resolve([]),
         loadPortalBrokers(app.deps.db),
-        coach.callsReviewed(new Date(weekEnd.getTime() - 28 * DAY), weekEnd),
         coach.excusesToConfirm(),
       ]);
-      return buildOverview({ weeks, week, snapshots, brokers: portalBrokers, callsReviewed, excusesToConfirm });
+      return buildOverview({ weeks, week, snapshots, brokers: portalBrokers, excusesToConfirm });
     },
   );
 

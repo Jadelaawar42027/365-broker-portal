@@ -2,7 +2,8 @@
  * File: apps/web/src/app/admin/coaching/[id]/page.tsx
  * Purpose: One broker's coaching page for leadership: score, band, trend and data coverage; the two focus areas with
  * the leads behind them (linking to the GHL contact) and the playbook action; every metric with its target, an
- * 8-week line and sample size; AI-excused misses with Shelly's confirm / count-as-missed; the suggested 1:1 topic;
+ * 8-week line and sample size (marked "90-day data" when measured over 90 days; speed to follow also shows the
+ * first-call score and median time to the next touch); AI-excused misses with Shelly's confirm / count-as-missed; the suggested 1:1 topic;
  * results context (not scored); Shelly's weekly pulse form; and the 1:1 history.
  *
  * Functions:
@@ -10,11 +11,14 @@
  * - sourceLabel(excuse): where an excuse came from, in words ("Client's words", "Call transcript", "Broker note only").
  * - contextRows(context): the results context as labelled values, skipping ones not available yet.
  * - money(value): "$480K" style amounts (Intl compact USD).
+ * - followDetail(detail): speed to follow's context line ("First calls 72 (5) · next touch 1.2 h median"), or null.
  */
 import {
   COACHING_METRIC_LABELS,
   formatCoachingTarget,
   formatCoachingValue,
+  formatWorkMinutes,
+  windowLabel,
   scoreBand,
   type CoachingBrokerResponse,
 } from "@bp/shared";
@@ -41,6 +45,16 @@ function sourceLabel(excuse: CoachingBrokerResponse["excuses"][number]): string 
 }
 
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
+
+function followDetail(detail: Record<string, number | null> | null): string | null {
+  if (!detail) return null;
+  const parts: string[] = [];
+  const firstValue = detail.first_calls_value;
+  if (typeof firstValue === "number") parts.push(`First calls ${Math.round(firstValue)} (${detail.first_calls_sample ?? 0})`);
+  const minutes = detail.median_work_minutes_to_next_touch;
+  if (typeof minutes === "number") parts.push(`next touch ${formatWorkMinutes(minutes)} median`);
+  return parts.length ? parts.join(" · ") : null;
+}
 
 function money(value: number): string {
   return MONEY.format(value);
@@ -184,7 +198,12 @@ export default async function BrokerCoachingPage({
                       <tbody>
                         {data.metrics.map((m) => (
                           <tr key={m.metric} className="border-b border-line last:border-0">
-                            <th scope="row" className="px-3 py-3 font-semibold">{COACHING_METRIC_LABELS[m.metric]}</th>
+                            <th scope="row" className="px-3 py-3 font-semibold">
+                              {COACHING_METRIC_LABELS[m.metric]}
+                              {m.metric === "speed_to_follow" && followDetail(m.detail) ? (
+                                <span className="block text-[14px] font-normal text-muted">{followDetail(m.detail)}</span>
+                              ) : null}
+                            </th>
                             <td className="px-3 py-3">
                               <MetricCell metric={m.metric} value={m.value} status={m.status} />
                             </td>
@@ -192,7 +211,10 @@ export default async function BrokerCoachingPage({
                             <td className="px-3 py-3">
                               <Sparkline values={m.history} label={`${COACHING_METRIC_LABELS[m.metric]}, last ${m.history.length} weeks, now ${formatCoachingValue(m.metric, m.value)}`} />
                             </td>
-                            <td className="px-3 py-3 tabular-nums text-muted">{m.sample}</td>
+                            <td className="px-3 py-3 tabular-nums text-muted">
+                              {m.sample}
+                              {windowLabel(m.windowDays) ? <span className="block text-[14px]">{windowLabel(m.windowDays)}</span> : null}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

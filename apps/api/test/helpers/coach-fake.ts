@@ -19,11 +19,18 @@ export function snapshot(brokerId: string, weekStart: string, overrides: Partial
     provisional: false,
     metrics: {
       on_time_touches: { value: 0.6, target: 0.8, status: "red", sample: 10, evidence: [{ leadId: "lead1", at: "2026-11-20T15:00:00.000Z", note: "missed idle due" }] },
-      speed_to_lead: { value: 40, target: 30, status: "amber", sample: 4 },
+      speed_to_follow: {
+        value: 55,
+        target: 60,
+        status: "amber",
+        sample: 4,
+        window_days: 90,
+        detail: { median_work_minutes_to_next_touch: 40, first_calls_value: 50, first_calls_sample: 2 },
+      },
     },
     focusAreas: [{ metric: "on_time_touches", action: "Go through the pipeline together", evidence: [{ leadId: "lead1", at: "2026-11-20T15:00:00.000Z", note: "missed idle due" }] }],
     trend: { score: -3 },
-    context: { deals_closed_28d: 1 },
+    context: { deals_closed_28d: 1, calls_reviewed: 3 },
     ...overrides,
   };
 }
@@ -39,7 +46,6 @@ export function createFakeCoachStore(seed: { snapshots?: SnapshotRow[]; excuses?
     snapshots: async (weekStart) => snapshots.filter((s) => s.weekStart === weekStart),
     brokerHistory: async (brokerId, upTo, count) =>
       snapshots.filter((s) => s.brokerId === brokerId && s.weekStart <= upTo).sort((a, b) => b.weekStart.localeCompare(a.weekStart)).slice(0, count),
-    callsReviewed: async () => 7,
     excusesToConfirm: async () => excuses.filter((e) => e.needsConfirmation && !e.decision).length,
     excuses: async (brokerId) => excuses.filter((e) => e.brokerId === brokerId),
     excuseBroker: async (momentKey) => excuses.find((e) => e.momentKey === momentKey)?.brokerId ?? null,

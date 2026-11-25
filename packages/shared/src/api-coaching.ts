@@ -5,8 +5,10 @@
  * themselves come from the coach service's weekly snapshots; nothing here computes a score.
  *
  * Functions:
- * - formatCoachingValue(metric, value): "47 min", "82%" or "61" for a metric value, "—" when unknown.
+ * - formatCoachingValue(metric, value): "47 min", "82%" or "61" (points) for a metric value, "—" when unknown.
  * - formatCoachingTarget(metric, target): "≤ 30 min" or "≥ 85%" for a target, "—" when there is none.
+ * - formatWorkMinutes(value): working minutes as "47 min" or "2.5 h", "—" when unknown.
+ * - windowLabel(windowDays): "90-day data" when a metric was measured over more than 28 days, else null.
  * - scoreBand(score, provisional): the label and tone for a broker's score ("At risk", "Needs attention", "On track", "Provisional").
  * - needsOneOnOneReason(row): why a broker needs a 1:1 this week (a red metric, a drop of 10+ points, thin data), or null.
  * - suggestedTopic(focusAreas): the 1:1 topic from the first focus area and its playbook action, or null.
@@ -14,7 +16,7 @@
 import { z } from "zod";
 
 export const COACHING_METRICS = [
-  "speed_to_lead",
+  "speed_to_follow",
   "next_step_coverage",
   "on_time_touches",
   "responsiveness",
@@ -27,7 +29,7 @@ export const coachingMetricSchema = z.enum(COACHING_METRICS);
 export type CoachingMetricId = z.infer<typeof coachingMetricSchema>;
 
 export const COACHING_METRIC_LABELS: Record<CoachingMetricId, string> = {
-  speed_to_lead: "Speed to lead",
+  speed_to_follow: "Speed to follow",
   next_step_coverage: "Next step",
   on_time_touches: "On-time touches",
   responsiveness: "Reply time",
@@ -37,7 +39,9 @@ export const COACHING_METRIC_LABELS: Record<CoachingMetricId, string> = {
   pipeline_movement: "Pipeline movement",
 };
 
-const MINUTE_METRICS: ReadonlySet<CoachingMetricId> = new Set(["speed_to_lead", "responsiveness"]);
+const MINUTE_METRICS: ReadonlySet<CoachingMetricId> = new Set(["responsiveness"]);
+const POINT_METRICS: ReadonlySet<CoachingMetricId> = new Set(["speed_to_follow", "call_quality"]);
+const BASE_WINDOW_DAYS = 28;
 
 export const coachingStatusSchema = z.enum(["green", "amber", "red", "unknown"]);
 export type CoachingStatus = z.infer<typeof coachingStatusSchema>;
@@ -57,6 +61,7 @@ const metricCellSchema = z.object({
   target: z.number().nullable(),
   status: coachingStatusSchema,
   sample: z.number(),
+  windowDays: z.number().nullable(),
 });
 
 export const coachingOverviewResponseSchema = z.object({
@@ -66,8 +71,8 @@ export const coachingOverviewResponseSchema = z.object({
   totals: z.object({
     teamScore: z.number().nullable(),
     onTimeRate: z.number().nullable(),
-    medianSpeedMinutes: z.number().nullable(),
-    callsReviewed: z.number(),
+    medianFollowMinutes: z.number().nullable(),
+    callsReviewed: z.number().nullable(),
     excusesToConfirm: z.number(),
   }),
   needsOneOnOne: z.array(
@@ -131,6 +136,8 @@ export const coachingBrokerResponseSchema = z.object({
       target: z.number().nullable(),
       status: coachingStatusSchema,
       sample: z.number(),
+      windowDays: z.number().nullable(),
+      detail: z.record(z.string(), z.number().nullable()).nullable(),
       history: z.array(z.number().nullable()),
     }),
   ),
@@ -172,9 +179,18 @@ export type PulseBody = z.infer<typeof pulseBodySchema>;
 
 export function formatCoachingValue(metric: CoachingMetricId, value: number | null): string {
   if (value === null) return "—";
-  if (MINUTE_METRICS.has(metric)) return value >= 90 ? `${Math.round(value / 6) / 10} h` : `${Math.round(value)} min`;
-  if (metric === "call_quality") return String(Math.round(value));
+  if (MINUTE_METRICS.has(metric)) return formatWorkMinutes(value);
+  if (POINT_METRICS.has(metric)) return String(Math.round(value));
   return `${Math.round(value * 100)}%`;
+}
+
+export function formatWorkMinutes(value: number | null): string {
+  if (value === null) return "—";
+  return value >= 90 ? `${Math.round(value / 6) / 10} h` : `${Math.round(value)} min`;
+}
+
+export function windowLabel(windowDays: number | null): string | null {
+  return windowDays !== null && windowDays > BASE_WINDOW_DAYS ? `${windowDays}-day data` : null;
 }
 
 export function formatCoachingTarget(metric: CoachingMetricId, target: number | null): string {

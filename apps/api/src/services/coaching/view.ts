@@ -7,10 +7,11 @@
  * Functions:
  * - toWeek(row): a { weekStart, isoWeek, weekNumber } from a snapshot week.
  * - ghlContactUrl(locationId, leadId): the lead's contact page in GoHighLevel, or null without a location id.
- * - cell(snapshot, metric): one metric's value, target, status and sample from a snapshot (Unknown when missing).
+ * - cell(snapshot, metric): one metric's value, target, status, sample and window (28 or 90 days) from a snapshot (Unknown when missing).
  * - focusMetrics(snapshot): the snapshot's focus areas as known metric ids with their playbook action.
  * - median(values): the median of a list of numbers, or null for an empty list.
- * - buildOverview(input): the team overview: totals, who needs a 1:1, and every broker's row (worst score first).
+ * - sumContext(snapshots, key): the sum of a numeric context figure across snapshots, or null when none has it.
+ * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1, and every broker's row (worst score first).
  * - buildBrokerPage(input): one broker's page: header numbers, focus areas with evidence, all metrics with an 8-week history, excused misses, topic, results context, pulse and 1:1 history.
  */
 import {
@@ -41,7 +42,12 @@ export function ghlContactUrl(locationId: string | undefined, leadId: string): s
 function cell(snapshot: SnapshotRow, metric: CoachingMetricId) {
   const m = snapshot.metrics[metric];
   const status = (m && STATUSES.has(m.status) ? m.status : "unknown") as CoachingStatus;
-  return { value: m?.value ?? null, target: m?.target ?? null, status, sample: m?.sample ?? 0 };
+  return { value: m?.value ?? null, target: m?.target ?? null, status, sample: m?.sample ?? 0, windowDays: typeof m?.window_days === "number" ? m.window_days : null };
+}
+
+function sumContext(snapshots: SnapshotRow[], key: string): number | null {
+  const values = snapshots.map((s) => s.context[key]).filter((v): v is number => typeof v === "number");
+  return values.length ? values.reduce((a, b) => a + b, 0) : null;
 }
 
 function focusMetrics(snapshot: SnapshotRow): Array<{ metric: CoachingMetricId; action: string | null }> {
@@ -63,11 +69,10 @@ export function buildOverview(input: {
   week: { weekStart: string; isoWeek: string } | null;
   snapshots: SnapshotRow[];
   brokers: Map<string, PortalBroker>;
-  callsReviewed: number;
   excusesToConfirm: number;
 }): CoachingOverviewResponse {
-  const rows = input.snapshots
-    .filter((s) => input.brokers.has(s.brokerId))
+  const portalSnapshots = input.snapshots.filter((s) => input.brokers.has(s.brokerId));
+  const rows = portalSnapshots
     .map((s) => {
       const broker = input.brokers.get(s.brokerId)!;
       const metrics = Object.fromEntries(COACHING_METRICS.map((m) => [m, cell(s, m)])) as CoachingOverviewResponse["brokers"][number]["metrics"];
@@ -104,8 +109,12 @@ export function buildOverview(input: {
     totals: {
       teamScore: shareable.length ? Math.round(shareable.reduce((a, b) => a + b, 0) / shareable.length) : null,
       onTimeRate: due ? met / due : null,
-      medianSpeedMinutes: median(rows.map((r) => r.metrics.speed_to_lead).filter((c) => c.status !== "unknown" && c.value !== null).map((c) => c.value!)),
-      callsReviewed: input.callsReviewed,
+      medianFollowMinutes: median(
+        portalSnapshots
+          .map((s) => s.metrics.speed_to_follow?.detail?.median_work_minutes_to_next_touch)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+      callsReviewed: sumContext(portalSnapshots, "calls_reviewed"),
       excusesToConfirm: input.excusesToConfirm,
     },
     needsOneOnOne: rows.flatMap((r) => {
@@ -148,7 +157,7 @@ export function buildBrokerPage(input: {
         })
       : [],
     metrics: current
-      ? COACHING_METRICS.map((m) => ({ metric: m, ...cell(current, m), history: oldestFirst.map((h) => cell(h, m).value) }))
+      ? COACHING_METRICS.map((m) => ({ metric: m, ...cell(current, m), detail: current.metrics[m]?.detail ?? null, history: oldestFirst.map((h) => cell(h, m).value) }))
       : [],
     excuses: input.excuses.map((e) => ({
       momentKey: e.momentKey,
