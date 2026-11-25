@@ -8,6 +8,7 @@
  * - formatCoachingValue(metric, value): "47 min", "82%" or "61" (points) for a metric value, "—" when unknown.
  * - formatCoachingTarget(metric, target): "≤ 30 min" or "≥ 85%" for a target, "—" when there is none.
  * - formatWorkMinutes(value): working minutes as "47 min" or "2.5 h", "—" when unknown.
+ * - formatPoints(points): a metric's own 0-100 points as "56", "—" when unknown.
  * - windowLabel(windowDays): "90-day data" when a metric was measured over more than 28 days, else null.
  * - scoreBand(score, provisional): the label and tone for a broker's score ("At risk", "Needs attention", "On track", "Provisional").
  * - needsOneOnOneReason(row): why a broker needs a 1:1 this week (a red metric, a drop of 10+ points, thin data), or null.
@@ -58,6 +59,7 @@ export const coachingEvidenceSchema = z.object({
 
 const metricCellSchema = z.object({
   value: z.number().nullable(),
+  points: z.number().nullable(),
   target: z.number().nullable(),
   status: coachingStatusSchema,
   sample: z.number(),
@@ -123,6 +125,7 @@ export const coachingBrokerResponseSchema = z.object({
     z.object({
       metric: coachingMetricSchema,
       value: z.number().nullable(),
+      points: z.number().nullable(),
       target: z.number().nullable(),
       status: coachingStatusSchema,
       action: z.string().nullable(),
@@ -133,6 +136,7 @@ export const coachingBrokerResponseSchema = z.object({
     z.object({
       metric: coachingMetricSchema,
       value: z.number().nullable(),
+      points: z.number().nullable(),
       target: z.number().nullable(),
       status: coachingStatusSchema,
       sample: z.number(),
@@ -187,6 +191,10 @@ export function formatCoachingValue(metric: CoachingMetricId, value: number | nu
 export function formatWorkMinutes(value: number | null): string {
   if (value === null) return "—";
   return value >= 90 ? `${Math.round(value / 6) / 10} h` : `${Math.round(value)} min`;
+}
+
+export function formatPoints(points: number | null): string {
+  return points === null ? "—" : String(Math.round(points));
 }
 
 export function windowLabel(windowDays: number | null): string | null {

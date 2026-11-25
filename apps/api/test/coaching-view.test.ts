@@ -1,7 +1,7 @@
 /**
  * File: apps/api/test/coaching-view.test.ts
  * Purpose: Unit tests for the Coaching view builders: worst score first, team totals (calls reviewed summed from the
- * snapshots), who needs a 1:1, the 90-day window flag, GHL evidence links, the 8-week metric history with speed to
+ * snapshots), who needs a 1:1, each metric's own points (v4 snapshots), the 90-day window flag, GHL evidence links, the 8-week metric history with speed to
  * follow's detail, and the 1:1 history with Shelly's pulse.
  *
  * Functions:
@@ -35,8 +35,19 @@ describe("buildOverview", () => {
   it("lists portal brokers only, worst score first, with all eight metric cells", () => {
     expect(overview.brokers.map((b) => b.name)).toEqual(["Ben", "Ana"]);
     expect(Object.keys(overview.brokers[0]!.metrics)).toHaveLength(8);
-    expect(overview.brokers[0]!.metrics.call_quality).toEqual({ value: null, target: null, status: "unknown", sample: 0, windowDays: null });
-    expect(overview.brokers[0]!.metrics.speed_to_follow).toEqual({ value: 55, target: 60, status: "amber", sample: 4, windowDays: 90 });
+    expect(overview.brokers[0]!.metrics.call_quality).toEqual({ value: null, points: null, target: null, status: "unknown", sample: 0, windowDays: null });
+    expect(overview.brokers[0]!.metrics.speed_to_follow).toEqual({ value: 55, points: null, target: 60, status: "amber", sample: 4, windowDays: 90 });
+  });
+
+  it("passes each metric's own points through from v4 snapshots", () => {
+    const v4 = buildOverview({
+      weeks: [week],
+      week,
+      snapshots: [snapshot(A, week.weekStart, { metrics: { attendance: { value: 0.56, points: 56, target: 0.46, status: "green", sample: 9 } } })],
+      brokers,
+      excusesToConfirm: 0,
+    });
+    expect(v4.brokers[0]!.metrics.attendance).toMatchObject({ value: 0.56, points: 56, status: "green" });
   });
 
   it("flags who needs a 1:1 with the reason and topic", () => {
