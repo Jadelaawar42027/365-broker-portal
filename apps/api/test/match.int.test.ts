@@ -3,7 +3,7 @@
  * Purpose: Integration tests for lead matching against a real Postgres, with the six matching sample brokers and a stand-in
  * for Claude: the API-key check (Bearer or X-API-Key), the exact reply shape the 365 Yachts AI expects (dry-run GHL ids
  * left out), ranking for the three sample leads with HEALTH_SOURCE none and mock, the tag-overlap fallback when Claude
- * fails, hard-filter exclusions logged to match_log, do-not-mention content never leaking, recording listed, off-list and
+ * fails, only health_not_live and no_persona sent as flags (every other flag kept in match_log), hard-filter exclusions logged to match_log, do-not-mention content never leaking, recording listed, off-list and
  * "none" choices (and the weekly cap they feed), persona saves re-extracting tags only when the text changed, admin
  * overrides, re-extract, the backfill and the scoring weights.
  *
@@ -193,9 +193,26 @@ describe("POST /api/match results", () => {
     fakeAi.judgeFit.mockRejectedValueOnce(new Error("overloaded"));
     const body = (await match(VETERAN_LEAD)).json() as MatchResponse;
     expect(body.brokers[0]!.name).toBe("Tom Brennan");
-    expect(body.brokers[0]!.flags).toContain("fit_from_tag_overlap");
-    const [logged] = await ctx.db.select({ fitMethod: matchLog.fitMethod }).from(matchLog).where(eq(matchLog.id, body.matchId));
+    expect(body.brokers[0]!.flags).not.toContain("fit_from_tag_overlap");
+    const [logged] = await ctx.db
+      .select({ fitMethod: matchLog.fitMethod, recommendations: matchLog.recommendations })
+      .from(matchLog)
+      .where(eq(matchLog.id, body.matchId));
     expect(logged!.fitMethod).toBe("tag_overlap");
+    expect(logged!.recommendations[0]!.flags).toContain("fit_from_tag_overlap");
+  });
+
+  it("sends only health_not_live and no_persona as flags and keeps every other flag in match_log", async () => {
+    const body = (await match(VETERAN_LEAD)).json() as MatchResponse;
+    const sent = body.brokers.flatMap((broker) => broker.flags);
+    expect(sent.every((flag) => flag === "health_not_live" || flag === "no_persona")).toBe(true);
+    const [logged] = await ctx.db.select({ recommendations: matchLog.recommendations }).from(matchLog).where(eq(matchLog.id, body.matchId));
+    const kept = logged!.recommendations.flatMap((entry) => entry.flags as string[]);
+    expect(kept.some((flag) => flag !== "health_not_live" && flag !== "no_persona")).toBe(true);
+    for (const broker of body.brokers) {
+      const entry = logged!.recommendations.find((row) => row.brokerId === broker.id)!;
+      expect(broker.flags).toEqual((entry.flags as string[]).filter((flag) => flag === "health_not_live" || flag === "no_persona"));
+    }
   });
 
   it("puts the light-touch sailor first for the nurture cruising lead", async () => {

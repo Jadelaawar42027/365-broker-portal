@@ -4,12 +4,13 @@
  * AI (the 365-whatsapp-bot service, brokerMatch.js) sends and expects them, plus the admin persona-tags view and its
  * override edits, the backfill, and the scoring weights. Response schemas strip unknown keys, so do-not-mention content
  * and persona notes can only reach the bot through the fields listed here; the full per-factor detail stays in match_log.
+ * Only the flags in PUBLIC_MATCH_FLAGS (health_not_live, no_persona) go to the bot; every other flag is kept in match_log only.
  *
  * Functions:
- * - none
+ * - publicMatchFlags(flags): the flags from a scored broker that may be sent to the bot, in the same order.
  */
 import { z } from "zod";
-import { MATCH_FLAGS, matchWeightsSchema } from "./scoring";
+import { matchWeightsSchema, type MatchFlag } from "./scoring";
 import { PERSONA_TAG_FIELDS, personaTagOverridesSchema, personaTagsSchema, type PersonaTagField } from "./tags";
 
 export const HEALTH_SOURCES = ["none", "mock", "coach"] as const;
@@ -17,6 +18,13 @@ export type HealthSource = (typeof HEALTH_SOURCES)[number];
 
 export const FIT_METHODS = ["claude", "tag_overlap", "none"] as const;
 export type FitMethod = (typeof FIT_METHODS)[number];
+
+export const PUBLIC_MATCH_FLAGS = ["health_not_live", "no_persona"] as const satisfies readonly MatchFlag[];
+export type PublicMatchFlag = (typeof PUBLIC_MATCH_FLAGS)[number];
+
+export function publicMatchFlags(flags: readonly MatchFlag[]): PublicMatchFlag[] {
+  return flags.filter((flag): flag is PublicMatchFlag => (PUBLIC_MATCH_FLAGS as readonly MatchFlag[]).includes(flag));
+}
 
 const nullableScore = z.number().nullable();
 
@@ -30,7 +38,7 @@ export const matchBrokerSchema = z.object({
     availability: nullableScore.describe("0-100, or null when the broker has no weekly lead cap"),
   }),
   reasons: z.array(z.string()).describe("One or two short reasons to give the setter"),
-  flags: z.array(z.enum(MATCH_FLAGS)),
+  flags: z.array(z.enum(PUBLIC_MATCH_FLAGS)).describe("Only health_not_live and no_persona; every other flag stays in match_log"),
   ghlUserId: z.string().optional().describe("The broker's GoHighLevel user id; left out when unknown or a dry-run placeholder"),
 });
 export type MatchBroker = z.infer<typeof matchBrokerSchema>;

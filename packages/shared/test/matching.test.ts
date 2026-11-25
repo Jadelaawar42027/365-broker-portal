@@ -2,7 +2,8 @@
  * File: packages/shared/test/matching.test.ts
  * Purpose: Unit tests for lead-to-broker matching: persona-tag clean-up and overrides, lead parsing (budget, boat type,
  * background), the hard filters, scoring with and without health (HEALTH_SOURCE none and mock), brokers with no persona,
- * the follow-up modifier, the tag-overlap fallback, and that do-not-mention content never reaches a reason.
+ * the follow-up modifier, the tag-overlap fallback, that do-not-mention content never reaches a reason, and that only
+ * health_not_live and no_persona are public flags.
  *
  * Functions:
  * - tags(overrides): a full tag set with the given fields filled and the rest null.
@@ -28,6 +29,7 @@ import {
   normalizeLanguage,
   parseBudget,
   personaSourceText,
+  publicMatchFlags,
   personaTagsPatchSchema,
   priceBandFor,
   rankCandidates,
@@ -419,5 +421,15 @@ describe("reasons never leak do-not-mention content", () => {
   it("never puts the do-not-mention list itself in the scored result", () => {
     const ranked = rankCandidates(veteranLead, [broker], new Map([["b-1", judgement("b-1")]]), DEFAULT_MATCH_WEIGHTS);
     expect(JSON.stringify(ranked)).not.toMatch(/his divorce/i);
+  });
+});
+
+describe("publicMatchFlags", () => {
+  it("keeps only health_not_live and no_persona, in order", () => {
+    expect(publicMatchFlags(["no_capacity_set", "no_persona", "fit_from_tag_overlap", "language_unconfirmed", "health_not_live"])).toEqual([
+      "no_persona",
+      "health_not_live",
+    ]);
+    expect(publicMatchFlags(["follow_up_unknown", "nothing_to_score"])).toEqual([]);
   });
 });

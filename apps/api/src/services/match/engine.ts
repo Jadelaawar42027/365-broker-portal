@@ -7,15 +7,16 @@
  * count), applies the hard filters, reads health through the health adapter, asks Claude once to judge background fit for
  * the eligible brokers with a persona (tag overlap is used if that call fails or Claude is not configured), scores and
  * ranks them, and writes the request, the full per-factor recommendations (without broker names), the excluded brokers,
- * weights, health source and fit method to match_log. The reply carries only what the bot reads. A broker's GoHighLevel
- * user id is left out while it is still a "dry-run" placeholder.
+ * weights, health source and fit method to match_log, with every flag. The reply carries only what the bot reads, and of the
+ * flags only health_not_live and no_persona. A broker's GoHighLevel user id is left out while it is still a "dry-run"
+ * placeholder.
  *
  * Functions:
  * - usableGhlUserId(value): the GoHighLevel user id, or null when it is missing or a "dry-run" placeholder.
  * - loadCandidates(db, now): every active or onboarding broker with their tags, GoHighLevel user id and recent assignment counts.
  * - assignmentCounts(db, brokerIds, now): picks per broker in the last 7 and 14 days.
  * - judgeWithClaude(deps, lead, eligible): Claude's fit judgements for the eligible brokers with tags, or null when not configured, not needed or the call failed.
- * - toMatchBroker(scored, ghlUserId): one ranked broker in the bot's shape.
+ * - toMatchBroker(scored, ghlUserId): one ranked broker in the bot's shape, with only the public flags (health_not_live, no_persona).
  * - runMatch(deps, request): runs the match, logs it and returns the bot's response.
  * - resolveChosenBroker(db, choice): the portal broker a choice refers to, by its id or else by its GoHighLevel user id, or null.
  * - parseTimestamp(value): an ISO timestamp as a Date, or null when missing or invalid.
@@ -24,6 +25,7 @@
 import { brokers, matchLog, users, type Database } from "@bp/db";
 import {
   applyHardFilters,
+  publicMatchFlags,
   rankCandidates,
   toLeadProfile,
   type FitJudgement,
@@ -126,7 +128,7 @@ function toMatchBroker(scored: ScoredBroker, ghlUserId: string | null): MatchBro
       availability: scored.breakdown.availability.score,
     },
     reasons: scored.reasons,
-    flags: scored.flags,
+    flags: publicMatchFlags(scored.flags),
     ...(ghlUserId ? { ghlUserId } : {}),
   };
 }
