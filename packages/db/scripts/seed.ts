@@ -3,7 +3,8 @@
  * Purpose: `pnpm db:seed` entry point. Seeds the onboarding steps, the owner from SEED_OWNER_*, the training chapters
  * from the manual (published outside production, drafts in production) and, outside production, three sample brokers
  * (with placeholder files when S3_* is set). Flags: --refresh-steps overwrites step copy, --no-samples skips sample
- * brokers, --no-training skips the training chapters.
+ * brokers, --no-training skips the training chapters, --match-samples adds the six lead-matching sample brokers with their
+ * persona tags (outside production only).
  *
  * Functions:
  * - readOwner(env): returns the owner account settings from the environment, or null (with a warning) if any are missing; throws on an invalid email or short password.
@@ -39,7 +40,11 @@ function printSummary(summary: SeedSummary, samplePassword: string | null): void
   for (const sample of summary.sampleBrokers) {
     console.log(`Sample broker ${sample.email}: ${sample.outcome}.`);
   }
-  if (samplePassword && summary.sampleBrokers.some((sample) => sample.outcome === "created")) {
+  for (const sample of summary.matchSampleBrokers ?? []) {
+    console.log(`Matching sample broker ${sample.email}: ${sample.outcome}.`);
+  }
+  const created = [...summary.sampleBrokers, ...(summary.matchSampleBrokers ?? [])].some((sample) => sample.outcome === "created");
+  if (samplePassword && created) {
     console.log(`Sample brokers who can log in use the password "${samplePassword}".`);
   }
   for (const invite of summary.inviteLinks) {
@@ -51,7 +56,9 @@ async function main(argv: string[]): Promise<void> {
   loadRootEnvFile();
   const production = process.env.NODE_ENV === "production";
   const withSamples = !production && !argv.includes("--no-samples");
-  const samplePassword = withSamples ? process.env.SEED_SAMPLE_PASSWORD || DEFAULT_SAMPLE_PASSWORD : null;
+  const withMatchSamples = !production && argv.includes("--match-samples");
+  if (production && argv.includes("--match-samples")) console.warn("--match-samples is ignored in production.");
+  const samplePassword = withSamples || withMatchSamples ? process.env.SEED_SAMPLE_PASSWORD || DEFAULT_SAMPLE_PASSWORD : null;
   const { db, close } = createDb(readDatabaseUrl(), { max: 1 });
   try {
     const storageConfig = readStorageConfig(process.env);
@@ -59,7 +66,8 @@ async function main(argv: string[]): Promise<void> {
     const summary = await seedDatabase(db, {
       storage: withSamples && storageConfig ? createS3Storage(storageConfig) : null,
       owner: readOwner(process.env),
-      sampleBrokers: samplePassword ? { password: passwordSchema.parse(samplePassword) } : null,
+      sampleBrokers: withSamples && samplePassword ? { password: passwordSchema.parse(samplePassword) } : null,
+      matchSamples: withMatchSamples ? { password: samplePassword ? passwordSchema.parse(samplePassword) : null } : null,
       refreshSteps: argv.includes("--refresh-steps"),
       training: argv.includes("--no-training") ? null : { publish: !production },
       webOrigin: process.env.WEB_ORIGIN,

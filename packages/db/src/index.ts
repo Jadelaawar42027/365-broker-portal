@@ -1,7 +1,7 @@
 /**
  * File: packages/db/src/index.ts
- * Purpose: Public entry of @bp/db: the schema, the client factory, migrations, broker creation, commission history, the seed,
- * the broker importer and the metrics login helper.
+ * Purpose: Public entry of @bp/db: the schema, the client factory, migrations, broker creation, commission history, the seed
+ * (including the lead-matching sample brokers and the persona hash they share with the API), the broker importer and the metrics login helper.
  *
  * Functions:
  * - none
@@ -19,3 +19,4 @@ export { migrationsFolder, runMigrations } from "./migrate";
 export * from "./schema";
 export { seedDatabase, type SeedOptions, type SeedSummary } from "./seed";
 export { ONBOARDING_STEP_SEEDS } from "./seed/steps";
+export { MATCH_SAMPLES, MATCH_SAMPLE_FIXTURE_MODEL, personaHash, seedMatchSamples } from "./seed/match-samples";

@@ -65,12 +65,14 @@ To start again from a clean slate: `docker compose down -v`, then `docker compos
 | `pnpm build` | Production build of web and API |
 | `pnpm db:generate` | Creates a migration after a schema change |
 | `pnpm db:migrate` | Applies migrations |
-| `pnpm db:seed` | Seeds onboarding steps, owner and sample brokers (`--refresh-steps` rewrites step copy, `--no-samples` skips brokers) |
+| `pnpm db:seed` | Seeds onboarding steps, owner and sample brokers (`--refresh-steps` rewrites step copy, `--no-samples` skips brokers, `--match-samples` adds the six lead-matching sample brokers) |
 | `pnpm db:studio` | Opens Drizzle Studio to browse the database |
 | `pnpm db:metrics-user` | Creates the read-only login other tools use to read `broker_metrics` |
 | `pnpm import:brokers -- --dry-run` | Previews importing existing brokers from `data/import/` |
 | `pnpm admin:invite -- --name "…" --email …` | Creates an admin account and prints the invite link |
 | `pnpm storage:cors` | Allows the web app to upload straight to the bucket (once per bucket) |
+| `pnpm match:backfill` | Extracts persona tags with Claude for every broker whose persona changed (`-- --force` redoes all) |
+| `pnpm match:sample-leads` | Sends three sample leads to a running API's `/api/match` and prints the results |
 
 ## Adding brokers from the admin panel
 
@@ -102,6 +104,39 @@ To import into production, see "Run once" in [docs/DEPLOY.md](docs/DEPLOY.md).
 ## 365 Yachts AI roster sync
 
 The portal can keep the 365 Yachts AI's roster (the people the WhatsApp bot recognises) in step: a broker you invite or add is added to the roster, and a broker you delete is deactivated there. The bot texts new roster entries a welcome message, so this is **off** unless the api has `AI_ROSTER_SYNC_ENABLED=true`, together with `AI_ROSTER_API_URL` (the bot's address) and `AI_ROSTER_API_SECRET` (the bot's `ROSTER_API_SECRET`). Leave it off while making test accounts. A roster failure never blocks the portal; it is recorded in the activity log as `roster.add_failed` or `roster.remove_failed`. Setting a broker to Inactive and the command-line import do not change the roster.
+
+## Lead-to-broker matching
+
+The 365 Yachts AI (the `365-whatsapp-bot` service) asks the portal which brokers should get a lead, so leadership and the setter can text it "match John Smith". Buyers close far better with a broker who shares their background, so background fit carries the most weight.
+
+**How a match works.** Each broker's persona (the admin-only Persona panel) is turned into structured tags by Claude: background (veteran with branch, pilot, first responder and so on), story hooks, boat types, price bands, buyer types they click with, clients to avoid, languages, follow-up style, reply speed, channels, the most new leads a week, and topics never to mention to leads. Anything the persona doesn't say stays empty; nothing is guessed. Tags are re-extracted in the background whenever a persona is saved with different text, and admins can override any field in the **Matching tags** panel under the persona (overrides always win). For each lead the portal:
+
+1. drops brokers who aren't active, don't speak the lead's language, don't cover the lead's price band or boat type, or already had their weekly cap of leads in the last 7 days;
+2. scores the rest 0–100: **fit 45%** (background match judged by one Claude call across the candidates, falling back to tag overlap, plus buyer type, boat type and price expertise), **performance 35%** (broker health) and **availability 20%** (picks in the last 14 days against twice the weekly cap); a factor with no data is left out and the others are reweighted, never filled with a made-up score;
+3. adjusts for follow-up: Buy Now, Active and hot leads favour brokers who follow up hard (up to ±10 points, using the health follow-up score once health is live); Nurture leads don't penalise light-touch brokers;
+4. returns the top brokers with one or two short reasons, which never contain anything from the broker's do-not-mention list.
+
+Weights live in the `match_weights` table and change without a redeploy (`PUT /v1/admin/match/weights`). Every match, with the full per-factor detail, the excluded brokers and the pick, is kept in `match_log`.
+
+**Endpoints** (the bot's contract; key in `Authorization: Bearer <MATCH_API_KEY>` or `X-API-Key`):
+
+- `POST /api/match` with `contactId`, `name` and optionally `budget`, `boat_type`, `location`, `language`, `priority` (Buy Now, Active, Nurture, Low Priority, On Hold), `hot`, `lead_background`, `notes`, `topN` (default 4). Returns `{ matchId, brokers: [{ id, name, score, breakdown: { fit, performance, availability }, reasons, flags, ghlUserId? }] }`. A factor is `null` when it had no data; `flags` include `health_not_live` and `no_persona`. `ghlUserId` is left out while a broker's GoHighLevel id is a `dry-run` placeholder.
+- `POST /api/match/:matchId/choice` with `{ brokerId, pickedBy, timestamp, brokerName, ghlUserId }`. An off-list pick sends `brokerId: null` and `offList: true` and is linked through `brokers.ghl_user_id`; "none" sends `brokerId: null` and no `ghlUserId`. A well-formed choice is always recorded.
+- Admin: `GET`/`PATCH /v1/admin/brokers/:id/persona-tags`, `POST /v1/admin/brokers/:id/persona-tags/refresh`, `POST /v1/admin/persona-tags/backfill`, `GET`/`PUT /v1/admin/match/weights`.
+
+**Settings** (api service):
+
+| Variable | Meaning |
+| --- | --- |
+| `MATCH_API_KEY` | The key the bot sends (the bot's `PORTAL_API_KEY`). Unset turns `/api/match` off (503). At least 24 characters. |
+| `ANTHROPIC_API_KEY` | Turns on persona-tag extraction and Claude's fit judgement. Without it, tags can only be set by hand and fit uses tag overlap. |
+| `MATCH_MODEL` | Claude model for both calls (default `claude-opus-5-5`). |
+| `HEALTH_SOURCE` | `none` (default): no health, performance is left out and every broker is flagged `health_not_live`. `mock`: fake scores that stay the same per broker, for local testing (refused in production). `coach`: reads coach-api's weekly snapshot. |
+| `COACH_DATABASE_URL` | With `HEALTH_SOURCE=coach`, the connection string for coach-api's read-only `coach_portal` role. Health is only ever read through it; without it every broker's health is null. |
+
+**When coach-api goes live:** in `apps/api/src/services/match/health.ts`, set `COACH_SNAPSHOT` to coach-api's real schema, table and column names (and `brokerKey` to what its broker column holds: the portal broker id, the GoHighLevel user id or the 365 email). Then set `COACH_DATABASE_URL` to the `coach_portal` connection string and `HEALTH_SOURCE=coach` on the api service and redeploy. If the query fails or a broker has no snapshot row, that broker's health is null and the match still runs. The portal never creates or writes coach-api's tables. Also replace the availability count with real GoHighLevel lead counts when that API is wired in (TODO in `services/match/engine.ts`).
+
+**Trying it locally:** `pnpm db:seed -- --match-samples` adds six sample brokers (Navy veteran, airline pilot, Spanish speaker, light-touch sailor, a firefighter who waits for leads, and one with an empty persona) with their tags already filled in, so no Claude key is needed. Set `MATCH_API_KEY` (and optionally `HEALTH_SOURCE=mock`), run `pnpm dev`, then `pnpm match:sample-leads`.
 
 ## Deploying
 

@@ -73,6 +73,11 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `AI_ROSTER_SYNC_ENABLED` | `false` (default) | type `true` only when real brokers are being added: each new broker is then added to the 365 Yachts AI roster (it texts them a welcome) and each deleted broker is deactivated there. Anything other than `true` keeps it off |
 | `AI_ROSTER_API_URL` | the AI bot's public address, e.g. `https://<bot>.up.railway.app` | the AI bot's Railway service → Settings → Networking |
 | `AI_ROSTER_API_SECRET` | the bot's `ROSTER_API_SECRET` | copy it from the AI bot's Railway variables |
+| `MATCH_API_KEY` | a long random key (`openssl rand -hex 24`) | set the same value as the AI bot's `PORTAL_API_KEY`; unset turns `/api/match` off |
+| `ANTHROPIC_API_KEY` | an Anthropic API key | console.anthropic.com → API keys; extracts persona tags and judges background fit |
+| `MATCH_MODEL` | leave unset (`claude-opus-5-5`) | only to try another Claude model for matching |
+| `HEALTH_SOURCE` | `none` (default) | `coach` once coach-api's weekly snapshot is live (README, "Lead-to-broker matching"); never `mock` in production (the api refuses to start) |
+| `COACH_DATABASE_URL` | the `coach_portal` read-only role's connection string | from coach-api's setup; only read with `HEALTH_SOURCE=coach` |
 
 Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in production.
 

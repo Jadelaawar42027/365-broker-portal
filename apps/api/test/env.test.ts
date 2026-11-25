@@ -1,6 +1,6 @@
 /**
  * File: apps/api/test/env.test.ts
- * Purpose: Unit tests for the API environment parser.
+ * Purpose: Unit tests for the API environment parser, including the lead-matching variables.
  *
  * Functions:
  * - none
@@ -50,5 +50,34 @@ describe("loadApiEnv", () => {
     expect(() => loadApiEnv({ ...required, NODE_ENV: "production", WEB_ORIGIN: "http://example.com" })).toThrow(
       /WEB_ORIGIN: must use https/,
     );
+  });
+
+  it("defaults lead matching to off: no Claude key, no API key, health none, the default model", () => {
+    const env = loadApiEnv(required);
+    expect(env).toMatchObject({ HEALTH_SOURCE: "none", MATCH_MODEL: "claude-opus-5-5" });
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env.MATCH_API_KEY).toBeUndefined();
+    expect(env.COACH_DATABASE_URL).toBeUndefined();
+    expect(loadApiEnv({ ...required, HEALTH_SOURCE: "", MATCH_MODEL: "" })).toMatchObject({ HEALTH_SOURCE: "none", MATCH_MODEL: "claude-opus-5-5" });
+  });
+
+  it("reads the matching variables and rejects a short API key or an unknown health source", () => {
+    const env = loadApiEnv({
+      ...required,
+      HEALTH_SOURCE: "coach",
+      COACH_DATABASE_URL: "postgres://coach_portal:x@localhost:5432/broker_portal",
+      MATCH_API_KEY: "k".repeat(24),
+      MATCH_MODEL: "claude-sonnet-5-5",
+    });
+    expect(env).toMatchObject({ HEALTH_SOURCE: "coach", MATCH_MODEL: "claude-sonnet-5-5" });
+    expect(env.COACH_DATABASE_URL).toContain("coach_portal");
+    expect(() => loadApiEnv({ ...required, MATCH_API_KEY: "short" })).toThrow(/MATCH_API_KEY/);
+    expect(() => loadApiEnv({ ...required, HEALTH_SOURCE: "live" })).toThrow(/HEALTH_SOURCE/);
+  });
+
+  it("refuses mock health in production", () => {
+    expect(() =>
+      loadApiEnv({ ...required, NODE_ENV: "production", WEB_ORIGIN: "https://team.365yachts.org", HEALTH_SOURCE: "mock" }),
+    ).toThrow(/HEALTH_SOURCE: mock is for local development/);
   });
 });

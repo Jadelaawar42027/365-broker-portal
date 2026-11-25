@@ -8,6 +8,7 @@
 export * from "./auth";
 export * from "./contracts";
 export * from "./enums";
+export * from "./matching";
 export * from "./portal";
 export * from "./steps";
 export * from "./training";

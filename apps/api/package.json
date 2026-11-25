@@ -14,9 +14,12 @@
     "admin:invite": "tsx scripts/admin-invite.ts",
     "storage:cors": "tsx scripts/storage-cors.ts",
     "provision:verify": "tsx scripts/provision-verify.ts",
-    "release": "node dist/release.js"
+    "release": "node dist/release.js",
+    "match:backfill": "tsx scripts/persona-tags-backfill.ts",
+    "match:sample-leads": "tsx scripts/match-sample-leads.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.13.0",
     "@bp/db": "workspace:*",
     "@bp/shared": "workspace:*",
     "@fastify/swagger": "^9.9.2",

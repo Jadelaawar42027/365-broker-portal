@@ -5,7 +5,7 @@
  * read the emails that were sent.
  *
  * Functions:
- * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none, and any extra environment variables) and returns the context object.
+ * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none, an optional Claude stand-in for lead matching, and any extra environment variables) and returns the context object.
  * - call(method, url, options): sends a request through app.inject with the portal's Origin header; returns the response.
  * - login(email, password): signs in through Better Auth and returns the session cookie.
  * - createBroker(input): creates a broker (and, unless invited, a password login) directly in the database; returns ids, email and a signed-in cookie.
@@ -31,6 +31,7 @@ import { readIntegrationConfig } from "../../src/services/provisioning/config";
 import type { Integrations } from "../../src/services/provisioning/integrations";
 import { processDueTasks } from "../../src/services/provisioning/worker";
 import type { EmailMessage, Mailer } from "../../src/services/mailer";
+import type { MatchAi } from "../../src/services/match/claude";
 
 export const WEB_ORIGIN = "http://localhost:3000";
 export const OWNER = { name: "Aj Owner", email: "owner@example.com", password: "owner-password-123" };
@@ -39,7 +40,13 @@ export const PASSWORD = "broker-password-123";
 type CallOptions = { cookie?: string; body?: unknown; headers?: Record<string, string>; rawBody?: Buffer };
 
 export async function createTestContext(
-  options: { uploadMode?: "direct" | "proxy"; supportNumber?: string; integrations?: Integrations; env?: Record<string, string> } = {},
+  options: {
+    uploadMode?: "direct" | "proxy";
+    supportNumber?: string;
+    integrations?: Integrations;
+    env?: Record<string, string>;
+    matchAi?: MatchAi | null;
+  } = {},
 ) {
   const database = await startTestDatabase();
   await seedDatabase(database.db, { owner: OWNER });
@@ -71,7 +78,15 @@ export async function createTestContext(
   const mailer: Mailer = { send: async (message) => void sent.push(message) };
   let nowValue: Date | null = null;
   const integrations: Integrations = options.integrations ?? { config: readIntegrationConfig(env), google: null, ghl: null };
-  const app = await buildApp({ env, db: database.db, storage, mailer, now: () => nowValue ?? new Date(), integrations });
+  const app = await buildApp({
+    env,
+    db: database.db,
+    storage,
+    mailer,
+    now: () => nowValue ?? new Date(),
+    integrations,
+    matchAi: options.matchAi ?? null,
+  });
 
   async function call(method: string, url: string, callOptions: CallOptions = {}) {
     const headers: Record<string, string> = { origin: WEB_ORIGIN, ...callOptions.headers };

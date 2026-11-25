@@ -10,7 +10,8 @@
  * editing level/status/dates, changing the
  * commission split (a new history row; agreements not yet countersigned are voided so the broker signs again, and
  * signed ones return the Section 1.7 addendum warning, SPEC D31), deleting a broker and everything about them for good
- * (owner only, the broker's full name typed to confirm), the persona, resending an invite, sending a reset link and reminders.
+ * (owner only, the broker's full name typed to confirm), the persona (saving it re-extracts the persona tags for lead
+ * matching in the background when the text changed), resending an invite, sending a reset link and reminders.
  * Setting a broker to inactive deletes their sessions at once (SPEC D9), ends their open invite link, cancels open account set-up and queues suspending
  * their Google account and deactivating their GHL user; reactivating queues unsuspending them (phase H2). The CRM phone
  * is edited here too. The list carries each broker's account status for the icons on 3b. Every change writes audit_log.
@@ -64,6 +65,7 @@ import { hasPasswordLogin, issueAccountToken, issueBrokerInviteToken, revokeOpen
 import { addBrokerToAiRoster, removeBrokerFromAiRoster } from "../../services/ai-roster";
 import { writeAudit } from "../../services/audit";
 import { deleteBrokerCompletely } from "../../services/broker-deletion";
+import { refreshPersonaTags } from "../../services/persona-tags";
 import { ensureBrokerInviteUrl, inviteUrl as inviteUrlFor, replaceBrokerInviteUrl } from "../../services/invite-links";
 import { countBrokersByStatus, listBrokerMetrics, loadBrokerWithUser, toBrokerListRow } from "../../services/brokers";
 import { inviteEmail, passwordResetEmail, reminderEmail, resignNeededEmail } from "../../services/emails";
@@ -565,6 +567,9 @@ export function registerAdminBrokerRoutes(app: FastifyInstance): void {
           after: { personaMd: markdown },
         });
       });
+      const { db: database, matchAi, now, background } = app.deps;
+      const log = request.log;
+      background.run("persona-tags", () => refreshPersonaTags({ db: database, matchAi, now, log }, broker.id, { actorUserId: actor.userId }));
       return { ok: true as const };
     },
   );

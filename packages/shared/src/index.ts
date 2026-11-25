@@ -1,7 +1,7 @@
 /**
  * File: packages/shared/src/index.ts
  * Purpose: Public entry of @bp/shared, the code both the web app and the API import (constants, schemas,
- * onboarding rules, step-video rules, metrics maths, permissions, chapters, WhatsApp links, training rules, account provisioning rules and contract). Safe to use in the browser.
+ * onboarding rules, step-video rules, metrics maths, permissions, chapters, WhatsApp links, training rules, account provisioning rules, lead-to-broker matching and contract). Safe to use in the browser.
  *
  * Functions:
  * - none
@@ -18,6 +18,7 @@ export * from "./contracts";
 export * from "./constants";
 export * from "./files";
 export * from "./guidance";
+export * from "./matching";
 export * from "./metrics";
 export * from "./next-step";
 export * from "./permissions";
