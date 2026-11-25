@@ -2,8 +2,9 @@
  * File: apps/api/src/services/provisioning/handlers.ts
  * Purpose: What each provisioning task does, per system and action. Every create looks the user up by email first, so
  * a retry never makes a duplicate: Google users are tagged with the broker's id (externalIds), and the address is saved
- * on the broker before Google is asked to create it. Google suspends and unsuspends; GoHighLevel has no deactivate
- * endpoint, so suspending deletes the GHL user and unsuspending creates (or finds) one again. Once the Google account
+ * on the broker before Google is asked to create it. Google suspends and unsuspends. GoHighLevel has no deactivate
+ * endpoint and the portal never deletes a GHL user, so suspending leaves the GHL user untouched and audits that it must
+ * be handled manually in GHL; unsuspending finds the same user again by email (and only creates one if it was removed). Once the Google account
  * exists, the corporate email becomes the broker's portal login. Every change writes audit_log; passwords are generated
  * here, sent to the provider and forgotten, except that new Google users get GOOGLE_STARTING_PASSWORD when it is set
  * (the audit row then says startingPassword: true, never the password). In dry-run mode linking an address nobody
@@ -23,7 +24,7 @@
  * - saveGhlAccount(db, broker, userId, action): stores the GHL user id and audits.
  * - ghlCreate(context, broker): finds or creates the broker's GHL user in the location.
  * - ghlLink(context, broker): stores the id of the existing GHL user with the broker's corporate email (a pretend one in dry-run).
- * - ghlSuspend(context, broker): deletes the broker's GHL user (the API has no deactivate).
+ * - ghlSuspend(context, broker): never calls GHL (no deactivate endpoint, and GHL users are never deleted); audits that the GHL account must be handled manually.
  * - runTaskAction(context, task): dispatches a claimed task to the handler for its system and action.
  */
 import { brokers, provisioningTasks, users, type Database, type DbOrTx } from "@bp/db";
@@ -238,15 +239,16 @@ async function ghlLink(context: TaskContext, broker: TaskBroker): Promise<void> 
   await saveGhlAccount(context.db, broker, found.id, "linked");
 }
 
+export const GHL_MANUAL_SUSPEND_NOTE = "GHL account must be handled manually: GoHighLevel has no deactivate endpoint and the portal never deletes GHL users.";
+
 async function ghlSuspend(context: TaskContext, broker: TaskBroker): Promise<void> {
   if (!broker.ghlUserId) return;
-  await context.integrations.ghl!.deleteUser(broker.ghlUserId);
   await writeAudit(context.db, {
     actorUserId: null,
-    action: "provisioning.ghl.suspended",
+    action: "provisioning.ghl.manual_action_needed",
     entityType: "broker",
     entityId: broker.id,
-    after: { ghlUserId: broker.ghlUserId, how: "deleted (GHL has no deactivate)" },
+    after: { ghlUserId: broker.ghlUserId, note: GHL_MANUAL_SUSPEND_NOTE },
   });
 }
 

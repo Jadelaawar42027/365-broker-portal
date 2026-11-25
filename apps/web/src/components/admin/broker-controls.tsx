@@ -67,12 +67,12 @@ export function BrokerControls({ broker, today, hasAccounts = false }: { broker:
               const status = event.target.value;
               if (status === "inactive") {
                 const confirmed = window.confirm(
-                  `Set ${broker.name} to inactive? They are signed out at once, can't log in, and today is recorded as their leaving date.${hasAccounts ? "\n\nThis will suspend their Google account and deactivate their GHL user." : ""}`,
+                  `Set ${broker.name} to inactive? They are signed out at once, can't log in, and today is recorded as their leaving date.${hasAccounts ? "\n\nThis will suspend their Google account. Their GoHighLevel user is left as it is: deactivate or remove it in GHL yourself." : ""}`,
                 );
                 if (!confirmed) return;
                 void patch({ status, ...(broker.leftAt ? {} : { leftAt: today }) });
               } else {
-                if (broker.status === "inactive" && hasAccounts && !window.confirm(`Reactivate ${broker.name}? Their Google account is unsuspended and a GHL user is set up again.`)) return;
+                if (broker.status === "inactive" && hasAccounts && !window.confirm(`Reactivate ${broker.name}? Their Google account is unsuspended and their GoHighLevel user is linked again (set up again only if it was removed in GHL).`)) return;
                 void patch({ status, ...(broker.status === "inactive" ? { leftAt: null } : {}) });
               }
             }}

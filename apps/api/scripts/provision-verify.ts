@@ -3,14 +3,14 @@
  * Purpose: `pnpm provision:verify` checks account provisioning end to end against the REAL Google Workspace and
  * GoHighLevel with the credentials in the environment. It creates a broker named "Provisioning Check" with a unique
  * timestamped address (provisioning.check.<timestamp>@GOOGLE_DOMAIN), creates the Google and GHL users through the same
- * code the worker uses, confirms both exist, suspends both, then deletes both test users and the broker row. It prints
+ * code the worker uses, confirms both exist, suspends both (checking that suspending leaves the GHL user in place, since
+ * the portal never deletes GHL users), then deletes both test users and the broker row. It prints
  * PASS or FAIL for each step. It never touches any other user: every lookup and deletion is checked against the ids this
  * run created, and the queue is never used, so other brokers' tasks are left alone. Clean-up runs even after a failure.
  *
  * Functions:
  * - report(step, ok, detail): prints one PASS / FAIL line and remembers failures.
  * - readIntegrationEnv(source): the Google and GHL variables from the environment (blank counts as missing).
- * - waitFor(check, timeoutMs): polls check() every 5 seconds until it returns true or the time runs out.
  * - main(): runs every step, cleans up and exits non-zero if any step failed.
  */
 import { brokers, createBroker, createDb, users } from "@bp/db";
@@ -39,15 +39,6 @@ function readIntegrationEnv(source: NodeJS.ProcessEnv): IntegrationEnv {
     GHL_COMPANY_ID: value("GHL_COMPANY_ID"),
     GHL_LOCATION_ID: value("GHL_LOCATION_ID"),
   };
-}
-
-async function waitFor(check: () => Promise<boolean>, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (await check()) return true;
-    if (Date.now() > deadline) return false;
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
 }
 
 async function main(): Promise<void> {
@@ -121,12 +112,11 @@ async function main(): Promise<void> {
     }
     if (ghlId) {
       await runTaskAction(context, { brokerId, system: "ghl", action: "suspend" }).then(
-        () => report("GHL user deactivated (deleted; GHL has no deactivate)", true, "GHL queues the deletion"),
-        (error: Error) => report("GHL user deactivated (deleted; GHL has no deactivate)", false, error.message),
+        () => report("GHL suspend ran without calling GHL (handled manually)", true),
+        (error: Error) => report("GHL suspend ran without calling GHL (handled manually)", false, error.message),
       );
-      const gone = await waitFor(async () => (await ghl.findUserByEmail(address)) === null, 180_000);
-      report("GHL user gone", gone, gone ? "" : "still listed after 3 minutes; GHL may still be processing the deletion");
-      if (gone) ghlId = null;
+      const kept = (await ghl.findUserByEmail(address))?.id === ghlId;
+      report("GHL user kept after suspend", kept, kept ? "" : "the GHL user is missing; suspending must never delete it");
     }
   } finally {
     if (googleId) {

@@ -4,7 +4,8 @@
  * replaced by in-memory fakes: inviting a broker queues Google then GHL, the address is the first name, then firstname.lastname
  * on a clash, then firstname.lastname2 (accents and punctuation stripped), the corporate email becomes the login, retries back off and never duplicate a
  * user, a crash between creating and saving is recovered by the lookup, partial failures leave the other system done,
- * five failed attempts stop, GHL waits for Google, and nothing is queued for systems that aren't configured.
+ * five failed attempts stop, GHL waits for Google, nothing is queued for systems that aren't configured, and suspending
+ * a broker with a real GHL user id never sends a single request to GoHighLevel (it is audited as needing manual action).
  *
  * Functions:
  * - invite(ctx, cookie, name): invites a broker through the API and returns their id.
@@ -16,6 +17,8 @@ import { PROVISIONING_BASE_DELAY_MS } from "@bp/shared";
 import { and, asc, eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProvisioningError } from "../src/services/provisioning/errors";
+import { createGhlClient } from "../src/services/provisioning/ghl";
+import { GHL_MANUAL_SUSPEND_NOTE, runTaskAction } from "../src/services/provisioning/handlers";
 import { createTestContext, OWNER, type TestContext } from "./helpers/context";
 import { createFakeGhl, createFakeGoogle, fakeIntegrations } from "./helpers/provisioning-fakes";
 
@@ -167,5 +170,44 @@ describe("provisioning with nothing configured", () => {
     expect(await tasksFor(ctx, brokerId)).toEqual([]);
     expect(await ctx.runProvisioning()).toBe(0);
     expect(await brokerRow(ctx, brokerId)).toMatchObject({ corporateEmail: null, googleUserId: null, ghlUserId: null });
+  });
+});
+
+describe("suspending a broker with a real GoHighLevel user", () => {
+  let ctx: TestContext;
+
+  beforeAll(async () => {
+    ctx = await createTestContext({ integrations: fakeIntegrations(null, null) });
+  });
+  afterAll(async () => ctx?.close());
+
+  it("never calls the GHL API, keeps the GHL id and audits that the account must be handled manually", async () => {
+    const requests: string[] = [];
+    const failingFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      requests.push(`${init?.method ?? "GET"} ${String(input)}`);
+      throw new Error("suspending must not call GoHighLevel");
+    }) as typeof fetch;
+    const realGhl = createGhlClient({ configured: true, agencyToken: "pit-agency-token", companyId: "company-1", locationId: "location-1" }, failingFetch);
+    const broker = await ctx.createBroker({ name: "Real Ghl", email: "real.ghl@example.com", status: "inactive" });
+    await ctx.db.update(brokers).set({ ghlUserId: "Xy7Real9GhlUserId" }).where(eq(brokers.id, broker.brokerId));
+
+    await runTaskAction({ db: ctx.db, integrations: fakeIntegrations(null, realGhl), now: () => new Date() }, { brokerId: broker.brokerId, system: "ghl", action: "suspend" });
+
+    expect(requests).toEqual([]);
+    expect((await brokerRow(ctx, broker.brokerId)).ghlUserId).toBe("Xy7Real9GhlUserId");
+    const audits = await ctx.db.select().from(auditLog).where(eq(auditLog.entityId, broker.brokerId));
+    expect(audits.map((row) => row.action)).toContain("provisioning.ghl.manual_action_needed");
+    expect(audits.find((row) => row.action === "provisioning.ghl.manual_action_needed")!.after).toEqual({ ghlUserId: "Xy7Real9GhlUserId", note: GHL_MANUAL_SUSPEND_NOTE });
+    expect(audits.map((row) => row.action)).not.toContain("provisioning.ghl.suspended");
+  });
+
+  it("does nothing for a broker without a GHL user", async () => {
+    const broker = await ctx.createBroker({ name: "No Ghl", email: "no.ghl@example.com", status: "inactive" });
+    const realGhl = createGhlClient({ configured: true, agencyToken: "pit-agency-token", companyId: "company-1", locationId: "location-1" }, (async () => {
+      throw new Error("suspending must not call GoHighLevel");
+    }) as typeof fetch);
+    await runTaskAction({ db: ctx.db, integrations: fakeIntegrations(null, realGhl), now: () => new Date() }, { brokerId: broker.brokerId, system: "ghl", action: "suspend" });
+    const audits = await ctx.db.select().from(auditLog).where(and(eq(auditLog.entityId, broker.brokerId), like(auditLog.action, "provisioning.ghl.%")));
+    expect(audits).toEqual([]);
   });
 });
