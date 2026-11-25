@@ -33,6 +33,7 @@ export type SnapshotRow = {
     string,
     {
       value: number | null;
+      points?: number | null;
       target: number | null;
       status: string;
       sample: number;
