@@ -157,7 +157,7 @@ describe("runImport", () => {
     expect((await stepsFor("alex@example.com")).every((step) => step.status === "approved")).toBe(true);
     const audit = await testDb.db.select({ action: auditLog.action }).from(auditLog);
     expect(audit.filter((row) => row.action === "broker.imported")).toHaveLength(3);
-    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(11 + 2 + 11);
+    expect(audit.filter((row) => row.action === "step.imported")).toHaveLength(14 + 2 + 14);
   });
 
   it("is idempotent: a second run changes nothing", async () => {

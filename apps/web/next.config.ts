@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@bp/shared"],
   poweredByHeader: false,
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  experimental: { proxyClientMaxBodySize: "12mb" },
+  experimental: { proxyClientMaxBodySize: "12mb", agentUpgrade: "security" },
   async rewrites() {
     return buildApiProxyRewrites(process.env.API_INTERNAL_URL ?? "http://localhost:4000");
   },

@@ -91,9 +91,9 @@ describe("seed", () => {
       .leftJoin(brokerSteps, eq(brokerSteps.brokerId, brokers.id))
       .groupBy(brokers.status);
     expect(Object.fromEntries(rows.map((row) => [row.status, row.count]))).toEqual({
-      onboarding: 11,
-      active: 11,
-      invited: 11,
+      onboarding: 14,
+      active: 14,
+      invited: 14,
     });
   });
 
@@ -187,7 +187,7 @@ describe("broker_metrics view", () => {
       stepsWaitingReview: 0,
     });
     expect(kevin.tenureDays).toBe(daysBetween("2026-08-18", today()));
-    expect(kevin.lastActivityAt?.toISOString()).toBe("2026-08-26T14:00:00.000Z");
+    expect(kevin.lastActivityAt?.toISOString()).toBe("2026-08-27T14:00:00.000Z");
   });
 
   it("reports a broker mid-onboarding", async () => {

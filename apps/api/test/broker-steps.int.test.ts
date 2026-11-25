@@ -113,7 +113,7 @@ describe("answer steps", () => {
 
   it("writes an audit row for every submission", async () => {
     const rows = await ctx.db.select().from(auditLog).where(eq(auditLog.actorUserId, broker.userId));
-    expect(rows.filter((row) => row.action === "step.submit")).toHaveLength(4);
+    expect(rows.filter((row) => row.action === "step.submit")).toHaveLength(5);
   });
 });
 

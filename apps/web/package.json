@@ -15,14 +15,14 @@
   },
   "dependencies": {
     "@bp/shared": "workspace:*",
-    "next": "^16.4.2",
+    "next": "^16.4.6",
     "pdfjs-dist": "4.10.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@bp/eslint-config": "workspace:*",
-    "@next/eslint-plugin-next": "^16.4.2",
+    "@next/eslint-plugin-next": "^16.4.6",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.2",
