@@ -1,11 +1,14 @@
 /**
  * File: apps/api/src/services/coaching/store.ts
- * Purpose: Reads and writes the coach service's tables (schema "coach") through their own connection, made with the
- * least-privilege coach_portal role (COACH_DATABASE_URL). Read-only except Shelly's pulse and excuse decisions.
- * Every query is a postgres.js tagged template, so values are always sent as parameters.
+ * Purpose: Reads and writes the coach service's tables (schema "coach") over the same coach_portal connection the lead
+ * matching health adapter uses (app.deps.coachDb, opened once from COACH_DATABASE_URL). It stays inside coach_portal's
+ * grants: SELECT on coach.weekly_snapshot, call_reviews, excuse_checks and excuse_decisions, INSERT on excuse_decisions
+ * and INSERT/UPDATE on manager_pulse; nothing in the portal's own schema. Every query is a postgres.js tagged template
+ * on that connection's client, so values are always sent as parameters; dates are sent as ISO strings cast to
+ * timestamptz, because the Drizzle driver leaves postgres.js without a Date serializer.
  *
  * Functions:
- * - createCoachStore(url): opens a small pool for the coach database and returns the store.
+ * - createCoachStore(coachDb): returns the store on top of the shared coach_portal connection (it opens and closes nothing).
  * - weeks(): the snapshot weeks available, newest first (up to 26).
  * - snapshots(weekStart): every broker's frozen snapshot for one week.
  * - brokerHistory(brokerId, upToWeekStart, count): one broker's snapshots up to a week, newest first.
@@ -17,9 +20,8 @@
  * - pulse(brokerId, weekStart): Shelly's pulse for a broker and week, or null.
  * - pulses(brokerId): every pulse for a broker, newest first.
  * - savePulse(input): creates or updates the pulse for a broker and week.
- * The store also exposes the pool's close (closed with the app).
  */
-import { createDb } from "@bp/db";
+import type { Database } from "@bp/db";
 
 export type SnapshotRow = {
   brokerId: string;
@@ -60,8 +62,8 @@ export type PulseRow = {
 
 export type CoachStore = ReturnType<typeof createCoachStore>;
 
-export function createCoachStore(url: string) {
-  const { sql, close } = createDb(url, { max: 3 });
+export function createCoachStore(coachDb: Database) {
+  const sql = coachDb.$client;
 
   return {
     async weeks(): Promise<Array<{ weekStart: string; isoWeek: string }>> {
@@ -89,7 +91,7 @@ export function createCoachStore(url: string) {
 
     async callsReviewed(from: Date, to: Date): Promise<number> {
       const [row] = await sql<Array<{ n: number }>>`
-        SELECT count(*)::int AS n FROM coach.call_reviews WHERE overall IS NOT NULL AND reviewed_at > ${from} AND reviewed_at <= ${to}`;
+        SELECT count(*)::int AS n FROM coach.call_reviews WHERE overall IS NOT NULL AND reviewed_at > ${from.toISOString()}::timestamptz AND reviewed_at <= ${to.toISOString()}::timestamptz`;
       return row?.n ?? 0;
     },
 
@@ -111,7 +113,7 @@ export function createCoachStore(url: string) {
           SELECT decision, decided_by_name FROM coach.excuse_decisions
           WHERE moment_key = c.moment_key ORDER BY decided_at DESC, id DESC LIMIT 1
         ) d ON true
-        WHERE c.broker_id = ${brokerId} AND c.excused AND c.due_at > ${from} AND c.due_at <= ${to}
+        WHERE c.broker_id = ${brokerId} AND c.excused AND c.due_at > ${from.toISOString()}::timestamptz AND c.due_at <= ${to.toISOString()}::timestamptz
         ORDER BY c.needs_confirmation DESC, c.due_at DESC`;
       return rows.map((r) => ({ ...r, dueAt: new Date(r.dueAt).toISOString() }));
     },
@@ -153,6 +155,5 @@ export function createCoachStore(url: string) {
           support_needed = EXCLUDED.support_needed, updated_at = now()`;
     },
 
-    close,
   };
 }

@@ -2,9 +2,9 @@
  * File: apps/api/src/deps.ts
  * Purpose: The dependencies every route needs (config, database, storage, mailer, auth, clock, the Google and GoHighLevel
  * clients for account provisioning, a way to wake the provisioning worker, the Claude client lead matching uses (null
- * when ANTHROPIC_API_KEY is not set), the read-only coach_portal connection for broker health (null unless HEALTH_SOURCE
- * is coach and COACH_DATABASE_URL is set), the runner for work done after a response, and the coach service's store
- * for the Coaching section when COACH_DATABASE_URL is set), and the Fastify
+ * when ANTHROPIC_API_KEY is not set), the single coach_portal connection (null unless COACH_DATABASE_URL is set),
+ * shared by the broker-health adapter and the Coaching section's coach store built on it, and the runner for work done
+ * after a response), and the Fastify
  * type additions that expose them as app.deps and the signed-in user as request.actor.
  *
  * Functions:

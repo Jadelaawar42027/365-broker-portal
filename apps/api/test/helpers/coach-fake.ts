@@ -52,7 +52,6 @@ export function createFakeCoachStore(seed: { snapshots?: SnapshotRow[]; excuses?
       if (i >= 0) pulses[i] = row;
       else pulses.push(row);
     },
-    close: async () => undefined,
-  } as CoachStore;
+  } satisfies CoachStore;
   return { store, decisions, pulses };
 }

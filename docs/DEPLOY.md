@@ -77,7 +77,8 @@ In the project, click **Create → GitHub Repo** twice and pick this repo both t
 | `ANTHROPIC_API_KEY` | an Anthropic API key | console.anthropic.com → API keys; extracts persona tags and judges background fit |
 | `MATCH_MODEL` | leave unset (`claude-opus-5-5`) | only to try another Claude model for matching |
 | `HEALTH_SOURCE` | `none` (default) | `coach` once coach-api's weekly snapshot is live (README, "Lead-to-broker matching"); never `mock` in production (the api refuses to start) |
-| `COACH_DATABASE_URL` | the `coach_portal` read-only role's connection string | from coach-api's setup; only read with `HEALTH_SOURCE=coach` |
+| `COACH_DATABASE_URL` | the `coach_portal` role's connection string (`postgresql://coach_portal:…@postgres.railway.internal:5432/railway`) | from coach-api's setup (REVIEW.md); one shared connection for the Coaching section and, with `HEALTH_SOURCE=coach`, lead-matching health |
+| `COACHING_BROKER_VIEW` | `false` | `true` lets brokers see their own coaching page; keep `false` during the shadow period |
 
 Never set `EMAIL_OUTBOX_DIR` on Railway: the api refuses to start with it in production.
 

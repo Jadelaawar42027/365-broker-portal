@@ -2,12 +2,13 @@
  * File: apps/api/src/app.ts
  * Purpose: Builds the Fastify application (validation, error handling, auth, OpenAPI and every route, including the
  * API-key lead-matching routes) without starting it, so tests can call it with app.inject() and server.ts can listen on a
- * port. Tests can pass their own Claude stand-in (matchAi), coach health connection (coachDb) and background runner. With
- * HEALTH_SOURCE=coach and COACH_DATABASE_URL set, it opens the read-only coach_portal connection and closes it with the app.
+ * port. Tests can pass their own Claude stand-in (matchAi), coach connection (coachDb), coach store and background runner.
+ * With COACH_DATABASE_URL set it opens ONE coach_portal connection, shared by the lead-matching health adapter (which only
+ * queries it when HEALTH_SOURCE is coach) and the Coaching section's store, and closes it with the app.
  *
  * Functions:
- * - buildApp(input): creates the Fastify instance with the given dependencies (opening the coach store when
- *   COACH_DATABASE_URL is set and none is given, and closing it with the app) and returns it ready to use.
+ * - buildApp(input): creates the Fastify instance with the given dependencies (opening the shared coach_portal connection
+ *   and building the coach store on it when COACH_DATABASE_URL is set and none is given) and returns it ready to use.
  */
 import { createDb, type Database } from "@bp/db";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -51,7 +52,8 @@ export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now" | "integrati
 
 export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
   const { env } = input;
-  const coach = input.coachDb === undefined && env.HEALTH_SOURCE === "coach" && env.COACH_DATABASE_URL ? createDb(env.COACH_DATABASE_URL, { max: 2 }) : null;
+  const coachConnection = input.coachDb === undefined && env.COACH_DATABASE_URL ? createDb(env.COACH_DATABASE_URL, { max: 3 }) : null;
+  const coachDb = input.coachDb !== undefined ? input.coachDb : (coachConnection?.db ?? null);
   const app = Fastify({
     logger: env.NODE_ENV === "test" ? false : { level: env.LOG_LEVEL },
     trustProxy: true,
@@ -68,15 +70,12 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
     integrations: input.integrations ?? createIntegrations(env),
     wakeProvisioning: input.wakeProvisioning ?? (() => undefined),
     matchAi: input.matchAi !== undefined ? input.matchAi : createMatchAiFromEnv(env),
-    coachDb: input.coachDb !== undefined ? input.coachDb : (coach?.db ?? null),
+    coachDb,
     background: input.background ?? createBackgroundTasks(app.log),
-    coach: input.coach !== undefined ? input.coach : env.COACH_DATABASE_URL ? createCoachStore(env.COACH_DATABASE_URL) : null,
-  });
-  app.addHook("onClose", async () => {
-    await app.deps.coach?.close();
+    coach: input.coach !== undefined ? input.coach : coachDb ? createCoachStore(coachDb) : null,
   });
 
-  if (coach) app.addHook("onClose", async () => coach.close());
+  if (coachConnection) app.addHook("onClose", async () => coachConnection.close());
 
   registerErrorHandler(app);
   registerOriginCheck(app, env.WEB_ORIGIN);

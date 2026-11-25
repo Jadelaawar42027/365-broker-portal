@@ -5,7 +5,7 @@
  * read the emails that were sent.
  *
  * Functions:
- * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none, an optional Claude stand-in for lead matching, any extra environment variables, and an optional in-memory coach store) and returns the context object.
+ * - createTestContext(options): starts everything (with the given Google / GoHighLevel stand-ins, or none, an optional Claude stand-in for lead matching, any extra environment variables, an optional in-memory coach store, and optionally COACH_DATABASE_URL pointing at this test database as another role, so the app opens its real shared coach_portal connection) and returns the context object.
  * - call(method, url, options): sends a request through app.inject with the portal's Origin header; returns the response.
  * - login(email, password): signs in through Better Auth and returns the session cookie.
  * - createBroker(input): creates a broker (and, unless invited, a password login) directly in the database; returns ids, email and a signed-in cookie.
@@ -48,6 +48,7 @@ export async function createTestContext(
     env?: Record<string, string>;
     matchAi?: MatchAi | null;
     coach?: CoachStore | null;
+    coachDatabaseUrl?: (databaseUrl: string) => string;
   } = {},
 ) {
   const database = await startTestDatabase();
@@ -66,6 +67,7 @@ export async function createTestContext(
     STORAGE_UPLOAD_MODE: options.uploadMode ?? "direct",
     SUPPORT_CONTACT_NAME: "Shelly",
     SUPPORT_WHATSAPP_NUMBER: options.supportNumber ?? "15614459241",
+    ...(options.coachDatabaseUrl ? { COACH_DATABASE_URL: options.coachDatabaseUrl(database.url) } : {}),
     ...options.env,
   });
   const storage = createS3Storage({
@@ -88,7 +90,7 @@ export async function createTestContext(
     now: () => nowValue ?? new Date(),
     integrations,
     matchAi: options.matchAi ?? null,
-    coach: options.coach ?? null,
+    ...(options.coach !== undefined ? { coach: options.coach } : {}),
   });
 
   async function call(method: string, url: string, callOptions: CallOptions = {}) {
