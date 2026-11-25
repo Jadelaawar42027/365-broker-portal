@@ -2,8 +2,9 @@
  * File: apps/web/src/app/admin/coaching/page.tsx
  * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (with the reason and a
  * suggested topic), and every broker's row (score, trend, data coverage, the eight metric cells against their
- * targets, focus areas under the name; the name column stays put while the table scrolls on a phone), worst score first, with the colour legend. Numbers come from the coach service's frozen
- * Monday snapshot for the chosen week.
+ * targets, with "90-day data" under a cell measured over 90 days, focus areas under the name; the name column stays put
+ * while the table scrolls on a phone), worst score first, with the colour legend. Numbers come from the coach
+ * service's frozen Monday snapshot for the chosen week.
  *
  * Functions:
  * - CoachingOverviewPage({ searchParams }): loads the overview for ?week= (default the newest) and renders the screen.
@@ -13,8 +14,9 @@ import {
   COACHING_METRIC_LABELS,
   COACHING_METRICS,
   formatCoachingTarget,
-  formatCoachingValue,
+  formatWorkMinutes,
   scoreBand,
+  windowLabel,
   type CoachingOverviewResponse,
 } from "@bp/shared";
 import type { Metadata } from "next";
@@ -58,8 +60,8 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
           <section aria-label="Team totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard label="Team score" value={data.totals.teamScore === null ? "—" : String(data.totals.teamScore)} detail="Average of non-provisional scores" />
             <StatCard label="Follow-ups on time" value={pct(data.totals.onTimeRate)} detail="Due moments met, whole team" />
-            <StatCard label="Median speed to lead" value={formatCoachingValue("speed_to_lead", data.totals.medianSpeedMinutes)} detail="Working minutes to first touch" />
-            <StatCard label="Calls reviewed" value={String(data.totals.callsReviewed)} detail="Scored by the call reviewer, 28 days" />
+            <StatCard label="Median follow-up" value={formatWorkMinutes(data.totals.medianFollowMinutes)} detail="Working time from a call's end to the next touch" />
+            <StatCard label="Calls reviewed" value={data.totals.callsReviewed === null ? "—" : String(data.totals.callsReviewed)} detail="Calls in the last 28 days with a scored review" />
             <StatCard label="Excuses to confirm" value={String(data.totals.excusesToConfirm)} detail="Found only in a broker note" />
           </section>
 
@@ -146,11 +148,15 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
                           <TrendText trend={row.trend} />
                         </td>
                         <td className="px-3 py-3 tabular-nums text-muted">{pct(row.coverage)}</td>
-                        {COACHING_METRICS.map((metric) => (
-                          <td key={metric} className="px-1.5 py-3">
-                            <MetricCell metric={metric} value={row.metrics[metric]?.value ?? null} status={row.metrics[metric]?.status ?? "unknown"} />
-                          </td>
-                        ))}
+                        {COACHING_METRICS.map((metric) => {
+                          const longer = windowLabel(row.metrics[metric]?.windowDays ?? null);
+                          return (
+                            <td key={metric} className="px-1.5 py-3 text-center">
+                              <MetricCell metric={metric} value={row.metrics[metric]?.value ?? null} status={row.metrics[metric]?.status ?? "unknown"} />
+                              {longer ? <span className="mt-1 block text-[13px] leading-tight text-muted">{longer}</span> : null}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}

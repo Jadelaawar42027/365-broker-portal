@@ -12,22 +12,35 @@ import {
   formatCoachingTarget,
   formatCoachingValue,
   needsOneOnOneReason,
+  formatWorkMinutes,
   pulseBodySchema,
   scoreBand,
   suggestedTopic,
+  windowLabel,
 } from "../src/api-coaching";
 
 describe("coaching formatting", () => {
   it("formats minutes, shares and call scores", () => {
-    expect(formatCoachingValue("speed_to_lead", 47)).toBe("47 min");
+    expect(formatCoachingValue("responsiveness", 47)).toBe("47 min");
+    expect(formatCoachingValue("speed_to_follow", 61.6)).toBe("62");
     expect(formatCoachingValue("responsiveness", 150)).toBe("2.5 h");
     expect(formatCoachingValue("on_time_touches", 0.817)).toBe("82%");
     expect(formatCoachingValue("call_quality", 61.4)).toBe("61");
     expect(formatCoachingValue("attendance", null)).toBe("—");
   });
 
+  it("labels metrics measured over more than 28 days, and formats working minutes", () => {
+    expect(windowLabel(90)).toBe("90-day data");
+    expect(windowLabel(28)).toBeNull();
+    expect(windowLabel(null)).toBeNull();
+    expect(formatWorkMinutes(40)).toBe("40 min");
+    expect(formatWorkMinutes(150)).toBe("2.5 h");
+    expect(formatWorkMinutes(null)).toBe("—");
+  });
+
   it("formats targets in the direction that is better", () => {
-    expect(formatCoachingTarget("speed_to_lead", 30)).toBe("≤ 30 min");
+    expect(formatCoachingTarget("responsiveness", 30)).toBe("≤ 30 min");
+    expect(formatCoachingTarget("speed_to_follow", 60)).toBe("≥ 60");
     expect(formatCoachingTarget("promises_kept", 0.85)).toBe("≥ 85%");
     expect(formatCoachingTarget("promises_kept", null)).toBe("—");
   });

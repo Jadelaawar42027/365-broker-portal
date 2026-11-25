@@ -70,7 +70,7 @@ function coachPortalUrl(url: string): string {
 async function snapshotRow(brokerId: string, weekStart: string, score: number | null, onTimeShare: number | null) {
   const metrics = {
     on_time_touches: { value: onTimeShare, target: 0.8, achievement: null, status: "unknown", sample: 6 },
-    speed_to_lead: { value: 12, target: 15, achievement: 1, status: "green", sample: 4 },
+    speed_to_follow: { value: 72, target: 60, achievement: 1, status: "green", sample: 4 },
   };
   await testDb.sql`
     INSERT INTO coach.weekly_snapshot (broker_id, week_start, iso_week, score, coverage, provisional, metrics, focus_areas, trend, rules_version, as_of)

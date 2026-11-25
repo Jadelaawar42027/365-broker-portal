@@ -90,15 +90,19 @@ beforeAll(async () => {
   owner = await ctx.login(OWNER.email, OWNER.password);
   brokerA = await ctx.createBroker({ name: "Coached A", email: "coached.a@example.com" });
   brokerB = await ctx.createBroker({ name: "Coached B", email: "coached.b@example.com" });
-  const metrics = JSON.stringify({ on_time_touches: { value: 0.75, target: 0.8, status: "amber", sample: 8 } });
+  const metrics = JSON.stringify({
+    on_time_touches: { value: 0.75, target: 0.8, status: "amber", sample: 8, window_days: 28 },
+    speed_to_follow: { value: 62, target: 60, status: "green", sample: 5, window_days: 90 },
+  });
   for (const [brokerId, week, score] of [
     [brokerA.brokerId, "2026-11-09", 70],
     [brokerA.brokerId, "2026-11-16", 88],
     [brokerB.brokerId, "2026-11-16", 52],
   ] as const) {
     await ctx.sql`
-      INSERT INTO coach.weekly_snapshot (broker_id, week_start, iso_week, score, coverage, provisional, metrics, focus_areas, trend, rules_version, as_of)
-      VALUES (${brokerId}, ${week}, ${week === "2026-11-16" ? "2026-W47" : "2026-W46"}, ${score}, ${0.9}, ${false}, ${metrics}::jsonb, ${"[]"}::jsonb, ${"{}"}::jsonb, ${"v1"}, now())`;
+      INSERT INTO coach.weekly_snapshot (broker_id, week_start, iso_week, score, coverage, provisional, metrics, focus_areas, trend, context, rules_version, as_of)
+      VALUES (${brokerId}, ${week}, ${week === "2026-11-16" ? "2026-W47" : "2026-W46"}, ${score}, ${0.9}, ${false}, ${metrics}::jsonb, ${"[]"}::jsonb, ${"{}"}::jsonb,
+        ${JSON.stringify({ calls_reviewed: brokerId === brokerA.brokerId ? 3 : 2 })}::jsonb, ${"v3"}, now())`;
   }
   await ctx.sql`
     INSERT INTO coach.call_reviews (call_id, lead_id, broker_id, call_type, rubric, overall, model, prompt_version, reviewed_at)
@@ -133,6 +137,8 @@ describe("Coaching routes within coach_portal's grants", () => {
     const res = await ctx.call("GET", "/v1/admin/coaching/overview", { cookie: owner });
     expect(res.statusCode).toBe(200);
     expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Coached B", "Coached A"]);
+    expect(res.json().totals.callsReviewed).toBe(5);
+    expect(res.json().brokers[0].metrics.speed_to_follow).toMatchObject({ value: 62, windowDays: 90 });
   });
 
   it("shows a broker's page with their history and the excuse waiting for a decision", async () => {

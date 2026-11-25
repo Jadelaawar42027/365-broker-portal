@@ -2,7 +2,7 @@
  * File: apps/api/src/services/coaching/store.ts
  * Purpose: Reads and writes the coach service's tables (schema "coach") over the same coach_portal connection the lead
  * matching health adapter uses (app.deps.coachDb, opened once from COACH_DATABASE_URL). It stays inside coach_portal's
- * grants: SELECT on coach.weekly_snapshot, call_reviews, excuse_checks and excuse_decisions, INSERT on excuse_decisions
+ * grants: SELECT on coach.weekly_snapshot, excuse_checks and excuse_decisions, INSERT on excuse_decisions
  * and INSERT/UPDATE on manager_pulse; nothing in the portal's own schema. Every query is a postgres.js tagged template
  * on that connection's client, so values are always sent as parameters; dates are sent as ISO strings cast to
  * timestamptz, because the Drizzle driver leaves postgres.js without a Date serializer.
@@ -12,7 +12,6 @@
  * - weeks(): the snapshot weeks available, newest first (up to 26).
  * - snapshots(weekStart): every broker's frozen snapshot for one week.
  * - brokerHistory(brokerId, upToWeekStart, count): one broker's snapshots up to a week, newest first.
- * - callsReviewed(from, to): how many calls got a scored review between two dates.
  * - excusesToConfirm(): broker-note-only excuses that have no decision yet.
  * - excuses(brokerId, from, to): one broker's excused misses due between two dates, with the latest decision.
  * - excuseBroker(momentKey): the broker an excused miss belongs to, or null.
@@ -30,7 +29,18 @@ export type SnapshotRow = {
   score: number | null;
   coverage: number;
   provisional: boolean;
-  metrics: Record<string, { value: number | null; target: number | null; status: string; sample: number; evidence?: Array<{ leadId: string; at: string; note: string }> }>;
+  metrics: Record<
+    string,
+    {
+      value: number | null;
+      target: number | null;
+      status: string;
+      sample: number;
+      window_days?: number | null;
+      detail?: Record<string, number | null>;
+      evidence?: Array<{ leadId: string; at: string; note: string }>;
+    }
+  >;
   focusAreas: Array<{ metric: string; action?: string | null; evidence?: Array<{ leadId: string; at: string; note: string }> }>;
   trend: Record<string, number | null>;
   context: Record<string, number | null>;
@@ -87,12 +97,6 @@ export function createCoachStore(coachDb: Database) {
         FROM coach.weekly_snapshot WHERE broker_id = ${brokerId} AND week_start <= ${upToWeekStart}
         ORDER BY week_start DESC LIMIT ${count}`;
       return [...rows];
-    },
-
-    async callsReviewed(from: Date, to: Date): Promise<number> {
-      const [row] = await sql<Array<{ n: number }>>`
-        SELECT count(*)::int AS n FROM coach.call_reviews WHERE overall IS NOT NULL AND reviewed_at > ${from.toISOString()}::timestamptz AND reviewed_at <= ${to.toISOString()}::timestamptz`;
-      return row?.n ?? 0;
     },
 
     async excusesToConfirm(): Promise<number> {
