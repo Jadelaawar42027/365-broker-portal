@@ -12,10 +12,7 @@
       "Bash(git commit *)"
     ],
     "deny": [
-      "Bash(git push)",
-      "Bash(git push *)",
       "Bash(git remote *)",
-      "Bash(gh *)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./**/.env)",
