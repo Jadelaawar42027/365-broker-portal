@@ -6,7 +6,8 @@
  * HEALTH_SOURCE=coach and COACH_DATABASE_URL set, it opens the read-only coach_portal connection and closes it with the app.
  *
  * Functions:
- * - buildApp(input): creates the Fastify instance with the given dependencies and returns it ready to use.
+ * - buildApp(input): creates the Fastify instance with the given dependencies (opening the coach store when
+ *   COACH_DATABASE_URL is set and none is given, and closing it with the app) and returns it ready to use.
  */
 import { createDb, type Database } from "@bp/db";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -26,15 +27,18 @@ import { registerHealthRoutes } from "./routes/health";
 import { registerInviteRoutes } from "./routes/invites";
 import { registerMatchRoutes } from "./routes/match";
 import { registerMeRoutes } from "./routes/me";
+import { registerMeCoachingRoutes } from "./routes/me-coaching";
 import { registerMyAccountRoutes } from "./routes/my-accounts";
 import { registerPasswordResetRoutes } from "./routes/password-reset";
 import { registerTrainingRoutes } from "./routes/training";
 import { createBackgroundTasks, type BackgroundTasks } from "./services/background-tasks";
+import { createCoachStore, type CoachStore } from "./services/coaching/store";
 import { createMailer, type Mailer } from "./services/mailer";
 import { createMatchAiFromEnv, type MatchAi } from "./services/match/claude";
 import { createIntegrations, type Integrations } from "./services/provisioning/integrations";
 
-export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now" | "integrations" | "wakeProvisioning" | "matchAi" | "coachDb" | "background"> & {
+export type BuildAppInput = Omit<AppDeps, "auth" | "mailer" | "now" | "integrations" | "wakeProvisioning" | "matchAi" | "coachDb" | "background" | "coach"> & {
+  coach?: CoachStore | null;
   auth?: Auth;
   mailer?: Mailer;
   now?: () => Date;
@@ -66,6 +70,10 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
     matchAi: input.matchAi !== undefined ? input.matchAi : createMatchAiFromEnv(env),
     coachDb: input.coachDb !== undefined ? input.coachDb : (coach?.db ?? null),
     background: input.background ?? createBackgroundTasks(app.log),
+    coach: input.coach !== undefined ? input.coach : env.COACH_DATABASE_URL ? createCoachStore(env.COACH_DATABASE_URL) : null,
+  });
+  app.addHook("onClose", async () => {
+    await app.deps.coach?.close();
   });
 
   if (coach) app.addHook("onClose", async () => coach.close());
@@ -80,6 +88,7 @@ export async function buildApp(input: BuildAppInput): Promise<FastifyInstance> {
   registerInviteRoutes(app);
   registerPasswordResetRoutes(app);
   registerMeRoutes(app);
+  registerMeCoachingRoutes(app);
   registerMyAccountRoutes(app);
   registerBrokerStepRoutes(app);
   registerContractRoutes(app);
