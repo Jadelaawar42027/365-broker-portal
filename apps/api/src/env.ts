@@ -62,6 +62,11 @@ const apiEnvSchema = z
     GHL_AGENCY_TOKEN: optionalString,
     GHL_COMPANY_ID: optionalString,
     GHL_LOCATION_ID: optionalString,
+    COACHING_BROKER_VIEW: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value === "true"),
     PROVISIONING_WORKER: z.enum(["on", "off"]).default("on"),
     PROVISIONING_MODE: z.enum(["live", "dry-run"]).default("live"),
     AI_ROSTER_SYNC_ENABLED: z

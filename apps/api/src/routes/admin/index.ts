@@ -11,6 +11,7 @@ import { requireAdmin } from "../../plugins/auth-guard";
 import { registerAdminBrokerAccountRoutes } from "./accounts";
 import { registerAdminAccountRoutes } from "./admins";
 import { registerAdminBrokerRoutes } from "./brokers";
+import { registerAdminCoachingRoutes } from "./coaching";
 import { registerAdminContractRoutes } from "./contracts";
 import { registerAdminIntegrationRoutes } from "./integrations";
 import { registerAdminMatchingRoutes } from "./matching";
@@ -34,5 +35,6 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     registerAdminBrokerAccountRoutes(scope);
     registerAdminIntegrationRoutes(scope);
     registerAdminMatchingRoutes(scope);
+    registerAdminCoachingRoutes(scope);
   });
 }

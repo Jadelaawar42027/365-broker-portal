@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/components/admin/admin-nav.tsx
- * Purpose: The admin sidebar's links (Overview, Brokers, Reviews with the waiting count, Onboarding steps, Chapters &
+ * Purpose: The admin sidebar's links (Overview, Brokers, Reviews with the waiting count, Coaching, Onboarding steps, Chapters &
  * quizzes, Admins) with the
  * current section highlighted, and the signed-in admin with a menu: "Your profile & signature" (the company
  * signature, SPEC D31) and "Sign out".
@@ -24,6 +24,7 @@ export function AdminNav({ waitingReviews }: { waitingReviews: number }) {
     { href: "/admin", label: "Overview", active: pathname === "/admin" },
     { href: "/admin/brokers", label: "Brokers", active: pathname.startsWith("/admin/brokers") },
     { href: "/admin/reviews", label: "Reviews", active: pathname.startsWith("/admin/reviews"), badge: waitingReviews },
+    { href: "/admin/coaching", label: "Coaching", active: pathname.startsWith("/admin/coaching") },
     { href: "/admin/steps", label: "Onboarding steps", active: pathname.startsWith("/admin/steps") },
     { href: "/admin/training", label: "Chapters & quizzes", active: pathname.startsWith("/admin/training") },
     { href: "/admin/admins", label: "Admins", active: pathname.startsWith("/admin/admins") },

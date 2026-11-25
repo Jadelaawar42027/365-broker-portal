@@ -65,7 +65,8 @@ describe("proxy upload mode", () => {
 
   it("rejects tampered tokens and tokens issued to someone else", async () => {
     const { upload } = await target();
-    const tampered = upload.url.replace(/.$/, (last) => (last === "A" ? "B" : "A"));
+    const signatureStart = upload.url.lastIndexOf(".") + 1;
+    const tampered = `${upload.url.slice(0, signatureStart)}${upload.url[signatureStart] === "A" ? "B" : "A"}${upload.url.slice(signatureStart + 1)}`;
     const bad = await ctx.call("PUT", tampered, { cookie: broker.cookie, headers: upload.headers, rawBody: Buffer.from(bytes) });
     expect(bad.json().error).toBe("invalid_upload_token");
     const other = await ctx.createBroker({ email: "other@example.com" });
