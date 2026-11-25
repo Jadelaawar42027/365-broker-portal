@@ -6,7 +6,9 @@
  * video already in it) moves from step 0 to the new step, step 0's copy goes back to one video, and step copy that
  * names step numbers is renumbered. Every broker gets a todo row for the new step. On a new, empty database nothing
  * happens here: the seed adds every step. Copy changes only run while the
- * step still has the exact earlier seeded wording, so admin edits are left alone. Writes audit_log rows.
+ * step still has the exact earlier seeded wording, so admin edits are left alone. Writes audit_log rows. The new
+ * step's stage is copied from step 0's row instead of written as the 'start_here' literal: on a fresh database 0009
+ * adds that enum value in the same migration transaction, and Postgres refuses uncommitted enum values as literals.
  *
  * Functions:
  * - none
@@ -30,7 +32,7 @@ WITH inserted AS (
   SELECT
     'ai_agent',
     1,
-    'start_here',
+    (SELECT stage FROM onboarding_steps WHERE key = 'start_here'),
     $g$Introducing your personal AI agent$g$,
     $g$Start here: your personal AI agent$g$,
     $g$Watch Aj introduce your personal AI agent. Takes about 5 minutes.$g$,

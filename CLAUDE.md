@@ -68,10 +68,11 @@ Header format for TypeScript:
 
 Python uses the same content as a module docstring. SQL and CSS use a block comment.
 
-## Rule 2: Git - never push
+## Rule 2: Git - branch, PR, squash-merge
 
-- NEVER run `git push`, `gh`, or `git remote` commands, and never open pull requests. Aj pushes to GitHub himself.
-- Never commit unless Aj says "commit". Then make a local commit with a message like `phase B: database schema and seed`.
+- Commit as `jadelaawar42027 <alawar.jad@gmail.com>`. No Co-Authored-By and no Claude attribution anywhere on GitHub (commits, PR titles/bodies, comments).
+- Work on a branch, push it, open a PR with `gh`, make sure the full local test suite passes (there is no CI in this repo), then squash-merge and delete the branch. If tests fail, fix them; if you can't, stop and tell Aj.
+- Merging deploys to Railway. After each merge, confirm the deploy succeeded (railway status/logs). If it fails, stop and tell Aj before doing anything else.
 - Never commit `.env*` files (except `.env.example`), anything in `data/import/`, uploaded files, or real broker data.
 
 ## Rule 3: Tests only when asked
