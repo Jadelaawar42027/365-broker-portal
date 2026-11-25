@@ -1,7 +1,7 @@
 /**
  * File: apps/api/src/services/audit.ts
- * Purpose: Writes rows to audit_log. Every status change, persona edit, admin download and admin account
- * action goes through here (CLAUDE.md Rule 4), inside the same transaction as the change it records.
+ * Purpose: Writes rows to audit_log. Every status change, persona edit (including persona-tag extraction and
+ * overrides), admin download, admin account action and lead-matching choice or weight change goes through here (CLAUDE.md Rule 4), inside the same transaction as the change it records.
  *
  * Functions:
  * - writeAudit(tx, entry): inserts one audit_log row.
@@ -11,7 +11,7 @@ import { auditLog, type DbOrTx } from "@bp/db";
 export type AuditEntry = {
   actorUserId: string | null;
   action: string;
-  entityType: "broker" | "broker_step" | "onboarding_step" | "file" | "user" | "account_token" | "chapter" | "lesson" | "question" | "quiz_attempt" | "contract_document" | "company_signature";
+  entityType: "broker" | "broker_step" | "onboarding_step" | "file" | "user" | "account_token" | "chapter" | "lesson" | "question" | "quiz_attempt" | "contract_document" | "company_signature" | "match" | "match_weights";
   entityId: string;
   before?: unknown;
   after?: unknown;

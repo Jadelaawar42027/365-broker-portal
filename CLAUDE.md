@@ -34,13 +34,15 @@ Keep these working at all times and update this list if they change.
 - `pnpm lint` and `pnpm typecheck` (lint also enforces Rule 1: header present, path correct, functions listed, no other comments)
 - `pnpm build` - production build of web + api
 - `pnpm start` / `node scripts/start.mjs` - production start for one Railway service (picks api or web from `RAILWAY_SERVICE_NAME` or `BP_SERVICE`)
-- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`, `--no-training`; training chapters are added live in development and as drafts in production; sample brokers are never seeded when `NODE_ENV=production`)
+- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` (seed flags: `--refresh-steps`, `--no-samples`, `--no-training`, `--match-samples` for the six lead-matching sample brokers; training chapters are added live in development and as drafts in production; sample brokers are never seeded when `NODE_ENV=production`)
 - `pnpm db:metrics-user` - create or reset the read-only `broker_metrics` login from `METRICS_READER_USER` / `METRICS_READER_PASSWORD`
 - `pnpm import:brokers -- --dry-run` - import existing brokers from `data/import/` (`--link` also queues linking their Google and GHL accounts by corporate email)
 - `pnpm provision:verify` - real end-to-end check of Google Workspace and GoHighLevel provisioning with the live credentials (creates and deletes its own test users; run by Aj only)
 - `pnpm admin:invite -- --name "Shelly Melcher" --email shelly@365yachts.org` - create an admin and print their invite link (owner task, SPEC D7)
 - `pnpm storage:cors` - allow the web origin to upload straight to the bucket (run once per bucket; SPEC D11)
 - `pnpm --filter @bp/api release` - production pre-deploy: migrations + idempotent seed (built by `pnpm build`; see docs/DEPLOY.md)
+- `pnpm match:backfill` - extract persona tags with Claude for brokers whose persona changed (`-- --force` redoes all; needs `ANTHROPIC_API_KEY`)
+- `pnpm match:sample-leads` - send three sample leads to a running API's `/api/match` and print the results (needs `MATCH_API_KEY`; seed `--match-samples` first)
 
 ## Rule 1: Comments - file headers only, never inline
 
@@ -104,6 +106,7 @@ Python uses the same content as a module docstring. SQL and CSS use a block comm
 - Permission checks live in the API on every route, never only in the UI.
 - Files are private. Serve them only through short-lived presigned URLs after a permission check.
 - Persona notes are admin-only. Never return them on broker-facing routes.
+- Lead matching (`/api/match`) never returns persona notes or do-not-mention topics. coach-api's health tables are only read, through `COACH_DATABASE_URL` (the read-only `coach_portal` role), never written or created here.
 
 ## Working style
 

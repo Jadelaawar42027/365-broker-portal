@@ -2,8 +2,9 @@
  * File: packages/db/src/seed/index.ts
  * Purpose: Seeds a database with the 14 onboarding steps (and their short guidance, video slots and knowledge check
  * while a step has none yet), the owner account, the training chapters from the manual
- * (when asked) and (outside production) three sample brokers in different states. Safe to run again: existing steps,
- * users and chapters are left alone.
+ * (when asked), (outside production) three sample brokers in different states and, when matchSamples is set, the six
+ * lead-matching sample brokers with their persona tags (match-samples.ts). Safe to run again: existing steps, users and
+ * chapters are left alone.
  *
  * Functions:
  * - seedDatabase(db, options): runs the whole seed in one transaction (including loading new or changed contract templates from docs/templates/contracts unless contractTemplates is false) (on deploy, first removing the old Part 0 and 01–06 training drafts nobody has touched); returns a summary of what changed and any invite links created.
@@ -30,6 +31,7 @@ import { accountTokens, accounts, brokerSteps, files, onboardingSteps, users } f
 import { SAMPLE_BIO, SAMPLE_PERSONA } from "./sample-content";
 import { samplePdf, samplePng } from "./sample-files";
 import { findContractTemplatesDir, seedContractTemplates } from "./contract-templates";
+import { seedMatchSamples } from "./match-samples";
 import { seedStepGuidance } from "./step-content";
 import { ONBOARDING_STEP_SEEDS } from "./steps";
 import { removeRetiredTrainingDrafts, seedTraining } from "./training";
@@ -37,6 +39,7 @@ import { removeRetiredTrainingDrafts, seedTraining } from "./training";
 export type SeedOptions = {
   owner?: { name: string; email: string; password: string } | null;
   sampleBrokers?: { password: string } | null;
+  matchSamples?: { password: string | null } | null;
   storage?: FileStorage | null;
   refreshSteps?: boolean;
   training?: { publish: boolean } | null;
@@ -56,6 +59,7 @@ export type SeedSummary = {
   trainingChaptersInserted: number;
   trainingDraftsDeleted?: string[];
   sampleBrokers: { email: string; outcome: "created" | "existing" }[];
+  matchSampleBrokers?: { email: string; outcome: "created" | "existing" }[];
   inviteLinks: { email: string; url: string }[];
 };
 
@@ -131,6 +135,10 @@ export async function seedDatabase(db: Database, options: SeedOptions = {}): Pro
       await seedDaniel(tx, context);
       await seedKevin(tx, context);
       await seedMarisol(tx, context);
+    }
+
+    if (options.matchSamples) {
+      summary.matchSampleBrokers = await seedMatchSamples(tx, { now, password: options.matchSamples.password, reviewedBy: ownerId });
     }
     return summary;
   });

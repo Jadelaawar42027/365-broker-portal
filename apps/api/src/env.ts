@@ -8,12 +8,17 @@
  * The WhatsApp help contact defaults to the 365 Yachts AI; an empty SUPPORT_WHATSAPP_NUMBER hides the help buttons.
  * AI_ROSTER_SYNC_ENABLED is off unless it is exactly "true"; only then (and with AI_ROSTER_API_URL and AI_ROSTER_API_SECRET
  * set) are new and deleted brokers sent to the 365 Yachts AI's roster.
+ * Lead matching: ANTHROPIC_API_KEY turns on persona-tag extraction and Claude's background-fit judgement (MATCH_MODEL picks
+ * the model), MATCH_API_KEY is the key the 365 Yachts AI sends to POST /api/match (unset turns the route off), and
+ * HEALTH_SOURCE picks where broker health comes from: none (default), mock (fake scores, refused in production) or coach,
+ * which reads coach-api's snapshot tables over COACH_DATABASE_URL (the read-only coach_portal role); without it health is null.
  *
  * Functions:
  * - loadApiEnv(source): parses source (defaults to process.env) and returns the typed config; throws listing every invalid variable.
  */
 import { DEFAULT_SUPPORT_CONTACT } from "@bp/shared";
 import { z } from "zod";
+import { DEFAULT_MATCH_MODEL } from "./services/match/claude";
 
 const optionalString = z
   .string()
@@ -70,6 +75,25 @@ const apiEnvSchema = z
       .or(z.literal("").transform(() => undefined))
       .transform((value) => value?.replace(/\/+$/, "")),
     AI_ROSTER_API_SECRET: optionalString,
+    ANTHROPIC_API_KEY: optionalString,
+    MATCH_MODEL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || DEFAULT_MATCH_MODEL),
+    MATCH_API_KEY: z
+      .string()
+      .trim()
+      .min(24, "must be at least 24 characters (openssl rand -hex 24)")
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
+    HEALTH_SOURCE: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || "none")
+      .pipe(z.enum(["none", "mock", "coach"])),
+    COACH_DATABASE_URL: optionalString,
     COMPANY_SIGNER_EMAIL: z
       .string()
       .trim()
@@ -85,6 +109,10 @@ const apiEnvSchema = z
   .refine((env) => env.NODE_ENV !== "production" || !env.EMAIL_OUTBOX_DIR, {
     path: ["EMAIL_OUTBOX_DIR"],
     message: "is for local development and tests only",
+  })
+  .refine((env) => env.NODE_ENV !== "production" || env.HEALTH_SOURCE !== "mock", {
+    path: ["HEALTH_SOURCE"],
+    message: "mock is for local development and tests only",
   });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

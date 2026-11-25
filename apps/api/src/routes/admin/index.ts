@@ -13,6 +13,7 @@ import { registerAdminAccountRoutes } from "./admins";
 import { registerAdminBrokerRoutes } from "./brokers";
 import { registerAdminContractRoutes } from "./contracts";
 import { registerAdminIntegrationRoutes } from "./integrations";
+import { registerAdminMatchingRoutes } from "./matching";
 import { registerAdminOverviewRoutes } from "./overview";
 import { registerAdminReviewRoutes } from "./reviews";
 import { registerAdminStepRoutes } from "./steps";
@@ -32,5 +33,6 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     registerAdminContractRoutes(scope);
     registerAdminBrokerAccountRoutes(scope);
     registerAdminIntegrationRoutes(scope);
+    registerAdminMatchingRoutes(scope);
   });
 }

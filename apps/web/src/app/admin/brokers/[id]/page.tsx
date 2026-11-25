@@ -5,7 +5,7 @@
  * (status, every version, countersign, void and re-issue, signed-outside uploads, SPEC D31),
  * the onboarding record with per-step actions (review, upload on behalf, mark done), every file with its version and
  * uploader, the Accounts panel (365 email, Google Workspace and GoHighLevel status, CRM phone, phase H2), the Persona
- * panel (docs/SPEC.md) and, under it, the Training & quizzes panel with the average quiz score. The owner also sees
+ * panel (docs/SPEC.md), the Matching tags panel (persona tags for lead matching, with admin overrides) and, under them, the Training & quizzes panel with the average quiz score. The owner also sees
  * "Delete this broker" at the bottom, which removes the broker and everything about them for good.
  *
  * Functions:
@@ -23,6 +23,7 @@ import {
   type BrokerProfileResponse,
   type BrokerTrainingResponse,
   type CompanySignatureStatus,
+  type PersonaTagsView,
 } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -33,6 +34,7 @@ import { CommissionEditor } from "@/components/admin/commission-editor";
 import { DeleteBrokerSection } from "@/components/admin/delete-broker";
 import { ContractsPanel } from "@/components/admin/contracts-panel";
 import { PersonaPanel } from "@/components/admin/persona-panel";
+import { PersonaTagsPanel } from "@/components/admin/persona-tags-panel";
 import { StepActions } from "@/components/admin/step-actions";
 import { TrainingPanel } from "@/components/admin/training-panel";
 import { FormMessage } from "@/components/auth/form-message";
@@ -74,12 +76,13 @@ export default async function BrokerProfilePage({
 }) {
   const { id } = await params;
   const { invited } = await searchParams;
-  const [{ data }, { data: training }, { data: contracts }, { data: signature }, { data: accounts }] = await Promise.all([
+  const [{ data }, { data: training }, { data: contracts }, { data: signature }, { data: accounts }, { data: personaTags }] = await Promise.all([
     serverGet<BrokerProfileResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}`),
     serverGet<BrokerTrainingResponse>(`/v1/admin/training/brokers/${encodeURIComponent(id)}`),
     serverGet<AdminContractsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/contracts`),
     serverGet<CompanySignatureStatus>("/v1/admin/company-signature"),
     serverGet<BrokerAccountsResponse>(`/v1/admin/brokers/${encodeURIComponent(id)}/accounts`),
+    serverGet<PersonaTagsView>(`/v1/admin/brokers/${encodeURIComponent(id)}/persona-tags`),
   ]);
   if (!data) notFound();
   const me = await requireMe();
@@ -209,6 +212,7 @@ export default async function BrokerProfilePage({
         <div className="space-y-5">
           {accounts ? <AccountsPanel brokerId={broker.id} data={accounts} crmPhone={broker.crmPhone} inactive={broker.status === "inactive"} /> : null}
           <PersonaPanel brokerId={broker.id} brokerName={broker.name} persona={data.persona} />
+          {personaTags ? <PersonaTagsPanel key={personaTags.extractedAt ?? "none"} brokerId={broker.id} view={personaTags} /> : null}
           {training ? <TrainingPanel brokerId={broker.id} training={training} /> : null}
         </div>
       </div>

@@ -22,6 +22,8 @@
     "admin:invite": "pnpm --filter @bp/api admin:invite",
     "storage:cors": "pnpm --filter @bp/api storage:cors",
     "provision:verify": "pnpm --filter @bp/api provision:verify",
+    "match:backfill": "pnpm --filter @bp/api match:backfill",
+    "match:sample-leads": "pnpm --filter @bp/api match:sample-leads",
     "start": "node scripts/start.mjs"
   },
   "devDependencies": {
