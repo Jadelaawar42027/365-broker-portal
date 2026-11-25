@@ -9,7 +9,7 @@
  * - BrokerCoachingPage({ params, searchParams }): loads the broker's coaching data for ?week= and renders the page.
  * - sourceLabel(excuse): where an excuse came from, in words ("Client's words", "Call transcript", "Broker note only").
  * - contextRows(context): the results context as labelled values, skipping ones not available yet.
- * - money(value): "$480K" style amounts.
+ * - money(value): "$480K" style amounts (Intl compact USD).
  */
 import {
   COACHING_METRIC_LABELS,
@@ -40,10 +40,10 @@ function sourceLabel(excuse: CoachingBrokerResponse["excuses"][number]): string 
   return "Client's words";
 }
 
+const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
+
 function money(value: number): string {
-  if (value >= 1_000_000) return `$${Math.round(value / 100_000) / 10}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  return `$${Math.round(value)}`;
+  return MONEY.format(value);
 }
 
 function contextRows(context: Record<string, number | null>): Array<{ label: string; value: string }> {
@@ -95,7 +95,8 @@ export default async function BrokerCoachingPage({
               </div>
             </div>
             {data.snapshot ? (
-              <dl className="flex flex-wrap items-end gap-x-8 gap-y-4 lg:ml-auto">
+              <div className="flex flex-wrap items-end gap-x-8 gap-y-4 lg:ml-auto">
+              <dl className="flex flex-wrap items-end gap-x-8 gap-y-4">
                 <div>
                   <dt className="text-[15px] text-muted">Score</dt>
                   <dd className="mt-1 flex items-center gap-2">
@@ -113,8 +114,9 @@ export default async function BrokerCoachingPage({
                   <dt className="text-[15px] text-muted">Data coverage</dt>
                   <dd className="mt-1 text-xl font-bold tabular-nums">{Math.round(data.snapshot.coverage * 100)}%</dd>
                 </div>
-                <WeekPicker weeks={data.weeks} current={data.week?.weekStart ?? null} />
               </dl>
+                <WeekPicker weeks={data.weeks} current={data.week?.weekStart ?? null} />
+              </div>
             ) : null}
           </Card>
 
@@ -123,7 +125,7 @@ export default async function BrokerCoachingPage({
               <p className="text-[17px] text-muted">No snapshot for {data.broker.name} in this week. They may not be linked to a GoHighLevel user yet.</p>
             </Card>
           ) : (
-            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="grid items-start gap-6 min-[1400px]:grid-cols-[minmax(0,1fr)_380px]">
               <div className="flex min-w-0 flex-col gap-6">
                 <section aria-labelledby="focus" className="space-y-3">
                   <h2 id="focus" className="text-xl font-bold">
@@ -245,14 +247,18 @@ export default async function BrokerCoachingPage({
                   <h2 className="text-lg font-bold">
                     Results <span className="text-[15px] font-normal text-muted">context, not scored</span>
                   </h2>
-                  <dl className="mt-3 grid grid-cols-2 gap-4">
-                    {contextRows(data.context).map((row) => (
-                      <div key={row.label}>
-                        <dt className="text-[15px] text-muted">{row.label}</dt>
-                        <dd className="text-lg font-bold tabular-nums">{row.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  {contextRows(data.context).length === 0 ? (
+                    <p className="mt-3 text-[15px] text-muted">No results figures for this week yet.</p>
+                  ) : (
+                    <dl className="mt-3 grid grid-cols-2 gap-4">
+                      {contextRows(data.context).map((row) => (
+                        <div key={row.label}>
+                          <dt className="text-[15px] text-muted">{row.label}</dt>
+                          <dd className="text-lg font-bold tabular-nums">{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </Card>
 
                 {data.week ? (
@@ -269,6 +275,7 @@ export default async function BrokerCoachingPage({
 
                 <Card as="section" className="px-6 py-5">
                   <h2 className="text-lg font-bold">1:1 history</h2>
+                  {data.history.length === 0 ? <p className="mt-3 text-[15px] text-muted">No earlier weeks yet.</p> : null}
                   <ol className="mt-3 flex flex-col gap-3">
                     {data.history.map((h) => (
                       <li key={h.weekStart} className="text-[15px]">

@@ -13,14 +13,15 @@ export function TrendText({ trend }: { trend: number | null }) {
   if (trend === null || Math.round(trend) === 0) {
     return (
       <span className="text-muted">
-        —<span className="sr-only"> no change</span>
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">no change</span>
       </span>
     );
   }
   const up = trend > 0;
   return (
     <span className={`font-bold tabular-nums ${up ? "text-success" : "text-danger"}`}>
-      {up ? "▲" : "▼"} {Math.abs(Math.round(trend))}
+      <span aria-hidden="true">{up ? "▲" : "▼"}</span> {Math.abs(Math.round(trend))}
       <span className="sr-only"> {up ? "up" : "down"} on the 4-week average</span>
     </span>
   );

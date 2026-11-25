@@ -6,7 +6,7 @@
  * Functions:
  * - ExcuseActions({ momentKey, decision, needsConfirmation }): renders "Count as missed", plus "Confirm excuse" when the
  *   excuse needs confirming (broker note only) or was counted as missed, so every decision can be changed.
- * - decide(next): sends the decision and refreshes the page.
+ * - decide(next): sends the decision (the clicked button reads "Saving…" meanwhile) and refreshes the page.
  */
 "use client";
 
@@ -26,11 +26,11 @@ export function ExcuseActions({
 }) {
   const showConfirm = needsConfirmation || decision !== null;
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"confirm" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function decide(next: "confirm" | "reject") {
-    setBusy(true);
+    setBusy(next);
     setError(null);
     try {
       await apiRequest("/v1/admin/coaching/excuses/decision", { method: "POST", body: { momentKey, decision: next } });
@@ -38,7 +38,7 @@ export function ExcuseActions({
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Couldn't save that. Please try again.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -48,20 +48,20 @@ export function ExcuseActions({
         {showConfirm ? (
           <button
             type="button"
-            disabled={busy || decision === "confirm"}
+            disabled={busy !== null || decision === "confirm"}
             onClick={() => decide("confirm")}
             className={buttonClasses(decision === "confirm" ? "soft" : "navy", "sm")}
           >
-            {decision === "confirm" ? "Excuse confirmed" : "Confirm excuse"}
+            {busy === "confirm" ? "Saving…" : decision === "confirm" ? "Excuse confirmed" : "Confirm excuse"}
           </button>
         ) : null}
         <button
           type="button"
-          disabled={busy || decision === "reject"}
+          disabled={busy !== null || decision === "reject"}
           onClick={() => decide("reject")}
           className={buttonClasses(decision === "reject" ? "soft" : "outline", "sm")}
         >
-          {decision === "reject" ? "Counted as missed" : "Count as missed"}
+          {busy === "reject" ? "Saving…" : decision === "reject" ? "Counted as missed" : "Count as missed"}
         </button>
       </div>
       {error ? (

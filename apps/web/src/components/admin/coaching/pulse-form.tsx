@@ -81,7 +81,8 @@ export function PulseForm({
           value={supportNeeded}
           onChange={(event) => (setSupportNeeded(event.target.value), setState("idle"))}
           className={`${inputClasses()} font-normal`}
-          placeholder="e.g. Wants help prioritising a big pipeline"
+          autoComplete="off"
+          placeholder="e.g. Wants help prioritising a big pipeline…"
         />
       </label>
       <div className="flex flex-wrap items-center gap-3">
