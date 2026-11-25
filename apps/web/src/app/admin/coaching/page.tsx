@@ -1,0 +1,165 @@
+/**
+ * File: apps/web/src/app/admin/coaching/page.tsx
+ * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (with the reason and a
+ * suggested topic), and every broker's row (score, trend, data coverage, the eight metric cells against their
+ * targets, focus areas under the name; the name column stays put while the table scrolls on a phone), worst score first, with the colour legend. Numbers come from the coach service's frozen
+ * Monday snapshot for the chosen week.
+ *
+ * Functions:
+ * - CoachingOverviewPage({ searchParams }): loads the overview for ?week= (default the newest) and renders the screen.
+ * - pct(value): a 0-1 share as "82%", or "—".
+ */
+import {
+  COACHING_METRIC_LABELS,
+  COACHING_METRICS,
+  formatCoachingTarget,
+  formatCoachingValue,
+  scoreBand,
+  type CoachingOverviewResponse,
+} from "@bp/shared";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { CoachingLegend, MetricCell } from "@/components/admin/coaching/metric-cell";
+import { NotConnected, TrendText } from "@/components/admin/coaching/status";
+import { WeekPicker } from "@/components/admin/coaching/week-picker";
+import { StatCard } from "@/components/admin/stat-card";
+import { Card } from "@/components/ui/misc";
+import { Pill } from "@/components/ui/pill";
+import { serverGet } from "@/lib/server-api";
+
+export const metadata: Metadata = { title: "Coaching · 365 Yachts admin" };
+
+function pct(value: number | null): string {
+  return value === null ? "—" : `${Math.round(value * 100)}%`;
+}
+
+export default async function CoachingOverviewPage({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
+  const { week } = await searchParams;
+  const { status, data } = await serverGet<CoachingOverviewResponse>(`/v1/admin/coaching/overview${week ? `?week=${encodeURIComponent(week)}` : ""}`);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-[35px] leading-tight font-extrabold tracking-tight">Coaching</h1>
+          <p className="mt-1 text-[17px] text-muted">What each broker controls, against target · last 28 days · lowest score first</p>
+        </div>
+        {data ? <WeekPicker weeks={data.weeks} current={data.week?.weekStart ?? null} /> : null}
+      </div>
+
+      {status === 503 || !data ? (
+        <NotConnected />
+      ) : !data.week ? (
+        <Card className="px-6 py-6">
+          <p className="text-[17px] text-muted">No weekly snapshot yet. The first one is frozen on Monday at 06:00 ET.</p>
+        </Card>
+      ) : (
+        <>
+          <section aria-label="Team totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Team score" value={data.totals.teamScore === null ? "—" : String(data.totals.teamScore)} detail="Average of non-provisional scores" />
+            <StatCard label="Follow-ups on time" value={pct(data.totals.onTimeRate)} detail="Due moments met, whole team" />
+            <StatCard label="Median speed to lead" value={formatCoachingValue("speed_to_lead", data.totals.medianSpeedMinutes)} detail="Working minutes to first touch" />
+            <StatCard label="Calls reviewed" value={String(data.totals.callsReviewed)} detail="Scored by the call reviewer, 28 days" />
+            <StatCard label="Excuses to confirm" value={String(data.totals.excusesToConfirm)} detail="Found only in a broker note" />
+          </section>
+
+          <section aria-labelledby="needs-1on1" className="space-y-3">
+            <h2 id="needs-1on1" className="text-xl font-bold">
+              Needs a 1:1 this week
+            </h2>
+            {data.needsOneOnOne.length === 0 ? (
+              <Card className="px-6 py-5">
+                <p className="text-[17px] text-muted">Nobody is off target or dropping this week.</p>
+              </Card>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                {data.needsOneOnOne.map((row) => {
+                  const band = scoreBand(row.score, row.provisional);
+                  return (
+                    <Card key={row.brokerId} className="flex flex-col gap-3 px-5 py-5">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link href={`/admin/coaching/${row.brokerId}${week ? `?week=${encodeURIComponent(week)}` : ""}`} className="text-lg font-bold text-brand underline-offset-2 hover:underline">
+                          {row.name}
+                        </Link>
+                        <Pill tone={band.tone}>
+                          {row.provisional || row.score === null ? band.label : `${Math.round(row.score)} · ${band.label}`}
+                        </Pill>
+                        <span className="ml-auto">
+                          <TrendText trend={row.trend} />
+                        </span>
+                      </div>
+                      <p className="text-[17px]">{row.reason}</p>
+                      {row.topic ? (
+                        <p className="text-[15px] text-muted">
+                          <strong className="font-bold text-ink">1:1 topic:</strong> {row.topic}
+                        </p>
+                      ) : null}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <Card as="section" className="space-y-4 px-5 py-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <h2 className="text-xl font-bold">All brokers</h2>
+              <CoachingLegend />
+            </div>
+            <div className="relative overflow-x-auto">
+              <table className="w-full min-w-[960px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-line text-[15px] text-muted">
+                    <th scope="col" className="sticky left-0 z-10 bg-white px-3 py-2.5 font-semibold">Broker</th>
+                    <th scope="col" className="px-3 py-2.5 font-semibold">Score</th>
+                    <th scope="col" className="px-3 py-2.5 font-semibold">Trend</th>
+                    <th scope="col" className="px-3 py-2.5 font-semibold">Data</th>
+                    {COACHING_METRICS.map((metric) => {
+                      const target = data.brokers[0]?.metrics[metric]?.target ?? null;
+                      return (
+                        <th key={metric} scope="col" className="px-1.5 py-2.5 align-bottom font-semibold">
+                          {COACHING_METRIC_LABELS[metric]}
+                          <span className="block font-normal tabular-nums">{formatCoachingTarget(metric, target)}</span>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.brokers.map((row) => {
+                    const band = scoreBand(row.score, row.provisional);
+                    return (
+                      <tr key={row.brokerId} className="border-b border-line last:border-0">
+                        <th scope="row" className="sticky left-0 z-10 bg-white px-3 py-3 text-left font-normal">
+                          <Link href={`/admin/coaching/${row.brokerId}${week ? `?week=${encodeURIComponent(week)}` : ""}`} className="font-bold whitespace-nowrap text-brand underline-offset-2 hover:underline">
+                            {row.name}
+                          </Link>
+                          <span className="block max-w-56 text-[14px] text-muted">
+                            <span className="capitalize">{row.level}</span>
+                            {row.focus.length ? ` · Focus: ${row.focus.map((m) => COACHING_METRIC_LABELS[m].toLowerCase()).join(", ")}` : ""}
+                          </span>
+                        </th>
+                        <td className="px-3 py-3">
+                          <Pill tone={band.tone}>{row.score === null ? "—" : `${Math.round(row.score)}${row.provisional ? " prov." : ""}`}</Pill>
+                        </td>
+                        <td className="px-3 py-3">
+                          <TrendText trend={row.trend} />
+                        </td>
+                        <td className="px-3 py-3 tabular-nums text-muted">{pct(row.coverage)}</td>
+                        {COACHING_METRICS.map((metric) => (
+                          <td key={metric} className="px-1.5 py-3">
+                            <MetricCell metric={metric} value={row.metrics[metric]?.value ?? null} status={row.metrics[metric]?.status ?? "unknown"} />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
