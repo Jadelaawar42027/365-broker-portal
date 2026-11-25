@@ -1,10 +1,12 @@
 /**
  * File: apps/web/src/app/admin/coaching/[id]/page.tsx
  * Purpose: One broker's coaching page for leadership: score, band, trend and data coverage; the two focus areas with
- * the leads behind them (linking to the GHL contact) and the playbook action; every metric with its target, an
- * 8-week line and sample size (marked "90-day data" when measured over 90 days; speed to follow also shows the
- * first-call score and median time to the next touch); AI-excused misses with Shelly's confirm / count-as-missed; the suggested 1:1 topic;
- * results context (not scored); Shelly's weekly pulse form; and the 1:1 history.
+ * the leads behind them (linking to the GHL contact) and the playbook action; every metric with its own 0-100 points
+ * (the score is their weighted average; the target only sets the colour), its target, an 8-week line and sample size
+ * (marked "90-day data" when measured over 90 days; speed to follow also shows the first-call score and median time
+ * to the next touch; reply time shows how many client messages needed no reply); AI-excused misses
+ * with Shelly's confirm / count-as-missed; the suggested 1:1 topic; results context (not scored); Shelly's weekly
+ * pulse form; and the 1:1 history.
  *
  * Functions:
  * - BrokerCoachingPage({ params, searchParams }): loads the broker's coaching data for ?week= and renders the page.
@@ -12,15 +14,19 @@
  * - contextRows(context): the results context as labelled values, skipping ones not available yet.
  * - money(value): "$480K" style amounts (Intl compact USD).
  * - followDetail(detail): speed to follow's context line ("First calls 72 (5) · next touch 1.2 h median"), or null.
+ * - replyDetail(detail): reply time's context line ("4 messages needed no reply"), or null when none were left out.
+ * - metricDetail(metric, detail): the context line shown under a metric's name, or null.
  */
 import {
   COACHING_METRIC_LABELS,
   formatCoachingTarget,
   formatCoachingValue,
+  formatPoints,
   formatWorkMinutes,
   windowLabel,
   scoreBand,
   type CoachingBrokerResponse,
+  type CoachingMetricId,
 } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -54,6 +60,18 @@ function followDetail(detail: Record<string, number | null> | null): string | nu
   const minutes = detail.median_work_minutes_to_next_touch;
   if (typeof minutes === "number") parts.push(`next touch ${formatWorkMinutes(minutes)} median`);
   return parts.length ? parts.join(" · ") : null;
+}
+
+function replyDetail(detail: Record<string, number | null> | null): string | null {
+  const skipped = detail?.no_reply_needed;
+  if (typeof skipped !== "number" || skipped <= 0) return null;
+  return `${skipped} ${skipped === 1 ? "message" : "messages"} needed no reply`;
+}
+
+function metricDetail(metric: CoachingMetricId, detail: Record<string, number | null> | null): string | null {
+  if (metric === "speed_to_follow") return followDetail(detail);
+  if (metric === "responsiveness") return replyDetail(detail);
+  return null;
 }
 
 function money(value: number): string {
@@ -147,7 +165,7 @@ export default async function BrokerCoachingPage({
                   </h2>
                   {data.focusAreas.length === 0 ? (
                     <Card className="px-6 py-5">
-                      <p className="text-[17px] text-muted">Every metric with enough data is on target.</p>
+                      <p className="text-[17px] text-muted">No focus areas this week: every metric with enough data is at full points.</p>
                     </Card>
                   ) : (
                     data.focusAreas.map((focus) => (
@@ -155,7 +173,14 @@ export default async function BrokerCoachingPage({
                         <div className="flex flex-wrap items-center gap-3">
                           <h3 className="text-lg font-bold">{COACHING_METRIC_LABELS[focus.metric]}</h3>
                           <MetricCell metric={focus.metric} value={focus.value} status={focus.status} />
-                          <span className="text-[15px] text-muted">target {formatCoachingTarget(focus.metric, focus.target)}</span>
+                          <span className="text-[15px] text-muted">
+                            {focus.points === null ? null : (
+                              <>
+                                <strong className="font-bold text-ink tabular-nums">{formatPoints(focus.points)}</strong> points ·{" "}
+                              </>
+                            )}
+                            target {formatCoachingTarget(focus.metric, focus.target)}
+                          </span>
                         </div>
                         {focus.evidence.length ? (
                           <ul className="flex flex-col gap-2">
@@ -183,15 +208,17 @@ export default async function BrokerCoachingPage({
                 </section>
 
                 <Card as="section" className="px-6 py-5">
-                  <h2 className="mb-3 text-xl font-bold">All metrics</h2>
+                  <h2 className="text-xl font-bold">All metrics</h2>
+                  <p className="mt-1 mb-3 text-[15px] text-muted">Each metric scores 0–100 points on its own; the score is their weighted average. The target only sets the colour.</p>
                   <div className="relative overflow-x-auto">
-                    <table className="w-full min-w-[560px] border-collapse text-left">
+                    <table className="w-full min-w-[640px] border-collapse text-left">
                       <thead>
                         <tr className="border-b border-line text-[15px] text-muted">
                           <th scope="col" className="px-3 py-2.5 font-semibold">Metric</th>
-                          <th scope="col" className="px-3 py-2.5 font-semibold">This week</th>
+                          <th scope="col" className="px-3 py-2.5 text-right font-semibold">Points</th>
+                          <th scope="col" className="px-3 py-2.5 font-semibold whitespace-nowrap">This week</th>
                           <th scope="col" className="px-3 py-2.5 font-semibold">Target</th>
-                          <th scope="col" className="px-3 py-2.5 font-semibold">Last 8 weeks</th>
+                          <th scope="col" className="px-3 py-2.5 font-semibold whitespace-nowrap">Last 8 weeks</th>
                           <th scope="col" className="px-3 py-2.5 font-semibold">Sample</th>
                         </tr>
                       </thead>
@@ -200,14 +227,15 @@ export default async function BrokerCoachingPage({
                           <tr key={m.metric} className="border-b border-line last:border-0">
                             <th scope="row" className="px-3 py-3 font-semibold">
                               {COACHING_METRIC_LABELS[m.metric]}
-                              {m.metric === "speed_to_follow" && followDetail(m.detail) ? (
-                                <span className="block text-[14px] font-normal text-muted">{followDetail(m.detail)}</span>
+                              {metricDetail(m.metric, m.detail) ? (
+                                <span className="block text-[14px] font-normal text-muted">{metricDetail(m.metric, m.detail)}</span>
                               ) : null}
                             </th>
+                            <td className="px-3 py-3 text-right text-[17px] font-bold tabular-nums">{formatPoints(m.points)}</td>
                             <td className="px-3 py-3">
                               <MetricCell metric={m.metric} value={m.value} status={m.status} />
                             </td>
-                            <td className="px-3 py-3 tabular-nums text-muted">{formatCoachingTarget(m.metric, m.target)}</td>
+                            <td className="px-3 py-3 whitespace-nowrap tabular-nums text-muted">{formatCoachingTarget(m.metric, m.target)}</td>
                             <td className="px-3 py-3">
                               <Sparkline values={m.history} label={`${COACHING_METRIC_LABELS[m.metric]}, last ${m.history.length} weeks, now ${formatCoachingValue(m.metric, m.value)}`} />
                             </td>
