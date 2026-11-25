@@ -3,8 +3,9 @@
  * Purpose: GoHighLevel client for API v2 (https://services.leadconnectorhq.com, header Version: 2021-07-28), built to
  * the official OpenAPI files in github.com/gohighlevel/api-v2-docs (apps/users.json, apps/locations.json; see
  * docs/DEPLOY.md). It uses an agency Private Integration token: filter-by-email only accepts agency access. Users are
- * looked up by email, created in GHL_LOCATION_ID with role "user" (type "account"), and removed with DELETE, the only
- * way the API offers to take a user's access away. Every failure becomes a ProvisioningError in plain words.
+ * looked up by email and created in GHL_LOCATION_ID with role "user" (type "account"). The API has no deactivate, and
+ * suspending a broker never deletes their GHL user; deleteUser is only used by provision:verify to remove its own test
+ * user. Every failure becomes a ProvisioningError in plain words.
  *
  * Functions:
  * - createGhlClient(config, fetchImpl): returns the client below.
@@ -12,7 +13,7 @@
  * - apiError(status, text): turns a failed call into the right plain-words error.
  * - findUserByEmail(email): POST /users/search/filter-by-email for one address (not deleted); returns { id, email } or null.
  * - createUser(input): POST /users/ in the location with role user; returns { id, email }.
- * - deleteUser(userId): DELETE /users/{userId} (GHL queues it; it takes effect within minutes). A missing user counts as done.
+ * - deleteUser(userId): DELETE /users/{userId} (GHL queues it; it takes effect within minutes). A missing user counts as done. Only provision:verify uses it, for its own test user.
  * - testConnection(): one harmless read: GET /locations/{GHL_LOCATION_ID}; returns a message naming the location.
  */
 import { ProvisioningError, isRetryableStatus, readErrorText, toProvisioningError } from "./errors";

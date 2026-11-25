@@ -2,7 +2,8 @@
  * File: apps/api/test/provisioning-routes.int.test.ts
  * Purpose: Integration tests for the account provisioning routes (phase H2) with the Google and GoHighLevel clients
  * mocked: the Accounts panel statuses and plain-words errors, Retry, entering a corporate email and "Link existing
- * account", the CRM phone (profile, list, broker_metrics), offboarding and reactivation, the Integrations panel and
+ * account", the CRM phone (profile, list, broker_metrics), offboarding and reactivation (Google is suspended, the GHL user
+ * is never deleted and shows "Handle in GHL manually"), the Integrations panel and
  * "Test connection", revealing a temporary password (once per click, 3 a day, audited without the password), and
  * the not-configured case. Permission tests: only owners and admins can provision, retry, link or edit the CRM phone;
  * only the broker can reveal, and only their own account.
@@ -16,6 +17,7 @@ import type { AccountSystemView, BrokerAccountsResponse } from "@bp/shared";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProvisioningError } from "../src/services/provisioning/errors";
+import { GHL_MANUAL_SUSPEND_NOTE } from "../src/services/provisioning/handlers";
 import { createTestContext, OWNER, PASSWORD, type TestContext } from "./helpers/context";
 import { createFakeGhl, createFakeGoogle, fakeIntegrations } from "./helpers/provisioning-fakes";
 
@@ -112,22 +114,34 @@ describe("account provisioning routes, both systems configured", () => {
     expect(profile.broker.crmPhone).toBe("+15615550100");
   });
 
-  it("suspends Google and removes the GHL user when a broker goes inactive, and turns them back on when reactivated", async () => {
+  it("suspends Google but never deletes the GHL user when a broker goes inactive, and turns them back on when reactivated", async () => {
     const linked = await linkedBroker("Sam Leaving", "sam.personal@example.com");
-    const googleId = (await accountsOf(ctx, owner, linked.brokerId)).google.accountId!;
+    const before = await accountsOf(ctx, owner, linked.brokerId);
+    const googleId = before.google.accountId!;
+    const ghlId = before.ghl.accountId!;
     expect((await ctx.call("PATCH", `/v1/admin/brokers/${linked.brokerId}`, { cookie: owner, body: { status: "inactive", leftAt: "2026-10-18" } })).statusCode).toBe(200);
     await ctx.runProvisioning();
     expect(google.users.get(linked.corporate)!.suspended).toBe(true);
-    expect(ghl.users.has(linked.corporate)).toBe(false);
+    expect(ghl.users.get(linked.corporate)?.id).toBe(ghlId);
+    expect(ghl.calls).not.toContain(`delete ${ghlId}`);
     const suspended = await accountsOf(ctx, owner, linked.brokerId);
-    expect([suspended.google.status, suspended.ghl.status]).toEqual(["suspended", "suspended"]);
+    expect([suspended.google.status, suspended.ghl.status]).toEqual(["suspended", "manual_action"]);
+    expect(suspended.ghl).toMatchObject({ statusLabel: "Handle in GHL manually", accountId: ghlId });
+    const manual = await ctx.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.entityId, linked.brokerId), eq(auditLog.action, "provisioning.ghl.manual_action_needed")));
+    expect(manual).toHaveLength(1);
+    expect(manual[0]!.after).toEqual({ ghlUserId: ghlId, note: GHL_MANUAL_SUSPEND_NOTE });
     expect((await ctx.call("PATCH", `/v1/admin/brokers/${linked.brokerId}`, { cookie: owner, body: { status: "active", leftAt: null } })).statusCode).toBe(200);
     await ctx.runProvisioning();
     expect(google.users.get(linked.corporate)!.suspended).toBe(false);
     expect(google.calls).toContain(`unsuspend ${googleId}`);
-    expect(ghl.users.get(linked.corporate)?.id).toMatch(/^ghl-/);
+    expect(ghl.users.get(linked.corporate)?.id).toBe(ghlId);
+    expect(ghl.calls.filter((call) => call.startsWith("delete"))).toEqual([]);
     const back = await accountsOf(ctx, owner, linked.brokerId);
     expect([back.google.status, back.ghl.status]).toEqual(["created", "created"]);
+    expect(back.ghl.accountId).toBe(ghlId);
   });
 
   it("shows the new 365 email and the admin's phone on the invite link, and signs the broker in with that email", async () => {

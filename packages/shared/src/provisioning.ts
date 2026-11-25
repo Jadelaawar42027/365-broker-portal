@@ -2,7 +2,8 @@
  * File: packages/shared/src/provisioning.ts
  * Purpose: Pure rules for account provisioning (phase H2): the broker's corporate address (firstname, then firstname.lastname
  * when that is taken, then firstname.lastname2, 3, ...; accents and punctuation stripped, middle names dropped), the first and last name sent to Google and
- * GoHighLevel, random temporary passwords, the retry backoff and the account status shown to admins.
+ * GoHighLevel, random temporary passwords, the retry backoff and the account status shown to admins. A suspended GoHighLevel
+ * user shows as manual_action: the portal never deletes GHL users, so an admin has to deactivate or remove them in GHL.
  *
  * Functions:
  * - asciiLetters(word): lowercases a word, turns accented and special letters into plain ones and drops everything else.
@@ -16,7 +17,7 @@
  */
 import { PROVISIONING_MAX_ATTEMPTS } from "./constants";
 
-export const ACCOUNT_STATUSES = ["not_configured", "not_set_up", "pending", "created", "failed", "suspended"] as const;
+export const ACCOUNT_STATUSES = ["not_configured", "not_set_up", "pending", "created", "failed", "suspended", "manual_action"] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
 export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
@@ -26,6 +27,7 @@ export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   created: "Created",
   failed: "Failed",
   suspended: "Suspended",
+  manual_action: "Handle in GHL manually",
 };
 
 export const PROVISIONING_SYSTEM_LABELS = { google: "Google Workspace", ghl: "GoHighLevel" } as const;

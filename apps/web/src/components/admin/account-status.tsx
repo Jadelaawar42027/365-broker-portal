@@ -16,6 +16,7 @@ export function accountStatusTone(status: AccountStatus): PillTone {
   if (status === "failed") return "danger";
   if (status === "pending") return "warning";
   if (status === "suspended") return "neutral";
+  if (status === "manual_action") return "warning";
   return "brand-soft";
 }
 
@@ -24,6 +25,7 @@ const MARK_STYLES: Record<AccountStatus, { symbol: string; classes: string }> = 
   pending: { symbol: "…", classes: "bg-warn-soft text-warn" },
   failed: { symbol: "!", classes: "bg-danger-soft text-danger border border-danger-line" },
   suspended: { symbol: "–", classes: "bg-neutral-soft text-muted" },
+  manual_action: { symbol: "!", classes: "bg-warn-soft text-warn border border-warn-line" },
   not_set_up: { symbol: "○", classes: "bg-page text-muted border border-line" },
   not_configured: { symbol: "·", classes: "bg-page text-muted border border-dashed border-line" },
 };

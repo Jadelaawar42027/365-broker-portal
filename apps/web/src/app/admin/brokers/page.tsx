@@ -44,7 +44,7 @@ function trainingLabel(training: BrokerListResponse["brokers"][number]["training
 
 function hasAccount(accounts: BrokerListResponse["brokers"][number]["accounts"]): boolean {
   if (!accounts) return false;
-  return [accounts.google, accounts.ghl].some((status) => status === "created" || status === "suspended");
+  return [accounts.google, accounts.ghl].some((status) => status === "created" || status === "suspended" || status === "manual_action");
 }
 
 function capitalise(word: string): string {

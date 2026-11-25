@@ -5,7 +5,7 @@
  * task for that system.
  *
  * Functions:
- * - deriveAccountStatus(input): the status for one system from configured, the stored id and the latest task.
+ * - deriveAccountStatus(input): the status for one system from configured, the stored id and the latest task (a finished GHL suspend is manual_action, because the portal never deletes GHL users).
  * - latestTasks(db, brokerIds): the newest provisioning task per broker and system, keyed "brokerId:system".
  * - loadAccountViews(db, integrations, broker): the Accounts panel rows (status, id, email, plain-words error, Retry / Link availability).
  * - loadAccountSummaries(db, integrations, brokers): { google, ghl } status per broker id for the brokers table.
@@ -26,11 +26,12 @@ type TaskRow = typeof provisioningTasks.$inferSelect;
 
 type AccountBroker = { id: string; corporateEmail: string | null; googleUserId: string | null; ghlUserId: string | null };
 
-export function deriveAccountStatus(input: { configured: boolean; accountId: string | null; latest: Pick<TaskRow, "action" | "status"> | null }): AccountStatus {
+export function deriveAccountStatus(input: { system: ProvisioningSystem; configured: boolean; accountId: string | null; latest: Pick<TaskRow, "action" | "status"> | null }): AccountStatus {
   const { latest } = input;
   if (latest && (latest.status === "pending" || latest.status === "running")) return input.configured ? "pending" : "not_configured";
   if (latest?.status === "failed") return "failed";
-  if (input.accountId) return latest?.status === "done" && latest.action === "suspend" ? "suspended" : "created";
+  if (input.accountId && latest?.status === "done" && latest.action === "suspend") return input.system === "ghl" ? "manual_action" : "suspended";
+  if (input.accountId) return "created";
   return input.configured ? "not_set_up" : "not_configured";
 }
 
@@ -51,7 +52,7 @@ export async function loadAccountViews(db: DbOrTx, integrations: Integrations, b
     const configured = isConfigured(integrations, system);
     const accountId = system === "google" ? broker.googleUserId : broker.ghlUserId;
     const task = latest.get(`${broker.id}:${system}`) ?? null;
-    const status = deriveAccountStatus({ configured, accountId, latest: task });
+    const status = deriveAccountStatus({ system, configured, accountId, latest: task });
     return {
       system,
       label: PROVISIONING_SYSTEM_LABELS[system],
@@ -80,8 +81,8 @@ export async function loadAccountSummaries(db: DbOrTx, integrations: Integration
   const summaries = new Map<string, Record<ProvisioningSystem, AccountStatus>>();
   for (const broker of brokers) {
     summaries.set(broker.id, {
-      google: deriveAccountStatus({ configured: isConfigured(integrations, "google"), accountId: broker.googleUserId, latest: latest.get(`${broker.id}:google`) ?? null }),
-      ghl: deriveAccountStatus({ configured: isConfigured(integrations, "ghl"), accountId: broker.ghlUserId, latest: latest.get(`${broker.id}:ghl`) ?? null }),
+      google: deriveAccountStatus({ system: "google", configured: isConfigured(integrations, "google"), accountId: broker.googleUserId, latest: latest.get(`${broker.id}:google`) ?? null }),
+      ghl: deriveAccountStatus({ system: "ghl", configured: isConfigured(integrations, "ghl"), accountId: broker.ghlUserId, latest: latest.get(`${broker.id}:ghl`) ?? null }),
     });
   }
   return summaries;
