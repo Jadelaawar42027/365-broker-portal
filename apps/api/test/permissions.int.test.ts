@@ -109,6 +109,10 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["PUT", `/v1/admin/brokers/${brokerId}/corporate-email`, { email: "hacked@365yachts.org" }],
     ["GET", "/v1/admin/integrations"],
     ["POST", "/v1/admin/integrations/google/test", {}],
+    ["GET", "/v1/admin/coaching/overview"],
+    ["GET", `/v1/admin/coaching/brokers/${brokerId}`],
+    ["POST", "/v1/admin/coaching/excuses/decision", { momentKey: "L:idle:2026-11-20T15:00:00.000Z", decision: "confirm" }],
+    ["PUT", `/v1/admin/coaching/brokers/${brokerId}/pulse`, { weekStart: "2026-11-16", engagement: 5, attitude: 5, supportNeeded: "" }],
   ];
 }
 
@@ -208,6 +212,7 @@ describe("broker-only routes", () => {
       ["GET", "/v1/me/steps"],
       ["GET", "/v1/me/steps/w9"],
       ["POST", "/v1/me/welcome-seen"],
+      ["GET", "/v1/me/coaching"],
     ] as const) {
       expect((await ctx.call(method, url, { cookie: owner })).statusCode).toBe(403);
     }
