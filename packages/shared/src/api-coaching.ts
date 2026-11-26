@@ -99,6 +99,20 @@ const metricCellSchema = z.object({
   windowDays: z.number().nullable(),
 });
 
+export const coachingOneOnOneDetailsSchema = z.object({
+  lastWeek: z.object({ text: z.string(), direction: z.enum(["improving", "about the same", "getting worse"]), stuck: z.boolean() }).nullable(),
+  slipping: z.array(
+    z.object({
+      metric: coachingMetricSchema,
+      sentence: z.string(),
+      examples: z.array(z.object({ name: z.string(), text: z.string(), ghlUrl: z.string().nullable() })),
+    }),
+  ),
+  results: z.string(),
+  focus: z.object({ topic: z.string(), question: z.string(), agree: z.array(z.string()) }).nullable(),
+  focusMessage: z.string().nullable(),
+});
+
 export const coachingOverviewResponseSchema = z.object({
   configured: z.boolean(),
   weeks: z.array(coachingWeekSchema),
@@ -119,6 +133,7 @@ export const coachingOverviewResponseSchema = z.object({
       trend: z.number().nullable(),
       reason: z.string(),
       topic: z.string().nullable(),
+      details: coachingOneOnOneDetailsSchema,
     }),
   ),
   brokers: z.array(

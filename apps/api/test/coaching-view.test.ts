@@ -52,9 +52,10 @@ describe("buildOverview", () => {
   });
 
   it("flags who needs a 1:1 with the reason and topic", () => {
-    expect(overview.needsOneOnOne).toEqual([
-      { brokerId: B, name: "Ben", score: 72, provisional: false, trend: -3, reason: "Off target: on-time touches 60% (≥ 80%), speed to follow 55 (≥ 60)", topic: "On-time touches: Go through the pipeline together" },
+    expect(overview.needsOneOnOne).toMatchObject([
+      { brokerId: B, name: "Ben", score: 72, provisional: false, trend: -3, reason: "Off target: on-time touches 60% (≥ 80%), speed to follow 55 (≥ 60)" },
     ]);
+    expect(overview.needsOneOnOne[0]!.details.slipping.map((l) => l.metric)).toEqual(["speed_to_follow", "on_time_touches"]);
   });
 
   describe("ordering and who needs a 1:1 (week 47 shapes)", () => {
@@ -70,7 +71,7 @@ describe("buildOverview", () => {
         snapshot(ids[4]!, week.weekStart, { score: null, provisional: true, coverage: 0, metrics: {}, focusAreas: [], trend: {} }),
         snapshot(ids[3]!, week.weekStart, { score: 43.3, provisional: true, coverage: 0.47, metrics: { next_step_coverage: cellAt("red", 0, 0.8, 0, 8) }, trend: { score: 13 } }),
         snapshot(ids[2]!, week.weekStart, { score: 43.9, metrics: { closes: cellAt("red", 0, 2, 0, 9), showings_completed: cellAt("red", 2, 6, 33.3, 12) }, focusAreas: [{ metric: "closes", action: "Review every deal" }], trend: {} }),
-        snapshot(ids[1]!, week.weekStart, { score: 52, metrics: { closed_value: cellAt("red", 50000, 1000000, 5, 9), responsiveness: cellAt("red", 75, 35, 47.8, 7) }, focusAreas: [{ metric: "closed_value", action: "Fill every deal value" }], trend: {} }),
+        snapshot(ids[1]!, week.weekStart, { score: 52, metrics: { closes: cellAt("red", 1, 2, 50, 9), closed_value: cellAt("red", 50000, 1000000, 5, 9), responsiveness: cellAt("red", 75, 35, 47.8, 7) }, focusAreas: [{ metric: "closed_value", action: "Fill every deal value" }], trend: {} }),
         snapshot(ids[0]!, week.weekStart, {
           score: 71.7,
           metrics: { on_time_touches: cellAt("amber", 0.541, 0.571, 54.1, 10), showing_conversion: cellAt("green", 0.3, 0.275, 30, 6) },
@@ -81,6 +82,13 @@ describe("buildOverview", () => {
       ],
       brokers: people,
       excusesToConfirm: 0,
+      playbook: {
+        on_time_touches: { topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning"] },
+        responsiveness: { topic: "Same-day replies", question: "What stops you answering within the hour?", agree: ["Notifications on"] },
+        closes: "Review every deal",
+      },
+      leadNames: new Map([["lead-x", "John Smith"]]),
+      ghlLocationId: "loc1",
     });
 
     it("table: full scores highest first, then provisional, then no score A-Z", () => {
@@ -96,13 +104,20 @@ describe("buildOverview", () => {
     it("every metric below target is listed and the topic is always one of them", () => {
       const charlie = o.needsOneOnOne[0]!;
       expect(charlie.reason).toBe("Off target: on-time touches 54% (≥ 57%)");
-      expect(charlie.topic).toBe("On-time touches: Work the due list every morning");
+      expect(charlie.topic).toBe("Consistent follow-ups");
+      expect(charlie.details.focus).toEqual({ topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning"] });
       const james = o.needsOneOnOne[1]!;
-      expect(james.reason).toBe("Off target: closed value $50K (≥ $1M), reply time 75 min (≤ 35 min)");
-      expect(james.topic).toBe("Closed value: Fill every deal value");
-      for (const row of o.needsOneOnOne) {
-        expect(row.reason.toLowerCase()).toContain(row.topic!.split(":")[0]!.toLowerCase());
-      }
+      expect(james.topic).toBe("Same-day replies");
+      expect(james.details.slipping.map((l) => l.metric)).toEqual(["responsiveness"]);
+      expect(james.details.slipping[0]!.sentence).toBe("Replies to clients take 75 minutes (target: within 35 minutes)");
+      expect(james.details.results).toContain("1 close worth $50K in the last 12 months");
+    });
+
+    it("the focus never comes from results: a broker slipping only on results gets the no-gaps message", () => {
+      const ben = o.needsOneOnOne[2]!;
+      expect(ben.details.slipping).toEqual([]);
+      expect(ben.topic).toBeNull();
+      expect(ben.details.focusMessage).toBe("No behaviour gaps this week. Review results and pipeline together");
     });
   });
 

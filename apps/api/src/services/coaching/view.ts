@@ -12,13 +12,20 @@
  * - median(values): the median of a list of numbers, or null for an empty list.
  * - sumContext(snapshots, key): the sum of a numeric context figure across snapshots, or null when none has it.
  * - cellsOf(snapshot): every metric's cell from a snapshot, keyed by metric.
- * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1 (full scores only, highest first), and every broker's row (full scores highest first, then provisional highest first, then no score A-Z).
+ * - oneOnOneCells(snapshot): every metric's status, value, target, points, weight, detail and evidence, for the 1:1 details.
+ * - coachingEntries(playbook): the playbook's coaching entries (topic, question, things to agree) by metric; plain strings are skipped.
+ * - evidenceLeadIds(snapshots): every lead id behind the behaviour metrics' evidence, to look up their names.
+ * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1 (full scores only, highest first, with plain-language details: last week's focus, what's slipping with example leads, results and this week's focus), and every broker's row (full scores highest first, then provisional highest first, then no score A-Z).
  * - buildBrokerPage(input): one broker's page: header numbers, focus areas with evidence, all metrics with an 8-week history, excused misses, topic, results context, pulse and 1:1 history.
  */
 import {
   COACHING_METRICS,
   coachingMetricSchema,
+  BEHAVIOUR_METRICS,
+  buildOneOnOneDetails,
   compareCoachingRows,
+  type CoachingEntry,
+  type OneOnOneCell,
   needsOneOnOneReason,
   oneOnOneTopic,
   scoreGroup,
@@ -52,6 +59,31 @@ function cellsOf(snapshot: SnapshotRow) {
   return Object.fromEntries(COACHING_METRICS.map((m) => [m, cell(snapshot, m)])) as Record<CoachingMetricId, ReturnType<typeof cell>>;
 }
 
+function oneOnOneCells(snapshot: SnapshotRow): Partial<Record<CoachingMetricId, OneOnOneCell>> {
+  return Object.fromEntries(
+    COACHING_METRICS.map((m) => {
+      const c = cell(snapshot, m);
+      const raw = snapshot.metrics[m];
+      return [m, { status: c.status, value: c.value, target: c.target, points: c.points, weight: c.weight, detail: raw?.detail ?? null, evidence: raw?.evidence ?? [] }];
+    }),
+  );
+}
+
+function coachingEntries(playbook: Record<string, unknown>): Partial<Record<CoachingMetricId, CoachingEntry>> {
+  const out: Partial<Record<CoachingMetricId, CoachingEntry>> = {};
+  for (const m of COACHING_METRICS) {
+    const e = playbook[m] as Partial<CoachingEntry> | string | undefined;
+    if (e && typeof e === "object" && typeof e.topic === "string") {
+      out[m] = { topic: e.topic, question: typeof e.question === "string" ? e.question : "", agree: Array.isArray(e.agree) ? e.agree.filter((a): a is string => typeof a === "string") : [] };
+    }
+  }
+  return out;
+}
+
+export function evidenceLeadIds(snapshots: SnapshotRow[]): string[] {
+  return [...new Set(snapshots.flatMap((s) => BEHAVIOUR_METRICS.flatMap((m) => (s.metrics[m]?.evidence ?? []).map((e) => e.leadId))))];
+}
+
 function sumContext(snapshots: SnapshotRow[], key: string): number | null {
   const values = snapshots.map((s) => s.context[key]).filter((v): v is number => typeof v === "number");
   return values.length ? values.reduce((a, b) => a + b, 0) : null;
@@ -77,7 +109,17 @@ export function buildOverview(input: {
   snapshots: SnapshotRow[];
   brokers: Map<string, PortalBroker>;
   excusesToConfirm: number;
+  previousSnapshots?: SnapshotRow[];
+  twoBackSnapshots?: SnapshotRow[];
+  playbook?: Record<string, unknown>;
+  leadNames?: Map<string, string>;
+  ghlLocationId?: string;
 }): CoachingOverviewResponse {
+  const playbook = coachingEntries(input.playbook ?? {});
+  const byBroker = (list: SnapshotRow[] | undefined) => new Map((list ?? []).map((s) => [s.brokerId, s]));
+  const previous = byBroker(input.previousSnapshots);
+  const twoBack = byBroker(input.twoBackSnapshots);
+  const current = byBroker(input.snapshots);
   const portalSnapshots = input.snapshots.filter((s) => input.brokers.has(s.brokerId));
   const rows = portalSnapshots
     .map((s) => {
@@ -127,7 +169,18 @@ export function buildOverview(input: {
     needsOneOnOne: rows.flatMap((r) => {
       if (scoreGroup(r) !== "full") return [];
       const reason = needsOneOnOneReason(r);
-      return reason ? [{ brokerId: r.brokerId, name: r.name, score: r.score, provisional: r.provisional, trend: r.trend, reason, topic: r.topic }] : [];
+      if (!reason) return [];
+      const prev = previous.get(r.brokerId);
+      const back = twoBack.get(r.brokerId);
+      const details = buildOneOnOneDetails({
+        current: oneOnOneCells(current.get(r.brokerId)!),
+        previous: prev ? oneOnOneCells(prev) : null,
+        twoBack: back ? oneOnOneCells(back) : null,
+        playbook,
+        leadName: (id) => input.leadNames?.get(id) ?? null,
+        ghlUrl: (id) => ghlContactUrl(input.ghlLocationId, id),
+      });
+      return [{ brokerId: r.brokerId, name: r.name, score: r.score, provisional: r.provisional, trend: r.trend, reason, topic: details.focus?.topic ?? null, details }];
     }),
     brokers: rows.map(({ topic: _topic, ...r }) => r),
   };
