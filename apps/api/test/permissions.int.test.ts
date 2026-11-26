@@ -23,7 +23,8 @@ function normalisePath(path: string): string {
     .split("?")[0]!
     .replace(/\/w9(\/|$)/, "/{key}$1")
     .replace("/contracts/broker_agreement/", "/contracts/{key}/")
-    .replace(/\/(accounts|integrations)\/google\//, "/$1/{system}/");
+    .replace(/\/(accounts|integrations)\/google\//, "/$1/{system}/")
+    .replace(/\/coaching\/targets\/[a-z_]+$/, "/coaching/targets/{metric}");
 }
 
 function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerStepId): [string, string, unknown?][] {
@@ -113,6 +114,8 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["GET", `/v1/admin/coaching/brokers/${brokerId}`],
     ["POST", "/v1/admin/coaching/excuses/decision", { momentKey: "L:idle:2026-11-20T15:00:00.000Z", decision: "confirm" }],
     ["PUT", `/v1/admin/coaching/brokers/${brokerId}/pulse`, { weekStart: "2026-11-16", engagement: 5, attitude: 5, supportNeeded: "" }],
+    ["GET", "/v1/admin/coaching/targets"],
+    ["PUT", "/v1/admin/coaching/targets/call_quality", { value: 1 }],
   ];
 }
 
