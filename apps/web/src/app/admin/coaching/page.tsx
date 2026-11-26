@@ -1,6 +1,6 @@
 /**
  * File: apps/web/src/app/admin/coaching/page.tsx
- * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (full scores only, highest
+ * Purpose: The Coaching team overview for leadership (with a link to edit the targets): team totals, who needs a 1:1 this week (full scores only, highest
  * first, as collapsed bars that open to plain-language details), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
  * and results against their targets, placeholder targets marked, with "90-day data" or "12-month data" under a cell
  * measured over a longer window, focus areas under the name; the name column stays put
@@ -51,9 +51,14 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-[35px] leading-tight font-extrabold tracking-tight">Coaching</h1>
-          <p className="mt-1 text-[17px] text-muted">What each broker controls, against target · last 28 days · lowest score first</p>
+          <p className="mt-1 text-[17px] text-muted">What each broker controls, against target · last 28 days · highest score first</p>
         </div>
-        {data ? <WeekPicker weeks={data.weeks} current={data.week?.weekStart ?? null} /> : null}
+        <div className="flex flex-wrap items-end gap-3">
+          <Link href="/admin/coaching/targets" className="inline-flex min-h-11 items-center text-base font-semibold text-brand underline-offset-2 hover:underline">
+            Edit targets
+          </Link>
+          {data ? <WeekPicker weeks={data.weeks} current={data.week?.weekStart ?? null} /> : null}
+        </div>
       </div>
 
       {status === 503 || !data ? (
