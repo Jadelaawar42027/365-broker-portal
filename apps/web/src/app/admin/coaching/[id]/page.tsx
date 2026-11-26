@@ -4,7 +4,8 @@
  * the leads behind them (linking to the GHL contact) and the playbook action; every metric with its own 0-100 points
  * (the score is their weighted average; the target only sets the colour), its target, an 8-week line and sample size
  * (marked "90-day data" when measured over 90 days; speed to follow also shows the first-call score and median time
- * to the next touch; reply time shows how many client messages needed no reply); AI-excused misses
+ * to the next touch; reply time shows how many client messages needed no reply; showing conversion shows booked vs
+ * completed showings, the median days to the first showing and the leads still pending); AI-excused misses
  * with Shelly's confirm / count-as-missed; the suggested 1:1 topic; results context (not scored); Shelly's weekly
  * pulse form; and the 1:1 history.
  *
@@ -15,6 +16,7 @@
  * - money(value): "$480K" style amounts (Intl compact USD).
  * - followDetail(detail): speed to follow's context line ("First calls 72 (5) · next touch 1.2 h median"), or null.
  * - replyDetail(detail): reply time's context line ("4 messages needed no reply"), or null when none were left out.
+ * - showingDetail(detail): showing conversion's context line ("2 completed · 1 booked · first showing 3 days median · 2 leads pending"), or null.
  * - metricDetail(metric, detail): the context line shown under a metric's name, or null.
  */
 import {
@@ -68,9 +70,24 @@ function replyDetail(detail: Record<string, number | null> | null): string | nul
   return `${skipped} ${skipped === 1 ? "message" : "messages"} needed no reply`;
 }
 
+function showingDetail(detail: Record<string, number | null> | null): string | null {
+  if (!detail) return null;
+  const parts: string[] = [];
+  const completed = detail.showings_completed;
+  const booked = detail.showings_booked;
+  if (typeof completed === "number" && completed > 0) parts.push(`${completed} completed`);
+  if (typeof booked === "number" && booked > 0) parts.push(`${booked} booked`);
+  const days = detail.median_days_to_first_showing;
+  if (typeof days === "number") parts.push(`first showing ${Math.round(days)} ${Math.round(days) === 1 ? "day" : "days"} median`);
+  const pending = detail.pending_leads;
+  if (typeof pending === "number" && pending > 0) parts.push(`${pending} ${pending === 1 ? "lead" : "leads"} pending`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 function metricDetail(metric: CoachingMetricId, detail: Record<string, number | null> | null): string | null {
   if (metric === "speed_to_follow") return followDetail(detail);
   if (metric === "responsiveness") return replyDetail(detail);
+  if (metric === "showing_conversion") return showingDetail(detail);
   return null;
 }
 
