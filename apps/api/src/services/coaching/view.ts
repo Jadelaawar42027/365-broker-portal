@@ -7,7 +7,7 @@
  * Functions:
  * - toWeek(row): a { weekStart, isoWeek, weekNumber } from a snapshot week.
  * - ghlContactUrl(locationId, leadId): the lead's contact page in GoHighLevel, or null without a location id.
- * - cell(snapshot, metric): one metric's value, its own 0-100 points, target, status, sample and window (28 or 90 days) from a snapshot (Unknown when missing; no points before rules v4).
+ * - cell(snapshot, metric): one metric's value, its own 0-100 points, target (and whether it is a placeholder), status, sample and window (28, 90 or 365 days) from a snapshot (Unknown when missing; no points before rules v4).
  * - focusMetrics(snapshot): the snapshot's focus areas as known metric ids with their playbook action.
  * - median(values): the median of a list of numbers, or null for an empty list.
  * - sumContext(snapshots, key): the sum of a numeric context figure across snapshots, or null when none has it.
@@ -42,7 +42,7 @@ export function ghlContactUrl(locationId: string | undefined, leadId: string): s
 function cell(snapshot: SnapshotRow, metric: CoachingMetricId) {
   const m = snapshot.metrics[metric];
   const status = (m && STATUSES.has(m.status) ? m.status : "unknown") as CoachingStatus;
-  return { value: m?.value ?? null, points: typeof m?.points === "number" ? m.points : null, target: m?.target ?? null, status, sample: m?.sample ?? 0, windowDays: typeof m?.window_days === "number" ? m.window_days : null };
+  return { value: m?.value ?? null, points: typeof m?.points === "number" ? m.points : null, target: m?.target ?? null, targetPlaceholder: m?.target_placeholder === true, status, sample: m?.sample ?? 0, windowDays: typeof m?.window_days === "number" ? m.window_days : null };
 }
 
 function sumContext(snapshots: SnapshotRow[], key: string): number | null {
@@ -153,7 +153,7 @@ export function buildBrokerPage(input: {
       ? focus.map((f) => {
           const c = cell(current, f.metric);
           const evidence = current.focusAreas.find((x) => x.metric === f.metric)?.evidence ?? current.metrics[f.metric]?.evidence ?? [];
-          return { metric: f.metric, value: c.value, points: c.points, target: c.target, status: c.status, action: f.action, evidence: evidence.slice(0, 5).map(withLink) };
+          return { metric: f.metric, value: c.value, points: c.points, target: c.target, targetPlaceholder: c.targetPlaceholder, status: c.status, action: f.action, evidence: evidence.slice(0, 5).map(withLink) };
         })
       : [],
     metrics: current

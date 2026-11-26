@@ -35,6 +35,7 @@ export type SnapshotRow = {
       value: number | null;
       points?: number | null;
       target: number | null;
+      target_placeholder?: boolean;
       status: string;
       sample: number;
       window_days?: number | null;

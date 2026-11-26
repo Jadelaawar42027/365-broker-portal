@@ -5,11 +5,12 @@
  * themselves come from the coach service's weekly snapshots; nothing here computes a score.
  *
  * Functions:
- * - formatCoachingValue(metric, value): "47 min", "82%" or "61" (points) for a metric value, "—" when unknown.
+ * - coachingMetricGroup(metric): "behaviour" or "results", the half of the score a metric belongs to.
+ * - formatCoachingValue(metric, value): "47 min", "82%", "61" (points or a count) or "$1.2M" (closed value) for a metric value, "—" when unknown.
  * - formatCoachingTarget(metric, target): "≤ 30 min" or "≥ 85%" for a target, "—" when there is none.
  * - formatWorkMinutes(value): working minutes as "47 min" or "2.5 h", "—" when unknown.
  * - formatPoints(points): a metric's own 0-100 points as "56", "—" when unknown.
- * - windowLabel(windowDays): "90-day data" when a metric was measured over more than 28 days, else null.
+ * - windowLabel(windowDays): "90-day data" (or "12-month data" from 365 days) when a metric was measured over more than 28 days, else null.
  * - scoreBand(score, provisional): the label and tone for a broker's score ("At risk", "Needs attention", "On track", "Provisional").
  * - needsOneOnOneReason(row): why a broker needs a 1:1 this week (a red metric, a drop of 10+ points, thin data), or null.
  * - suggestedTopic(focusAreas): the 1:1 topic from the first focus area and its playbook action, or null.
@@ -18,12 +19,16 @@ import { z } from "zod";
 
 export const COACHING_METRICS = [
   "speed_to_follow",
-  "next_step_coverage",
   "on_time_touches",
-  "responsiveness",
-  "showing_conversion",
+  "next_step_coverage",
   "call_quality",
+  "responsiveness",
   "promises_kept",
+  "showings_completed",
+  "hot_pipeline",
+  "closes",
+  "closed_value",
+  "showing_conversion",
   "pipeline_movement",
 ] as const;
 export const coachingMetricSchema = z.enum(COACHING_METRICS);
@@ -38,11 +43,31 @@ export const COACHING_METRIC_LABELS: Record<CoachingMetricId, string> = {
   call_quality: "Call quality",
   promises_kept: "Promises kept",
   pipeline_movement: "Pipeline movement",
+  showings_completed: "Showings completed",
+  hot_pipeline: "Hot pipeline",
+  closes: "Closes",
+  closed_value: "Closed value",
 };
 
+const BEHAVIOUR_METRICS: ReadonlySet<CoachingMetricId> = new Set([
+  "speed_to_follow",
+  "on_time_touches",
+  "next_step_coverage",
+  "call_quality",
+  "responsiveness",
+  "promises_kept",
+]);
+
+export function coachingMetricGroup(metric: CoachingMetricId): "behaviour" | "results" {
+  return BEHAVIOUR_METRICS.has(metric) ? "behaviour" : "results";
+}
+
 const MINUTE_METRICS: ReadonlySet<CoachingMetricId> = new Set(["responsiveness"]);
-const POINT_METRICS: ReadonlySet<CoachingMetricId> = new Set(["speed_to_follow", "call_quality"]);
+const POINT_METRICS: ReadonlySet<CoachingMetricId> = new Set(["speed_to_follow", "call_quality", "showings_completed", "hot_pipeline", "closes"]);
+const MONEY_METRICS: ReadonlySet<CoachingMetricId> = new Set(["closed_value"]);
+const COMPACT_USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
 const BASE_WINDOW_DAYS = 28;
+const YEAR_DAYS = 365;
 
 export const coachingStatusSchema = z.enum(["green", "amber", "red", "unknown"]);
 export type CoachingStatus = z.infer<typeof coachingStatusSchema>;
@@ -61,6 +86,7 @@ const metricCellSchema = z.object({
   value: z.number().nullable(),
   points: z.number().nullable(),
   target: z.number().nullable(),
+  targetPlaceholder: z.boolean(),
   status: coachingStatusSchema,
   sample: z.number(),
   windowDays: z.number().nullable(),
@@ -127,6 +153,7 @@ export const coachingBrokerResponseSchema = z.object({
       value: z.number().nullable(),
       points: z.number().nullable(),
       target: z.number().nullable(),
+      targetPlaceholder: z.boolean(),
       status: coachingStatusSchema,
       action: z.string().nullable(),
       evidence: z.array(coachingEvidenceSchema),
@@ -138,6 +165,7 @@ export const coachingBrokerResponseSchema = z.object({
       value: z.number().nullable(),
       points: z.number().nullable(),
       target: z.number().nullable(),
+      targetPlaceholder: z.boolean(),
       status: coachingStatusSchema,
       sample: z.number(),
       windowDays: z.number().nullable(),
@@ -184,6 +212,7 @@ export type PulseBody = z.infer<typeof pulseBodySchema>;
 export function formatCoachingValue(metric: CoachingMetricId, value: number | null): string {
   if (value === null) return "—";
   if (MINUTE_METRICS.has(metric)) return formatWorkMinutes(value);
+  if (MONEY_METRICS.has(metric)) return COMPACT_USD.format(value);
   if (POINT_METRICS.has(metric)) return String(Math.round(value));
   return `${Math.round(value * 100)}%`;
 }
@@ -198,7 +227,8 @@ export function formatPoints(points: number | null): string {
 }
 
 export function windowLabel(windowDays: number | null): string | null {
-  return windowDays !== null && windowDays > BASE_WINDOW_DAYS ? `${windowDays}-day data` : null;
+  if (windowDays === null || windowDays <= BASE_WINDOW_DAYS) return null;
+  return windowDays >= YEAR_DAYS ? "12-month data" : `${windowDays}-day data`;
 }
 
 export function formatCoachingTarget(metric: CoachingMetricId, target: number | null): string {
