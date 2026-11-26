@@ -1,10 +1,11 @@
 /**
  * File: apps/web/src/app/admin/coaching/page.tsx
- * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (with the reason and a
- * suggested topic), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
+ * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (full scores only, highest
+ * first, with every metric below target and a topic taken from them), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
  * and results against their targets, placeholder targets marked, with "90-day data" or "12-month data" under a cell
  * measured over a longer window, focus areas under the name; the name column stays put
- * while the table scrolls on a phone), worst score first, with the colour legend. Numbers come from the coach
+ * while the table scrolls on a phone), full scores highest first, then provisional ("prov."), then no score A-Z ("—"),
+ * with the colour legend. Numbers come from the coach
  * service's frozen Monday snapshot for the chosen week.
  *
  * Functions:
