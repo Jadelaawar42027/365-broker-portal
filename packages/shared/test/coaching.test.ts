@@ -26,7 +26,7 @@ describe("coaching formatting", () => {
     expect(formatCoachingValue("responsiveness", 150)).toBe("2.5 h");
     expect(formatCoachingValue("on_time_touches", 0.817)).toBe("82%");
     expect(formatCoachingValue("call_quality", 61.4)).toBe("61");
-    expect(formatCoachingValue("attendance", null)).toBe("—");
+    expect(formatCoachingValue("showing_conversion", null)).toBe("—");
   });
 
   it("labels metrics measured over more than 28 days, and formats working minutes", () => {
@@ -62,7 +62,7 @@ describe("needsOneOnOneReason", () => {
     ).toBe("Off target: on-time touches 52%");
     expect(needsOneOnOneReason({ provisional: false, coverage: 1, trend: -12, metrics: {} })).toBe("Score down 12 points on the 4-week average");
     expect(needsOneOnOneReason({ provisional: true, coverage: 0.45, trend: null, metrics: {} })).toBe("Only 45% of the score has enough data");
-    expect(needsOneOnOneReason({ provisional: false, coverage: 1, trend: 2, metrics: { attendance: { status: "amber", value: 0.8 } } })).toBeNull();
+    expect(needsOneOnOneReason({ provisional: false, coverage: 1, trend: 2, metrics: { showing_conversion: { status: "amber", value: 0.8 } } })).toBeNull();
   });
 });
 
