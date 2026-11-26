@@ -71,7 +71,7 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
         <>
           <section aria-label="Team totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard label="Team score" value={data.totals.teamScore === null ? "—" : String(data.totals.teamScore)} detail="Average of non-provisional scores" />
-            <StatCard label="Follow-ups on time" value={pct(data.totals.onTimeRate)} detail="Due moments met, whole team" />
+            <StatCard label="Deadlines met on time" value={pct(data.totals.onTimeRate)} detail="New leads, after consultations and no-shows, agreed dates" />
             <StatCard label="Median follow-up" value={formatWorkMinutes(data.totals.medianFollowMinutes)} detail="Working time from a call's end to the next touch" />
             <StatCard label="Calls reviewed" value={data.totals.callsReviewed === null ? "—" : String(data.totals.callsReviewed)} detail="Calls in the last 28 days with a scored review" />
             <StatCard label="Excuses to confirm" value={String(data.totals.excusesToConfirm)} detail="Found only in a broker note" />
@@ -96,7 +96,7 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
               <CoachingLegend />
             </div>
             <div className="relative overflow-x-auto">
-              <table className="w-full min-w-[1360px] border-collapse text-left">
+              <table className="w-full min-w-[1460px] border-collapse text-left">
                 <thead>
                   <tr className="text-[14px] font-bold tracking-wide text-muted uppercase">
                     <td colSpan={4} className="sticky left-0 z-10 bg-white" />
@@ -110,7 +110,7 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
                   <tr className="border-b border-line text-[15px] text-muted">
                     <th scope="col" className="sticky left-0 z-10 bg-white px-3 py-2.5 font-semibold">Broker</th>
                     <th scope="col" className="px-3 py-2.5 font-semibold">Score</th>
-                    <th scope="col" className="px-3 py-2.5 font-semibold">Trend</th>
+                    <th scope="col" className="px-3 py-2.5 font-semibold whitespace-nowrap">vs 4-week avg</th>
                     <th scope="col" className="px-3 py-2.5 font-semibold">Data</th>
                     {COACHING_METRICS.map((metric) => {
                       const target = data.brokers[0]?.metrics[metric]?.target ?? null;

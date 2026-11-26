@@ -6,8 +6,9 @@
  * (marked "90-day data" when measured over 90 days; speed to follow also shows the first-call score and median time
  * to the next touch; reply time shows how many client messages needed no reply; showing conversion shows booked vs
  * completed showings, the median days to the first showing and the leads still pending); AI-excused misses
- * with Shelly's confirm / count-as-missed; the suggested 1:1 topic; results context (not scored); Shelly's weekly
- * pulse form; and the 1:1 history.
+ * with Shelly's confirm / count-as-missed; this week's 1:1 topic (an admin's override with who set it and the note, the
+ * results review, or the behaviour gap) with a form to set or remove an override; results context (not scored); Shelly's
+ * weekly pulse form; and the 1:1 history with each week's topic and who set it.
  *
  * Functions:
  * - BrokerCoachingPage({ params, searchParams }): loads the broker's coaching data for ?week= and renders the page.
@@ -41,6 +42,7 @@ import { notFound } from "next/navigation";
 import { ExcuseActions } from "@/components/admin/coaching/excuse-actions";
 import { MetricCell } from "@/components/admin/coaching/metric-cell";
 import { PulseForm } from "@/components/admin/coaching/pulse-form";
+import { TopicForm } from "@/components/admin/coaching/topic-form";
 import { Sparkline } from "@/components/admin/coaching/sparkline";
 import { WeekPicker } from "@/components/admin/coaching/week-picker";
 import { Avatar, Card } from "@/components/ui/misc";
@@ -254,7 +256,7 @@ export default async function BrokerCoachingPage({
 
                 <Card as="section" className="px-6 py-5">
                   <h2 className="text-xl font-bold">All metrics</h2>
-                  <p className="mt-1 mb-3 text-[15px] text-muted">Each metric scores 0–100 points on its own; the score is their weighted average, half behaviour and half results. Results counts score against their target; other targets only set the colour. Targets marked placeholder are still to be set.</p>
+                  <p className="mt-1 mb-3 text-[15px] text-muted">Each metric scores 0–100 points on its own; the score is their weighted average, half behaviour and half results. Results counts score against their target; other targets only set the colour. Targets can be changed under Edit targets.</p>
                   <div className="relative overflow-x-auto">
                     <table className="w-full min-w-[640px] border-collapse text-left">
                       <thead>
@@ -345,9 +347,28 @@ export default async function BrokerCoachingPage({
               <aside className="flex min-w-0 flex-col gap-6">
                 <section aria-labelledby="topic" className="rounded-2xl border border-brand/20 bg-brand-soft px-6 py-5">
                   <h2 id="topic" className="text-lg font-bold">
-                    Suggested 1:1 topic
+                    1:1 topic this week
                   </h2>
                   <p className="mt-2 text-[17px]">{data.topic ?? "No focus area this week: use the 1:1 to keep momentum."}</p>
+                  {data.topicSource?.source === "override" ? (
+                    <div className="mt-2 flex flex-col gap-1">
+                      <p>
+                        <Pill tone="neutral">Set by {data.topicSource.setBy}</Pill>
+                      </p>
+                      {data.topicSource.note ? <p className="text-[17px]">{data.topicSource.note}</p> : null}
+                      {data.topicSource.automaticTopic ? <p className="text-[15px] text-muted">Automatic topic: {data.topicSource.automaticTopic}</p> : null}
+                    </div>
+                  ) : data.topicSource?.source === "results" ? (
+                    <p className="mt-1 text-[15px] text-muted">Day-to-day work is close to target, so this week looks at results.</p>
+                  ) : null}
+                  {data.week ? (
+                    <TopicForm
+                      key={`${data.week.weekStart}-${data.topicSource?.source === "override" ? data.topic : "auto"}`}
+                      brokerId={data.broker.brokerId}
+                      weekStart={data.week.weekStart}
+                      current={data.topicSource?.source === "override" && data.topic ? { topic: data.topic, note: data.topicSource.note } : null}
+                    />
+                  ) : null}
                 </section>
 
                 <Card as="section" className="px-6 py-5">
@@ -387,6 +408,12 @@ export default async function BrokerCoachingPage({
                     {data.history.map((h) => (
                       <li key={h.weekStart} className="text-[15px]">
                         <strong className="font-bold">{h.isoWeek.replace(/^\d{4}-W/, "Week ")}</strong> · {h.topic ?? "No focus area"}
+                        {h.topicSource?.source === "override" ? (
+                          <span className="block text-muted">
+                            Set by {h.topicSource.setBy}
+                            {h.topicSource.note ? ` · ${h.topicSource.note}` : ""}
+                          </span>
+                        ) : null}
                         {h.pulse ? (
                           <span className="block text-muted">
                             Pulse {h.pulse.engagement}/5 engagement, {h.pulse.attitude}/5 attitude{h.pulse.supportNeeded ? ` · ${h.pulse.supportNeeded}` : ""}
