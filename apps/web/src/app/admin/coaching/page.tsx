@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/app/admin/coaching/page.tsx
  * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (full scores only, highest
- * first, with every metric below target and a topic taken from them), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
+ * first, as collapsed bars that open to plain-language details), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
  * and results against their targets, placeholder targets marked, with "90-day data" or "12-month data" under a cell
  * measured over a longer window, focus areas under the name; the name column stays put
  * while the table scrolls on a phone), full scores highest first, then provisional ("prov."), then no score A-Z ("—"),
@@ -25,6 +25,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CoachingLegend, MetricCell } from "@/components/admin/coaching/metric-cell";
+import { OneOnOneList } from "@/components/admin/coaching/one-on-one-list";
 import { NotConnected, TrendText } from "@/components/admin/coaching/status";
 import { WeekPicker } from "@/components/admin/coaching/week-picker";
 import { StatCard } from "@/components/admin/stat-card";
@@ -80,32 +81,7 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
                 <p className="text-[17px] text-muted">Nobody is off target or dropping this week.</p>
               </Card>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                {data.needsOneOnOne.map((row) => {
-                  const band = scoreBand(row.score, row.provisional);
-                  return (
-                    <Card key={row.brokerId} className="flex flex-col gap-3 px-5 py-5">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Link href={`/admin/coaching/${row.brokerId}${week ? `?week=${encodeURIComponent(week)}` : ""}`} className="text-lg font-bold text-brand underline-offset-2 hover:underline">
-                          {row.name}
-                        </Link>
-                        <Pill tone={band.tone}>
-                          {row.provisional || row.score === null ? band.label : `${Math.round(row.score)} · ${band.label}`}
-                        </Pill>
-                        <span className="ml-auto">
-                          <TrendText trend={row.trend} />
-                        </span>
-                      </div>
-                      <p className="text-[17px]">{row.reason}</p>
-                      {row.topic ? (
-                        <p className="text-[15px] text-muted">
-                          <strong className="font-bold text-ink">1:1 topic:</strong> {row.topic}
-                        </p>
-                      ) : null}
-                    </Card>
-                  );
-                })}
-              </div>
+              <OneOnOneList items={data.needsOneOnOne} week={week ?? data.week?.weekStart ?? null} />
             )}
           </section>
 
