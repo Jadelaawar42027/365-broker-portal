@@ -34,6 +34,7 @@ export type SnapshotRow = {
     {
       value: number | null;
       points?: number | null;
+      weight?: number | null;
       target: number | null;
       target_placeholder?: boolean;
       status: string;

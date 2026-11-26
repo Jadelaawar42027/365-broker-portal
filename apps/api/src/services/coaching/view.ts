@@ -11,14 +11,17 @@
  * - focusMetrics(snapshot): the snapshot's focus areas as known metric ids with their playbook action.
  * - median(values): the median of a list of numbers, or null for an empty list.
  * - sumContext(snapshots, key): the sum of a numeric context figure across snapshots, or null when none has it.
- * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1, and every broker's row (worst score first).
+ * - cellsOf(snapshot): every metric's cell from a snapshot, keyed by metric.
+ * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1 (full scores only, highest first), and every broker's row (full scores highest first, then provisional highest first, then no score A-Z).
  * - buildBrokerPage(input): one broker's page: header numbers, focus areas with evidence, all metrics with an 8-week history, excused misses, topic, results context, pulse and 1:1 history.
  */
 import {
   COACHING_METRICS,
   coachingMetricSchema,
+  compareCoachingRows,
   needsOneOnOneReason,
-  suggestedTopic,
+  oneOnOneTopic,
+  scoreGroup,
   type CoachingBrokerResponse,
   type CoachingMetricId,
   type CoachingOverviewResponse,
@@ -42,7 +45,11 @@ export function ghlContactUrl(locationId: string | undefined, leadId: string): s
 function cell(snapshot: SnapshotRow, metric: CoachingMetricId) {
   const m = snapshot.metrics[metric];
   const status = (m && STATUSES.has(m.status) ? m.status : "unknown") as CoachingStatus;
-  return { value: m?.value ?? null, points: typeof m?.points === "number" ? m.points : null, target: m?.target ?? null, targetPlaceholder: m?.target_placeholder === true, status, sample: m?.sample ?? 0, windowDays: typeof m?.window_days === "number" ? m.window_days : null };
+  return { value: m?.value ?? null, points: typeof m?.points === "number" ? m.points : null, weight: typeof m?.weight === "number" ? m.weight : null, target: m?.target ?? null, targetPlaceholder: m?.target_placeholder === true, status, sample: m?.sample ?? 0, windowDays: typeof m?.window_days === "number" ? m.window_days : null };
+}
+
+function cellsOf(snapshot: SnapshotRow) {
+  return Object.fromEntries(COACHING_METRICS.map((m) => [m, cell(snapshot, m)])) as Record<CoachingMetricId, ReturnType<typeof cell>>;
 }
 
 function sumContext(snapshots: SnapshotRow[], key: string): number | null {
@@ -75,7 +82,7 @@ export function buildOverview(input: {
   const rows = portalSnapshots
     .map((s) => {
       const broker = input.brokers.get(s.brokerId)!;
-      const metrics = Object.fromEntries(COACHING_METRICS.map((m) => [m, cell(s, m)])) as CoachingOverviewResponse["brokers"][number]["metrics"];
+      const metrics = cellsOf(s) as CoachingOverviewResponse["brokers"][number]["metrics"];
       return {
         brokerId: s.brokerId,
         name: broker.name,
@@ -86,10 +93,10 @@ export function buildOverview(input: {
         trend: s.trend.score ?? null,
         metrics,
         focus: focusMetrics(s).map((f) => f.metric),
-        topic: suggestedTopic(focusMetrics(s)),
+        topic: oneOnOneTopic(metrics, focusMetrics(s)),
       };
     })
-    .sort((a, b) => (a.score ?? Number.POSITIVE_INFINITY) - (b.score ?? Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name));
+    .sort(compareCoachingRows);
 
   let met = 0;
   let due = 0;
@@ -118,6 +125,7 @@ export function buildOverview(input: {
       excusesToConfirm: input.excusesToConfirm,
     },
     needsOneOnOne: rows.flatMap((r) => {
+      if (scoreGroup(r) !== "full") return [];
       const reason = needsOneOnOneReason(r);
       return reason ? [{ brokerId: r.brokerId, name: r.name, score: r.score, provisional: r.provisional, trend: r.trend, reason, topic: r.topic }] : [];
     }),
@@ -172,13 +180,13 @@ export function buildBrokerPage(input: {
       decidedBy: e.decidedBy,
       ghlUrl: ghlContactUrl(input.ghlLocationId, e.leadId),
     })),
-    topic: suggestedTopic(focus),
+    topic: current ? oneOnOneTopic(cellsOf(current), focus) : null,
     context: current?.context ?? {},
     pulse: toPulse(input.pulse),
     history: input.history.map((h) => ({
       weekStart: h.weekStart,
       isoWeek: h.isoWeek,
-      topic: suggestedTopic(focusMetrics(h)),
+      topic: oneOnOneTopic(cellsOf(h), focusMetrics(h)),
       pulse: toPulse(pulseByWeek.get(h.weekStart)),
     })),
   };

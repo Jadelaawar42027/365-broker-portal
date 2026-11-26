@@ -136,7 +136,7 @@ describe("Coaching routes within coach_portal's grants", () => {
   it("shows the team overview for the latest week", async () => {
     const res = await ctx.call("GET", "/v1/admin/coaching/overview", { cookie: owner });
     expect(res.statusCode).toBe(200);
-    expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Coached B", "Coached A"]);
+    expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Coached A", "Coached B"]);
     expect(res.json().totals.callsReviewed).toBe(5);
     expect(res.json().brokers[0].metrics.speed_to_follow).toMatchObject({ value: 62, windowDays: 90 });
   });
