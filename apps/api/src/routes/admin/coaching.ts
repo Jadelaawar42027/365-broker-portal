@@ -11,7 +11,9 @@
  * - registerAdminCoachingRoutes(app): mounts GET /v1/admin/coaching/overview, GET /v1/admin/coaching/brokers/:id,
  *   POST /v1/admin/coaching/excuses/decision, PUT /v1/admin/coaching/brokers/:id/pulse, GET /v1/admin/coaching/targets
  *   and PUT /v1/admin/coaching/targets/:metric (the typed value is range-checked, converted, saved with the change log
- *   and audit-logged; the new colour applies from the next engine run and Monday snapshot).
+ *   and audit-logged; the new colour applies from the next engine run and Monday snapshot), and
+ *   PUT /v1/admin/coaching/brokers/:id/topic (sets or clears a broker's 1:1 topic for a week, with a note; appended and
+ *   audit-logged).
  */
 import { brokers, users, type DbOrTx } from "@bp/db";
 import {
@@ -23,6 +25,7 @@ import {
   coachingTargetsResponseSchema,
   excuseDecisionBodySchema,
   pulseBodySchema,
+  topicOverrideBodySchema,
   targetFromInput,
   targetRangeError,
   type CoachingMetricId,
@@ -70,18 +73,20 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
       const week = pickWeek(weeks, request.query.week);
       const at = week ? weeks.indexOf(week) : -1;
       const earlier = (n: number) => (at >= 0 && weeks[at + n] ? coach.snapshots(weeks[at + n]!.weekStart) : Promise.resolve([]));
-      const [snapshots, previousSnapshots, twoBackSnapshots, portalBrokers, excusesToConfirm, playbook] = await Promise.all([
+      const shownWeeks = at >= 0 ? weeks.slice(at, at + 3).map((w) => w.weekStart) : [];
+      const [snapshots, previousSnapshots, twoBackSnapshots, portalBrokers, excusesToConfirm, playbook, overrides] = await Promise.all([
         week ? coach.snapshots(week.weekStart) : Promise.resolve([]),
         earlier(1),
         earlier(2),
         loadPortalBrokers(app.deps.db),
         coach.excusesToConfirm(),
         coach.playbook(),
+        coach.topicOverrides(shownWeeks),
       ]);
       const leadNames = await coach.leadNames(evidenceLeadIds(snapshots));
       return buildOverview({
         weeks, week, snapshots, brokers: portalBrokers, excusesToConfirm,
-        previousSnapshots, twoBackSnapshots, playbook, leadNames, ghlLocationId: app.deps.env.GHL_LOCATION_ID,
+        previousSnapshots, twoBackSnapshots, playbook, leadNames, ghlLocationId: app.deps.env.GHL_LOCATION_ID, overrides,
       });
     },
   );
@@ -96,13 +101,15 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
       const weeks = await coach.weeks();
       const week = pickWeek(weeks, request.query.week);
       const weekEnd = week ? new Date(Date.parse(week.weekStart) + 7 * DAY) : app.deps.now();
-      const [history, excuses, pulse, pulses] = await Promise.all([
+      const [history, excuses, pulse, pulses, playbook, overrides] = await Promise.all([
         week ? coach.brokerHistory(broker.brokerId, week.weekStart, 8) : Promise.resolve([]),
         coach.excuses(broker.brokerId, new Date(weekEnd.getTime() - 28 * DAY), weekEnd),
         week ? coach.pulse(broker.brokerId, week.weekStart) : Promise.resolve(null),
         coach.pulses(broker.brokerId),
+        coach.playbook(),
+        coach.brokerTopicOverrides(broker.brokerId),
       ]);
-      return buildBrokerPage({ weeks, week, broker, history, excuses, pulse, pulses, ghlLocationId: app.deps.env.GHL_LOCATION_ID });
+      return buildBrokerPage({ weeks, week, broker, history, excuses, pulse, pulses, ghlLocationId: app.deps.env.GHL_LOCATION_ID, playbook, overrides });
     },
   );
 
@@ -143,6 +150,30 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
         entityId: broker.brokerId,
         before: before ? { engagement: before.engagement, attitude: before.attitude, supportNeeded: before.supportNeeded } : null,
         after: { weekStart: request.body.weekStart, engagement: request.body.engagement, attitude: request.body.attitude, supportNeeded: request.body.supportNeeded },
+      });
+      return { ok: true as const };
+    },
+  );
+
+  r.put(
+    "/v1/admin/coaching/brokers/:id/topic",
+    { schema: { params: z.object({ id: z.uuid() }), body: topicOverrideBodySchema, response: { 200: z.object({ ok: z.literal(true) }) } } },
+    async (request) => {
+      const coach = requireCoach(app);
+      const actor = currentActor(request);
+      const broker = (await loadPortalBrokers(app.deps.db)).get(request.params.id);
+      if (!broker) throw notFound("No broker with that id.");
+      const { weekStart, topic, note } = request.body;
+      if (!(await coach.weeks()).some((w) => w.weekStart === weekStart)) throw notFound("No snapshot for that week.");
+      const [before] = await coach.topicOverrides([weekStart], broker.brokerId);
+      await coach.setTopicOverride({ brokerId: broker.brokerId, weekStart, topic, note: topic ? note : "", userId: actor.userId, userName: actor.name });
+      await writeAudit(app.deps.db, {
+        actorUserId: actor.userId,
+        action: topic ? "coaching.topic_set" : "coaching.topic_cleared",
+        entityType: "broker",
+        entityId: broker.brokerId,
+        before: before?.topic ? { weekStart, topic: before.topic, note: before.note } : null,
+        after: { weekStart, topic, note: topic ? note : "" },
       });
       return { ok: true as const };
     },

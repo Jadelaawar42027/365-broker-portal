@@ -4,7 +4,7 @@
  * grants (copied from coach-api migrations 1764072000000_events, 1764110000000_engine, 1764120000000_ai-layer,
  * 1764130000000_portal-access, 1764190000000_config-v8-playbook: SELECT on config, SELECT (id, name) on leads, and
  * 1764200000000_config-v9-fixed-targets: SELECT and column UPDATE on metric_targets, SELECT/INSERT on the append-only
- * metric_target_changes), with
+ * metric_target_changes; 1764210000000_config-v10-consistency: SELECT and INSERT on the append-only topic_overrides), with
  * COACH_DATABASE_URL logging in as coach_portal. It checks that the app opens one
  * coach_portal connection even with HEALTH_SOURCE=none, that the Coaching store and the lead-matching health adapter
  * both use that same connection, that it reads lead names and the playbook but no other lead column, and that every Coaching route (overview, broker page, pulse insert and update, excuse
@@ -86,7 +86,17 @@ CREATE TRIGGER metric_target_changes_no_update_delete
   BEFORE UPDATE OR DELETE ON coach.metric_target_changes
   FOR EACH ROW EXECUTE FUNCTION coach.events_append_only();
 INSERT INTO coach.metric_targets (metric, target, updated_by_name) VALUES ('promises_kept', 0.8, 'Initial targets (rules v9)'), ('closed_value', 500000, 'Initial targets (rules v9)');
+CREATE TABLE coach.topic_overrides (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, broker_id uuid NOT NULL, week_start date NOT NULL,
+  topic text CHECK (topic IS NULL OR length(topic) BETWEEN 1 AND 120), note text NOT NULL DEFAULT '' CHECK (length(note) <= 280),
+  set_by_user_id uuid, set_by_name text NOT NULL, set_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TRIGGER topic_overrides_no_update_delete
+  BEFORE UPDATE OR DELETE ON coach.topic_overrides
+  FOR EACH ROW EXECUTE FUNCTION coach.events_append_only();
 GRANT USAGE ON SCHEMA coach TO coach_portal;
+GRANT SELECT, INSERT ON coach.topic_overrides TO coach_portal;
+GRANT USAGE ON SEQUENCE coach.topic_overrides_id_seq TO coach_portal;
 GRANT SELECT ON coach.metric_targets, coach.metric_target_changes TO coach_portal;
 GRANT UPDATE (target, updated_by_user_id, updated_by_name, updated_at) ON coach.metric_targets TO coach_portal;
 GRANT INSERT ON coach.metric_target_changes TO coach_portal;
@@ -222,6 +232,18 @@ describe("Coaching routes within coach_portal's grants", () => {
     await expect(coachDb.$client`DELETE FROM coach.metric_target_changes`).rejects.toThrow(/permission denied/);
     await expect(coachDb.$client`DELETE FROM coach.metric_targets`).rejects.toThrow(/permission denied/);
     await expect(coachDb.$client`INSERT INTO coach.metric_targets (metric, target, updated_by_name) VALUES ('x', 1, 'x')`).rejects.toThrow(/permission denied/);
+  });
+
+  it("sets and removes a 1:1 topic override (SELECT and INSERT on the append-only topic_overrides)", async () => {
+    const url = `/v1/admin/coaching/brokers/${brokerA.brokerId}/topic`;
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-11-16", topic: "Pipeline review", note: "Big week" } })).statusCode).toBe(200);
+    const page = (await ctx.call("GET", `/v1/admin/coaching/brokers/${brokerA.brokerId}?week=2026-11-16`, { cookie: owner })).json();
+    expect(page).toMatchObject({ topic: "Pipeline review", topicSource: { source: "override", note: "Big week" } });
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-11-16", topic: null, note: "" } })).statusCode).toBe(200);
+    const rows = await ctx.sql<{ topic: string | null }[]>`SELECT topic FROM coach.topic_overrides WHERE broker_id = ${brokerA.brokerId} ORDER BY id`;
+    expect(rows.map((r) => r.topic)).toEqual(["Pipeline review", null]);
+    const coachDb = ctx.app.deps.coachDb!;
+    await expect(coachDb.$client`DELETE FROM coach.topic_overrides`).rejects.toThrow(/permission denied/);
   });
 
   it("shows a broker their own page", async () => {

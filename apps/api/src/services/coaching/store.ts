@@ -3,8 +3,8 @@
  * Purpose: Reads and writes the coach service's tables (schema "coach") over the same coach_portal connection the lead
  * matching health adapter uses (app.deps.coachDb, opened once from COACH_DATABASE_URL). It stays inside coach_portal's
  * grants: SELECT on coach.weekly_snapshot, config, excuse_checks and excuse_decisions, SELECT (id, name) on coach.leads, INSERT on excuse_decisions,
- * INSERT/UPDATE on manager_pulse, SELECT and UPDATE (target and who/when) on metric_targets and SELECT/INSERT on
- * metric_target_changes; nothing in the portal's own schema. Every query is a postgres.js tagged template
+ * INSERT/UPDATE on manager_pulse, SELECT and UPDATE (target and who/when) on metric_targets, SELECT/INSERT on
+ * metric_target_changes and SELECT/INSERT on topic_overrides (append-only); nothing in the portal's own schema. Every query is a postgres.js tagged template
  * on that connection's client, so values are always sent as parameters; dates are sent as ISO strings cast to
  * timestamptz, because the Drizzle driver leaves postgres.js without a Date serializer.
  *
@@ -26,6 +26,9 @@
  * - targetChanges(limit): the target change log, newest first.
  * - setTarget(input): changes one metric's target and logs the change in one transaction; returns the old target, or
  *   null (nothing changed) when the metric has no target row.
+ * - topicOverrides(weekStarts, brokerId): the newest 1:1 topic override per broker and week for the given weeks (one broker or all).
+ * - brokerTopicOverrides(brokerId): the newest override per week for one broker.
+ * - setTopicOverride(input): appends an override for a broker and week (topic null clears it).
  */
 import type { Database } from "@bp/db";
 
@@ -79,6 +82,8 @@ export type PulseRow = {
   reviewerName: string;
   updatedAt: string;
 };
+
+export type TopicOverrideRow = { brokerId: string; weekStart: string; topic: string | null; note: string; setByName: string; setAt: string };
 
 export type CoachStore = ReturnType<typeof createCoachStore>;
 
@@ -201,6 +206,32 @@ export function createCoachStore(coachDb: Database) {
           VALUES (${input.metric}, ${row.target}, ${input.target}, ${input.userId}, ${input.userName})`;
         return { oldTarget: row.target };
       });
+    },
+
+    async topicOverrides(weekStarts: string[], brokerId?: string): Promise<TopicOverrideRow[]> {
+      if (!weekStarts.length) return [];
+      const rows = await sql<Array<Omit<TopicOverrideRow, "setAt"> & { setAt: Date }>>`
+        SELECT DISTINCT ON (broker_id, week_start) broker_id AS "brokerId", to_char(week_start, 'YYYY-MM-DD') AS "weekStart",
+               topic, note, set_by_name AS "setByName", set_at AS "setAt"
+        FROM coach.topic_overrides
+        WHERE week_start = ANY(${weekStarts}::text[]::date[]) AND (${brokerId ?? null}::uuid IS NULL OR broker_id = ${brokerId ?? null}::uuid)
+        ORDER BY broker_id, week_start, set_at DESC, id DESC`;
+      return rows.map((r) => ({ ...r, setAt: new Date(r.setAt).toISOString() }));
+    },
+
+    async brokerTopicOverrides(brokerId: string): Promise<TopicOverrideRow[]> {
+      const rows = await sql<Array<Omit<TopicOverrideRow, "setAt"> & { setAt: Date }>>`
+        SELECT DISTINCT ON (week_start) broker_id AS "brokerId", to_char(week_start, 'YYYY-MM-DD') AS "weekStart",
+               topic, note, set_by_name AS "setByName", set_at AS "setAt"
+        FROM coach.topic_overrides WHERE broker_id = ${brokerId}
+        ORDER BY week_start, set_at DESC, id DESC`;
+      return rows.map((r) => ({ ...r, setAt: new Date(r.setAt).toISOString() }));
+    },
+
+    async setTopicOverride(input: { brokerId: string; weekStart: string; topic: string | null; note: string; userId: string; userName: string }): Promise<void> {
+      await sql`
+        INSERT INTO coach.topic_overrides (broker_id, week_start, topic, note, set_by_user_id, set_by_name)
+        VALUES (${input.brokerId}, ${input.weekStart}, ${input.topic}, ${input.note}, ${input.userId}, ${input.userName})`;
     },
 
     async savePulse(input: { brokerId: string; weekStart: string; userId: string; userName: string; engagement: number; attitude: number; supportNeeded: string }): Promise<void> {

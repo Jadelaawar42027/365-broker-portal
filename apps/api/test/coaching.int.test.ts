@@ -2,7 +2,8 @@
  * File: apps/api/test/coaching.int.test.ts
  * Purpose: Integration tests for the Coaching section: leadership reads the overview and a broker's page, Shelly's
  * pulse and excuse decisions are saved and audit-logged, fixed targets are edited with a change log and audit_log
- * (typed values range-checked and converted), the section answers 503 when the coach database isn't
+ * (typed values range-checked and converted), an admin's 1:1 topic override shows on the overview, the broker page and
+ * its history and is audit-logged (and can be removed), the section answers 503 when the coach database isn't
  * connected, and a broker's own coaching route only ever returns their own data (no IDOR), with pulse notes hidden.
  *
  * Functions:
@@ -93,6 +94,39 @@ describe("leadership", () => {
     }
     expect((await ctx.call("PUT", "/v1/admin/coaching/targets/made_up", { cookie: owner, body: { value: 5 } })).statusCode).toBe(400);
     expect((await ctx.call("PUT", "/v1/admin/coaching/targets/hot_pipeline", { cookie: owner, body: { value: 5 } })).statusCode).toBe(404);
+  });
+
+  it("sets a 1:1 topic override, shows it with who set it and the note, logs it, and can remove it", async () => {
+    const url = `/v1/admin/coaching/brokers/${brokerB.brokerId}/topic`;
+    const body = { weekStart: "2026-11-16", topic: "Hand-offs from setters", note: "Two setter leads waited a day" };
+    expect((await ctx.call("PUT", url, { cookie: owner, body })).statusCode).toBe(200);
+
+    const overview = (await ctx.call("GET", "/v1/admin/coaching/overview", { cookie: owner })).json();
+    const item = overview.needsOneOnOne.find((x: { brokerId: string }) => x.brokerId === brokerB.brokerId);
+    expect(item.details.focus).toMatchObject({ topic: "Hand-offs from setters", source: "override", note: "Two setter leads waited a day" });
+    expect(item.topic).toBe("Hand-offs from setters");
+
+    const page = (await ctx.call("GET", `/v1/admin/coaching/brokers/${brokerB.brokerId}?week=2026-11-16`, { cookie: owner })).json();
+    expect(page.topic).toBe("Hand-offs from setters");
+    expect(page.topicSource).toMatchObject({ source: "override", note: "Two setter leads waited a day" });
+    expect(page.history[0]).toMatchObject({ weekStart: "2026-11-16", topic: "Hand-offs from setters", topicSource: { source: "override" } });
+
+    const rows = await ctx.db.select().from(auditLog).where(eq(auditLog.action, "coaching.topic_set"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.after).toEqual(body);
+
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-11-16", topic: null, note: "" } })).statusCode).toBe(200);
+    const cleared = (await ctx.call("GET", `/v1/admin/coaching/brokers/${brokerB.brokerId}?week=2026-11-16`, { cookie: owner })).json();
+    expect(cleared.topicSource?.source).not.toBe("override");
+    expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "coaching.topic_cleared"))).toHaveLength(1);
+  });
+
+  it("rejects a topic override that is too long, for a week with no snapshot, or for an unknown broker", async () => {
+    const url = `/v1/admin/coaching/brokers/${brokerB.brokerId}/topic`;
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-11-16", topic: "x", note: "n".repeat(281) } })).statusCode).toBe(400);
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-11-16", topic: "t".repeat(121), note: "" } })).statusCode).toBe(400);
+    expect((await ctx.call("PUT", url, { cookie: owner, body: { weekStart: "2026-10-05", topic: "x", note: "" } })).statusCode).toBe(404);
+    expect((await ctx.call("PUT", "/v1/admin/coaching/brokers/00000000-0000-4000-8000-000000000000/topic", { cookie: owner, body: { weekStart: "2026-11-16", topic: "x", note: "" } })).statusCode).toBe(404);
   });
 
   it("rejects an invalid pulse", async () => {

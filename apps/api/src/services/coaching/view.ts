@@ -15,8 +15,10 @@
  * - oneOnOneCells(snapshot): every metric's status, value, target, points, weight, detail and evidence, for the 1:1 details.
  * - coachingEntries(playbook): the playbook's coaching entries (topic, question, things to agree) by metric; plain strings are skipped.
  * - evidenceLeadIds(snapshots): every lead id behind the behaviour metrics' evidence, to look up their names.
+ * - toOverride(row): a stored topic override as the 1:1 logic takes it (set by the admin's first name), or null.
+ * - topicSource(focus): where a week's topic came from (behaviour gap, results review or an admin's override), for the broker page.
  * - buildOverview(input): the team overview: totals (calls reviewed summed from the snapshots, by call date), who needs a 1:1 (full scores only, highest first, with plain-language details: last week's focus, what's slipping with example leads, results and this week's focus), and every broker's row (full scores highest first, then provisional highest first, then no score A-Z).
- * - buildBrokerPage(input): one broker's page: header numbers, focus areas with evidence, all metrics with an 8-week history, excused misses, topic, results context, pulse and 1:1 history.
+ * - buildBrokerPage(input): one broker's page: header numbers, focus areas with evidence, all metrics with an 8-week history, excused misses, the week's 1:1 topic (override, results review or behaviour gap, as on the overview), results context, pulse and 1:1 history with each week's topic and who set it.
  */
 import {
   COACHING_METRICS,
@@ -29,13 +31,16 @@ import {
   needsOneOnOneReason,
   oneOnOneTopic,
   scoreGroup,
+  weeklyFocus,
+  type TopicOverride,
+  type WeeklyFocus,
   type CoachingBrokerResponse,
   type CoachingMetricId,
   type CoachingOverviewResponse,
   type CoachingStatus,
   type CoachingWeek,
 } from "@bp/shared";
-import type { ExcuseRow, PulseRow, SnapshotRow } from "./store";
+import type { ExcuseRow, PulseRow, SnapshotRow, TopicOverrideRow } from "./store";
 
 export type PortalBroker = { brokerId: string; name: string; level: string; status: string };
 
@@ -103,6 +108,15 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
+export function toOverride(row: TopicOverrideRow | undefined): TopicOverride | null {
+  if (!row) return null;
+  return { topic: row.topic, note: row.note, setBy: row.setByName.trim().split(/\s+/)[0] ?? row.setByName };
+}
+
+function topicSource(focus: WeeklyFocus | null) {
+  return focus ? { source: focus.source, setBy: focus.setBy, note: focus.note, automaticTopic: focus.automaticTopic } : null;
+}
+
 export function buildOverview(input: {
   weeks: Array<{ weekStart: string; isoWeek: string }>;
   week: { weekStart: string; isoWeek: string } | null;
@@ -114,7 +128,10 @@ export function buildOverview(input: {
   playbook?: Record<string, unknown>;
   leadNames?: Map<string, string>;
   ghlLocationId?: string;
+  overrides?: TopicOverrideRow[];
 }): CoachingOverviewResponse {
+  const overrideOf = (s: SnapshotRow | undefined) =>
+    s ? toOverride((input.overrides ?? []).find((o) => o.brokerId === s.brokerId && o.weekStart === s.weekStart)) : null;
   const playbook = coachingEntries(input.playbook ?? {});
   const byBroker = (list: SnapshotRow[] | undefined) => new Map((list ?? []).map((s) => [s.brokerId, s]));
   const previous = byBroker(input.previousSnapshots);
@@ -179,6 +196,9 @@ export function buildOverview(input: {
         playbook,
         leadName: (id) => input.leadNames?.get(id) ?? null,
         ghlUrl: (id) => ghlContactUrl(input.ghlLocationId, id),
+        override: overrideOf(current.get(r.brokerId)),
+        previousOverride: overrideOf(prev),
+        twoBackOverride: overrideOf(back),
       });
       return [{ brokerId: r.brokerId, name: r.name, score: r.score, provisional: r.provisional, trend: r.trend, reason, topic: details.focus?.topic ?? null, details }];
     }),
@@ -195,7 +215,13 @@ export function buildBrokerPage(input: {
   pulse: PulseRow | null;
   pulses: PulseRow[];
   ghlLocationId: string | undefined;
+  playbook?: Record<string, unknown>;
+  overrides?: TopicOverrideRow[];
 }): CoachingBrokerResponse {
+  const entries = coachingEntries(input.playbook ?? {});
+  const focusOf = (h: SnapshotRow) => weeklyFocus(oneOnOneCells(h), entries, toOverride((input.overrides ?? []).find((o) => o.weekStart === h.weekStart)));
+  const currentFocus = input.week ? (input.history.find((h) => h.weekStart === input.week!.weekStart) ?? null) : null;
+  const weekFocus = currentFocus ? focusOf(currentFocus) : null;
   const current = input.week ? (input.history.find((h) => h.weekStart === input.week!.weekStart) ?? null) : null;
   const oldestFirst = [...input.history].slice(0, 8).reverse();
   const withLink = (e: { leadId: string; at: string; note: string }) => ({ leadId: e.leadId, at: e.at, note: e.note, ghlUrl: ghlContactUrl(input.ghlLocationId, e.leadId) });
@@ -233,13 +259,17 @@ export function buildBrokerPage(input: {
       decidedBy: e.decidedBy,
       ghlUrl: ghlContactUrl(input.ghlLocationId, e.leadId),
     })),
-    topic: current ? oneOnOneTopic(cellsOf(current), focus) : null,
+    topic: weekFocus?.topic ?? null,
+    topicSource: topicSource(weekFocus),
     context: current?.context ?? {},
     pulse: toPulse(input.pulse),
     history: input.history.map((h) => ({
       weekStart: h.weekStart,
       isoWeek: h.isoWeek,
-      topic: oneOnOneTopic(cellsOf(h), focusMetrics(h)),
+      ...(() => {
+        const f = focusOf(h);
+        return { topic: f?.topic ?? null, topicSource: topicSource(f) };
+      })(),
       pulse: toPulse(pulseByWeek.get(h.weekStart)),
     })),
   };
