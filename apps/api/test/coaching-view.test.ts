@@ -43,11 +43,11 @@ describe("buildOverview", () => {
     const v4 = buildOverview({
       weeks: [week],
       week,
-      snapshots: [snapshot(A, week.weekStart, { metrics: { attendance: { value: 0.56, points: 56, target: 0.46, status: "green", sample: 9 } } })],
+      snapshots: [snapshot(A, week.weekStart, { metrics: { showing_conversion: { value: 0.56, points: 56, target: 0.46, status: "green", sample: 9 } } })],
       brokers,
       excusesToConfirm: 0,
     });
-    expect(v4.brokers[0]!.metrics.attendance).toMatchObject({ value: 0.56, points: 56, status: "green" });
+    expect(v4.brokers[0]!.metrics.showing_conversion).toMatchObject({ value: 0.56, points: 56, status: "green" });
   });
 
   it("flags who needs a 1:1 with the reason and topic", () => {
