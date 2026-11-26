@@ -98,8 +98,11 @@ describe("plain sentences", () => {
     expect(slippingSentence("promises_kept", amber(0.6, 0.643, 60, 7))).toBe("60% of promises to clients were kept on time (target: 64% or more)");
     expect(slippingSentence("call_quality", amber(57.3, 57.9, 57.3, 8))).toBe("Calls rate 57 out of 100 on the call checklist (target: 58 or more)");
     expect(slippingSentence("call_quality", amber(57.5, 58.2, 57.5, 8))).toBe("Calls rate 57.5 out of 100 on the call checklist (target: 58.2 or more)");
+    expect(slippingSentence("speed_to_follow", red(58.9, 75, 58.9, 10, { detail: { median_work_minutes_to_next_touch: 64.5, fast_share: 0.4, scheduled_share: 0.333 } }))).toBe(
+      "Client heard back within 2 working hours after 40% of calls; a next contact was booked after 33% (target: 75 or more)",
+    );
     expect(slippingSentence("speed_to_follow", red(33.3, 61, 33.3, 10, { detail: { median_work_minutes_to_next_touch: 540 } }))).toBe(
-      "After calls, the next contact usually comes about 9 working hours later; follow-up rates 33 out of 100 (target: 61 or more)",
+      "Follow-up after calls rates 33 out of 100 (target: 61 or more)",
     );
     expect(workTime(35)).toBe("35 minutes");
   });

@@ -13,6 +13,7 @@ export * from "./api-steps";
 export * from "./api-training";
 export * from "./api-coaching";
 export * from "./coaching-one-on-one";
+export * from "./coaching-targets";
 export * from "./chapters";
 export * from "./commission";
 export * from "./contact";

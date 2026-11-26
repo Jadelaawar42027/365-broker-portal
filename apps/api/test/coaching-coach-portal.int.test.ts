@@ -2,11 +2,14 @@
  * File: apps/api/test/coaching-coach-portal.int.test.ts
  * Purpose: Integration test for the Coaching section against coach-api's real tables and the coach_portal role's real
  * grants (copied from coach-api migrations 1764072000000_events, 1764110000000_engine, 1764120000000_ai-layer,
- * 1764130000000_portal-access and 1764190000000_config-v8-playbook: SELECT on config, SELECT (id, name) on leads), with
+ * 1764130000000_portal-access, 1764190000000_config-v8-playbook: SELECT on config, SELECT (id, name) on leads, and
+ * 1764200000000_config-v9-fixed-targets: SELECT and column UPDATE on metric_targets, SELECT/INSERT on the append-only
+ * metric_target_changes), with
  * COACH_DATABASE_URL logging in as coach_portal. It checks that the app opens one
  * coach_portal connection even with HEALTH_SOURCE=none, that the Coaching store and the lead-matching health adapter
  * both use that same connection, that it reads lead names and the playbook but no other lead column, and that every Coaching route (overview, broker page, pulse insert and update, excuse
- * confirm then reject, the broker's own page) works within coach_portal's grants.
+ * confirm then reject, editing a target with its change log, the broker's own page) works within coach_portal's grants,
+ * and that coach_portal cannot rewrite or delete the target change log.
  *
  * Functions:
  * - asCoachPortal(url): the test database URL with coach_portal's login in place of the owner's.
@@ -71,7 +74,23 @@ BEGIN
   END IF;
 END
 $$;
+CREATE TABLE coach.metric_targets (
+  metric text PRIMARY KEY, target numeric NOT NULL CHECK (target > 0), updated_by_user_id uuid, updated_by_name text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE coach.metric_target_changes (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, metric text NOT NULL, old_target numeric, new_target numeric NOT NULL,
+  changed_by_user_id uuid, changed_by_name text NOT NULL, changed_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TRIGGER metric_target_changes_no_update_delete
+  BEFORE UPDATE OR DELETE ON coach.metric_target_changes
+  FOR EACH ROW EXECUTE FUNCTION coach.events_append_only();
+INSERT INTO coach.metric_targets (metric, target, updated_by_name) VALUES ('promises_kept', 0.8, 'Initial targets (rules v9)'), ('closed_value', 500000, 'Initial targets (rules v9)');
 GRANT USAGE ON SCHEMA coach TO coach_portal;
+GRANT SELECT ON coach.metric_targets, coach.metric_target_changes TO coach_portal;
+GRANT UPDATE (target, updated_by_user_id, updated_by_name, updated_at) ON coach.metric_targets TO coach_portal;
+GRANT INSERT ON coach.metric_target_changes TO coach_portal;
+GRANT USAGE ON SEQUENCE coach.metric_target_changes_id_seq TO coach_portal;
 GRANT SELECT ON coach.weekly_snapshot, coach.excuse_checks, coach.call_reviews, coach.config TO coach_portal;
 GRANT SELECT (id, name) ON coach.leads TO coach_portal;
 GRANT SELECT, INSERT, UPDATE ON coach.manager_pulse TO coach_portal;
@@ -187,6 +206,22 @@ describe("Coaching routes within coach_portal's grants", () => {
     expect(decisions.map((row) => row.decision)).toEqual(["confirm", "reject"]);
     const page = await ctx.call("GET", `/v1/admin/coaching/brokers/${brokerB.brokerId}?week=2026-11-16`, { cookie: owner });
     expect(page.json().excuses[0].decision).toBe("reject");
+  });
+
+  it("edits a target and logs the change (column UPDATE on metric_targets, INSERT on the change log)", async () => {
+    const res = await ctx.call("PUT", "/v1/admin/coaching/targets/promises_kept", { cookie: owner, body: { value: 75 } });
+    expect(res.statusCode).toBe(200);
+    const page = (await ctx.call("GET", "/v1/admin/coaching/targets", { cookie: owner })).json();
+    expect(page.targets).toEqual([
+      expect.objectContaining({ metric: "promises_kept", target: 0.75 }),
+      expect.objectContaining({ metric: "closed_value", target: 500000 }),
+    ]);
+    expect(page.changes).toEqual([expect.objectContaining({ metric: "promises_kept", oldTarget: 0.8, newTarget: 0.75 })]);
+    const coachDb = ctx.app.deps.coachDb!;
+    await expect(coachDb.$client`UPDATE coach.metric_target_changes SET new_target = 1`).rejects.toThrow(/append-only|permission denied/);
+    await expect(coachDb.$client`DELETE FROM coach.metric_target_changes`).rejects.toThrow(/permission denied/);
+    await expect(coachDb.$client`DELETE FROM coach.metric_targets`).rejects.toThrow(/permission denied/);
+    await expect(coachDb.$client`INSERT INTO coach.metric_targets (metric, target, updated_by_name) VALUES ('x', 1, 'x')`).rejects.toThrow(/permission denied/);
   });
 
   it("shows a broker their own page", async () => {

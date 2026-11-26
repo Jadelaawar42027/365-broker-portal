@@ -2,8 +2,9 @@
  * File: apps/api/src/services/coaching/store.ts
  * Purpose: Reads and writes the coach service's tables (schema "coach") over the same coach_portal connection the lead
  * matching health adapter uses (app.deps.coachDb, opened once from COACH_DATABASE_URL). It stays inside coach_portal's
- * grants: SELECT on coach.weekly_snapshot, config, excuse_checks and excuse_decisions, SELECT (id, name) on coach.leads, INSERT on excuse_decisions
- * and INSERT/UPDATE on manager_pulse; nothing in the portal's own schema. Every query is a postgres.js tagged template
+ * grants: SELECT on coach.weekly_snapshot, config, excuse_checks and excuse_decisions, SELECT (id, name) on coach.leads, INSERT on excuse_decisions,
+ * INSERT/UPDATE on manager_pulse, SELECT and UPDATE (target and who/when) on metric_targets and SELECT/INSERT on
+ * metric_target_changes; nothing in the portal's own schema. Every query is a postgres.js tagged template
  * on that connection's client, so values are always sent as parameters; dates are sent as ISO strings cast to
  * timestamptz, because the Drizzle driver leaves postgres.js without a Date serializer.
  *
@@ -21,6 +22,10 @@
  * - pulse(brokerId, weekStart): Shelly's pulse for a broker and week, or null.
  * - pulses(brokerId): every pulse for a broker, newest first.
  * - savePulse(input): creates or updates the pulse for a broker and week.
+ * - targets(): every metric's fixed target with who changed it last and when.
+ * - targetChanges(limit): the target change log, newest first.
+ * - setTarget(input): changes one metric's target and logs the change in one transaction; returns the old target, or
+ *   null (nothing changed) when the metric has no target row.
  */
 import type { Database } from "@bp/db";
 
@@ -167,6 +172,35 @@ export function createCoachStore(coachDb: Database) {
                support_needed AS "supportNeeded", reviewer_name AS "reviewerName", updated_at AS "updatedAt"
         FROM coach.manager_pulse WHERE broker_id = ${brokerId} ORDER BY week_start DESC LIMIT 26`;
       return rows.map((r) => ({ ...r, updatedAt: new Date(r.updatedAt).toISOString() }));
+    },
+
+    async targets(): Promise<Array<{ metric: string; target: number; updatedByName: string; updatedAt: string }>> {
+      const rows = await sql<Array<{ metric: string; target: number; updatedByName: string; updatedAt: Date }>>`
+        SELECT metric, target::float8 AS target, updated_by_name AS "updatedByName", updated_at AS "updatedAt" FROM coach.metric_targets`;
+      return rows.map((r) => ({ ...r, updatedAt: new Date(r.updatedAt).toISOString() }));
+    },
+
+    async targetChanges(limit: number): Promise<Array<{ metric: string; oldTarget: number | null; newTarget: number; changedByName: string; changedAt: string }>> {
+      const rows = await sql<Array<{ metric: string; oldTarget: number | null; newTarget: number; changedByName: string; changedAt: Date }>>`
+        SELECT metric, old_target::float8 AS "oldTarget", new_target::float8 AS "newTarget", changed_by_name AS "changedByName", changed_at AS "changedAt"
+        FROM coach.metric_target_changes ORDER BY changed_at DESC, id DESC LIMIT ${limit}`;
+      return rows.map((r) => ({ ...r, changedAt: new Date(r.changedAt).toISOString() }));
+    },
+
+    async setTarget(input: { metric: string; target: number; userId: string; userName: string }): Promise<{ oldTarget: number } | null> {
+      return sql.begin(async (tx) => {
+        const [row] = await tx<Array<{ target: number }>>`
+          SELECT target::float8 AS target FROM coach.metric_targets WHERE metric = ${input.metric} FOR UPDATE`;
+        if (!row) return null;
+        await tx`
+          UPDATE coach.metric_targets SET target = ${input.target}, updated_by_user_id = ${input.userId},
+            updated_by_name = ${input.userName}, updated_at = now()
+          WHERE metric = ${input.metric}`;
+        await tx`
+          INSERT INTO coach.metric_target_changes (metric, old_target, new_target, changed_by_user_id, changed_by_name)
+          VALUES (${input.metric}, ${row.target}, ${input.target}, ${input.userId}, ${input.userName})`;
+        return { oldTarget: row.target };
+      });
     },
 
     async savePulse(input: { brokerId: string; weekStart: string; userId: string; userName: string; engagement: number; attitude: number; supportNeeded: string }): Promise<void> {

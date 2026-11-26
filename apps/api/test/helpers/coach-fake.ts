@@ -1,8 +1,8 @@
 /**
  * File: apps/api/test/helpers/coach-fake.ts
  * Purpose: An in-memory stand-in for the coach service's store, so Coaching routes and views can be tested without the
- * coach database. Snapshots, excuses, pulses, the playbook and lead names are plain seed values the test fills in;
- * decisions and pulses are recorded.
+ * coach database. Snapshots, excuses, pulses, the playbook, lead names and targets are plain seed values the test fills in;
+ * decisions, pulses and target changes are recorded.
  *
  * Functions:
  * - snapshot(brokerId, weekStart, overrides): a weekly snapshot row with sensible defaults.
@@ -37,8 +37,17 @@ export function snapshot(brokerId: string, weekStart: string, overrides: Partial
 }
 
 export function createFakeCoachStore(
-  seed: { snapshots?: SnapshotRow[]; excuses?: ExcuseRow[]; pulses?: PulseRow[]; playbook?: Record<string, unknown>; leadNames?: Record<string, string> } = {},
+  seed: {
+    snapshots?: SnapshotRow[];
+    excuses?: ExcuseRow[];
+    pulses?: PulseRow[];
+    playbook?: Record<string, unknown>;
+    leadNames?: Record<string, string>;
+    targets?: Record<string, number>;
+  } = {},
 ) {
+  const targets = new Map(Object.entries(seed.targets ?? {}).map(([metric, target]) => [metric, { metric, target, updatedByName: "Initial targets", updatedAt: "2026-11-26T12:00:00.000Z" }]));
+  const targetChanges: Array<{ metric: string; oldTarget: number | null; newTarget: number; changedByName: string; changedAt: string }> = [];
   const snapshots = seed.snapshots ?? [];
   const excuses = seed.excuses ?? [];
   const pulses = seed.pulses ?? [];
@@ -63,6 +72,16 @@ export function createFakeCoachStore(
       if (i >= 0) pulses[i] = row;
       else pulses.push(row);
     },
+    targets: async () => [...targets.values()],
+    targetChanges: async (limit) => targetChanges.slice(0, limit),
+    setTarget: async (input) => {
+      const row = targets.get(input.metric);
+      if (!row) return null;
+      const changedAt = new Date().toISOString();
+      targets.set(input.metric, { metric: input.metric, target: input.target, updatedByName: input.userName, updatedAt: changedAt });
+      targetChanges.unshift({ metric: input.metric, oldTarget: row.target, newTarget: input.target, changedByName: input.userName, changedAt });
+      return { oldTarget: row.target };
+    },
   } satisfies CoachStore;
-  return { store, decisions, pulses };
+  return { store, decisions, pulses, targetChanges };
 }

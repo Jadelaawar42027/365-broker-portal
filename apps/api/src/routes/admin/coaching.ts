@@ -9,20 +9,29 @@
  * - pickWeek(weeks, requested): the requested snapshot week if it exists, else the newest one, else null.
  * - loadPortalBrokers(db): every broker's id, name, level and status from the portal tables.
  * - registerAdminCoachingRoutes(app): mounts GET /v1/admin/coaching/overview, GET /v1/admin/coaching/brokers/:id,
- *   POST /v1/admin/coaching/excuses/decision and PUT /v1/admin/coaching/brokers/:id/pulse.
+ *   POST /v1/admin/coaching/excuses/decision, PUT /v1/admin/coaching/brokers/:id/pulse, GET /v1/admin/coaching/targets
+ *   and PUT /v1/admin/coaching/targets/:metric (the typed value is range-checked, converted, saved with the change log
+ *   and audit-logged; the new colour applies from the next engine run and Monday snapshot).
  */
 import { brokers, users, type DbOrTx } from "@bp/db";
 import {
+  COACHING_METRICS,
   coachingBrokerResponseSchema,
+  coachingMetricSchema,
   coachingOverviewResponseSchema,
+  coachingTargetBodySchema,
+  coachingTargetsResponseSchema,
   excuseDecisionBodySchema,
   pulseBodySchema,
+  targetFromInput,
+  targetRangeError,
+  type CoachingMetricId,
 } from "@bp/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { HttpError, notFound } from "../../errors";
+import { badRequest, HttpError, notFound } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { writeAudit } from "../../services/audit";
 import type { CoachStore } from "../../services/coaching/store";
@@ -136,6 +145,41 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
         after: { weekStart: request.body.weekStart, engagement: request.body.engagement, attitude: request.body.attitude, supportNeeded: request.body.supportNeeded },
       });
       return { ok: true as const };
+    },
+  );
+
+  r.get("/v1/admin/coaching/targets", { schema: { response: { 200: coachingTargetsResponseSchema } } }, async () => {
+    const coach = requireCoach(app);
+    const known = new Set<string>(COACHING_METRICS);
+    const [targets, changes] = await Promise.all([coach.targets(), coach.targetChanges(50)]);
+    const order = (m: string) => COACHING_METRICS.indexOf(m as CoachingMetricId);
+    return {
+      targets: targets.filter((t) => known.has(t.metric)).sort((a, b) => order(a.metric) - order(b.metric)) as Array<(typeof targets)[number] & { metric: CoachingMetricId }>,
+      changes: changes.filter((c) => known.has(c.metric)) as Array<(typeof changes)[number] & { metric: CoachingMetricId }>,
+    };
+  });
+
+  r.put(
+    "/v1/admin/coaching/targets/:metric",
+    { schema: { params: z.object({ metric: coachingMetricSchema }), body: coachingTargetBodySchema, response: { 200: z.object({ ok: z.literal(true), target: z.number() }) } } },
+    async (request) => {
+      const coach = requireCoach(app);
+      const actor = currentActor(request);
+      const { metric } = request.params;
+      const problem = targetRangeError(metric, request.body.value);
+      if (problem) throw badRequest(problem);
+      const target = targetFromInput(metric, request.body.value);
+      const saved = await coach.setTarget({ metric, target, userId: actor.userId, userName: actor.name });
+      if (!saved) throw notFound("That metric has no target to change.");
+      await writeAudit(app.deps.db, {
+        actorUserId: actor.userId,
+        action: "coaching.target_changed",
+        entityType: "user",
+        entityId: actor.userId,
+        before: { metric, target: saved.oldTarget },
+        after: { metric, target },
+      });
+      return { ok: true as const, target };
     },
   );
 }
