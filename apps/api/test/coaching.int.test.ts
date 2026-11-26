@@ -39,10 +39,10 @@ beforeAll(async () => {
 afterAll(() => ctx?.close());
 
 describe("leadership", () => {
-  it("sees the team overview, worst score first", async () => {
+  it("sees the team overview, highest score first", async () => {
     const res = await ctx.call("GET", "/v1/admin/coaching/overview", { cookie: owner });
     expect(res.statusCode).toBe(200);
-    expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Broker B", "Broker A"]);
+    expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Broker A", "Broker B"]);
   });
 
   it("sees any broker's page", async () => {

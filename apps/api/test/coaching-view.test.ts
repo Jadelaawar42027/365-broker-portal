@@ -1,6 +1,7 @@
 /**
  * File: apps/api/test/coaching-view.test.ts
- * Purpose: Unit tests for the Coaching view builders: worst score first, team totals (calls reviewed summed from the
+ * Purpose: Unit tests for the Coaching view builders: full scores highest first, then provisional, then no score A-Z;
+ * who needs a 1:1 (full scores only, highest first, every metric below target, the topic one of them); team totals (calls reviewed summed from the
  * snapshots), who needs a 1:1, all twelve metric cells with each metric's own points (v4 snapshots), the 90-day window flag, GHL evidence links, the 8-week metric history with speed to
  * follow's detail, and the 1:1 history with Shelly's pulse.
  *
@@ -32,11 +33,11 @@ describe("buildOverview", () => {
     excusesToConfirm: 2,
   });
 
-  it("lists portal brokers only, worst score first, with all twelve metric cells", () => {
-    expect(overview.brokers.map((b) => b.name)).toEqual(["Ben", "Ana"]);
+  it("lists portal brokers only, highest score first, with all twelve metric cells", () => {
+    expect(overview.brokers.map((b) => b.name)).toEqual(["Ana", "Ben"]);
     expect(Object.keys(overview.brokers[0]!.metrics)).toHaveLength(12);
-    expect(overview.brokers[0]!.metrics.call_quality).toEqual({ value: null, points: null, target: null, targetPlaceholder: false, status: "unknown", sample: 0, windowDays: null });
-    expect(overview.brokers[0]!.metrics.speed_to_follow).toEqual({ value: 55, points: null, target: 60, targetPlaceholder: false, status: "amber", sample: 4, windowDays: 90 });
+    expect(overview.brokers[1]!.metrics.call_quality).toEqual({ value: null, points: null, weight: null, target: null, targetPlaceholder: false, status: "unknown", sample: 0, windowDays: null });
+    expect(overview.brokers[1]!.metrics.speed_to_follow).toEqual({ value: 55, points: null, weight: null, target: 60, targetPlaceholder: false, status: "amber", sample: 4, windowDays: 90 });
   });
 
   it("passes each metric's own points through from v4 snapshots", () => {
@@ -52,8 +53,57 @@ describe("buildOverview", () => {
 
   it("flags who needs a 1:1 with the reason and topic", () => {
     expect(overview.needsOneOnOne).toEqual([
-      { brokerId: B, name: "Ben", score: 72, provisional: false, trend: -3, reason: "Off target: on-time touches 60%", topic: "On-time touches: Go through the pipeline together" },
+      { brokerId: B, name: "Ben", score: 72, provisional: false, trend: -3, reason: "Off target: on-time touches 60% (≥ 80%), speed to follow 55 (≥ 60)", topic: "On-time touches: Go through the pipeline together" },
     ]);
+  });
+
+  describe("ordering and who needs a 1:1 (week 47 shapes)", () => {
+    const ids = ["c", "j", "b", "p", "m", "a"].map((x) => `00000000-0000-4000-8000-0000000000${x}${x}`);
+    const people = new Map(
+      ["Charlie", "James", "Ben", "Peter", "Mark", "Alex"].map((name, i) => [ids[i]!, { brokerId: ids[i]!, name, level: "senior", status: "active" }]),
+    );
+    const cellAt = (status: "green" | "amber" | "red", value: number, target: number, points: number, weight: number) => ({ value, target, status, sample: 9, points, weight });
+    const o = buildOverview({
+      weeks: [week],
+      week,
+      snapshots: [
+        snapshot(ids[4]!, week.weekStart, { score: null, provisional: true, coverage: 0, metrics: {}, focusAreas: [], trend: {} }),
+        snapshot(ids[3]!, week.weekStart, { score: 43.3, provisional: true, coverage: 0.47, metrics: { next_step_coverage: cellAt("red", 0, 0.8, 0, 8) }, trend: { score: 13 } }),
+        snapshot(ids[2]!, week.weekStart, { score: 43.9, metrics: { closes: cellAt("red", 0, 2, 0, 9), showings_completed: cellAt("red", 2, 6, 33.3, 12) }, focusAreas: [{ metric: "closes", action: "Review every deal" }], trend: {} }),
+        snapshot(ids[1]!, week.weekStart, { score: 52, metrics: { closed_value: cellAt("red", 50000, 1000000, 5, 9), responsiveness: cellAt("red", 75, 35, 47.8, 7) }, focusAreas: [{ metric: "closed_value", action: "Fill every deal value" }], trend: {} }),
+        snapshot(ids[0]!, week.weekStart, {
+          score: 71.7,
+          metrics: { on_time_touches: cellAt("amber", 0.541, 0.571, 54.1, 10), showing_conversion: cellAt("green", 0.3, 0.275, 30, 6) },
+          focusAreas: [{ metric: "on_time_touches", action: "Work the due list every morning" }, { metric: "showing_conversion", action: "Propose a showing" }],
+          trend: {},
+        }),
+        snapshot(ids[5]!, week.weekStart, { score: null, provisional: true, coverage: 0, metrics: {}, focusAreas: [], trend: {} }),
+      ],
+      brokers: people,
+      excusesToConfirm: 0,
+    });
+
+    it("table: full scores highest first, then provisional, then no score A-Z", () => {
+      expect(o.brokers.map((b) => [b.name, b.score, b.provisional])).toEqual([
+        ["Charlie", 71.7, false], ["James", 52, false], ["Ben", 43.9, false], ["Peter", 43.3, true], ["Alex", null, true], ["Mark", null, true],
+      ]);
+    });
+
+    it("needs a 1:1: full scores only, highest first; provisional and no-score brokers are left out", () => {
+      expect(o.needsOneOnOne.map((r) => r.name)).toEqual(["Charlie", "James", "Ben"]);
+    });
+
+    it("every metric below target is listed and the topic is always one of them", () => {
+      const charlie = o.needsOneOnOne[0]!;
+      expect(charlie.reason).toBe("Off target: on-time touches 54% (≥ 57%)");
+      expect(charlie.topic).toBe("On-time touches: Work the due list every morning");
+      const james = o.needsOneOnOne[1]!;
+      expect(james.reason).toBe("Off target: closed value $50K (≥ $1M), reply time 75 min (≤ 35 min)");
+      expect(james.topic).toBe("Closed value: Fill every deal value");
+      for (const row of o.needsOneOnOne) {
+        expect(row.reason.toLowerCase()).toContain(row.topic!.split(":")[0]!.toLowerCase());
+      }
+    });
   });
 
   it("totals the team", () => {
