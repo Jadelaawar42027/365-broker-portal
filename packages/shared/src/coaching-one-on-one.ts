@@ -15,7 +15,7 @@
  * - percent(value, target): a share and its target as "54%" and "57%", with one decimal when rounding would make them equal.
  * - outOf100(value, target): a 0-100 rating and its target, with one decimal when rounding would make them equal.
  * - slippingSentence(metric, cell): one plain sentence with the actual number and the target (for follow-up after calls: the two
- *   parts the rating is made of: a follow-up within 2 working hours or on the agreed day, and a booked next contact).
+ *   parts the rating is made of: the share of calls followed up within 2 working hours and the share with a next contact booked).
  * - exampleText(metric, facts): what happened on one lead, in plain words, or null without facts.
  * - count(n, one, many): "1 close" or "3 closes".
  * - resultsLine(cells): showings, hot leads, closes and closed value, each with its time window.
@@ -149,11 +149,11 @@ export function slippingSentence(metric: CoachingMetricId, cell: OneOnOneCell): 
       const [v, t] = outOf100(value, target);
       const fast = cell.detail?.fast_share;
       const booked = cell.detail?.scheduled_share;
-      const lead =
-        typeof fast === "number" && typeof booked === "number"
-          ? `After calls, the client heard back within 2 working hours (or on the agreed day) ${Math.round(fast * 100)}% of the time and a next contact was booked ${Math.round(booked * 100)}% of the time; follow-up`
-          : "Follow-up after calls";
-      return `${lead} rates ${v} out of 100${t ? ` (target: ${t} or more)` : ""}`;
+      const goal = t ? ` (target: ${t} or more)` : "";
+      if (typeof fast === "number" && typeof booked === "number") {
+        return `Client heard back within 2 working hours after ${Math.round(fast * 100)}% of calls; a next contact was booked after ${Math.round(booked * 100)}%${goal}`;
+      }
+      return `Follow-up after calls rates ${v} out of 100${goal}`;
     }
     default:
       return formatCoachingValue(metric, cell.value);
