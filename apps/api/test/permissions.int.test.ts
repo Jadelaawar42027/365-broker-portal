@@ -115,6 +115,7 @@ function adminRoutes(brokerId: string, brokerStepId: string, chapterId = brokerS
     ["POST", "/v1/admin/coaching/excuses/decision", { momentKey: "L:idle:2026-11-20T15:00:00.000Z", decision: "confirm" }],
     ["PUT", `/v1/admin/coaching/brokers/${brokerId}/pulse`, { weekStart: "2026-11-16", engagement: 5, attitude: 5, supportNeeded: "" }],
     ["GET", "/v1/admin/coaching/targets"],
+    ["PUT", `/v1/admin/coaching/brokers/${brokerId}/topic`, { weekStart: "2026-11-16", topic: "x", note: "" }],
     ["PUT", "/v1/admin/coaching/targets/call_quality", { value: 1 }],
   ];
 }

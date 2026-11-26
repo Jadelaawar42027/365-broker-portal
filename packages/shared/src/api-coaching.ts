@@ -26,6 +26,7 @@ import { z } from "zod";
 export const COACHING_METRICS = [
   "speed_to_follow",
   "on_time_touches",
+  "follow_consistency",
   "next_step_coverage",
   "call_quality",
   "responsiveness",
@@ -44,6 +45,7 @@ export const COACHING_METRIC_LABELS: Record<CoachingMetricId, string> = {
   speed_to_follow: "Speed to follow",
   next_step_coverage: "Next step",
   on_time_touches: "On-time touches",
+  follow_consistency: "Follow-up consistency",
   responsiveness: "Reply time",
   showing_conversion: "Showing conversion",
   call_quality: "Call quality",
@@ -58,6 +60,7 @@ export const COACHING_METRIC_LABELS: Record<CoachingMetricId, string> = {
 const BEHAVIOUR_METRICS: ReadonlySet<CoachingMetricId> = new Set([
   "speed_to_follow",
   "on_time_touches",
+  "follow_consistency",
   "next_step_coverage",
   "call_quality",
   "responsiveness",
@@ -100,7 +103,7 @@ const metricCellSchema = z.object({
 });
 
 export const coachingOneOnOneDetailsSchema = z.object({
-  lastWeek: z.object({ text: z.string(), direction: z.enum(["improving", "about the same", "getting worse"]), stuck: z.boolean() }).nullable(),
+  lastWeek: z.object({ text: z.string(), direction: z.enum(["improving", "about the same", "getting worse"]).nullable(), stuck: z.boolean() }).nullable(),
   slipping: z.array(
     z.object({
       metric: coachingMetricSchema,
@@ -109,9 +112,33 @@ export const coachingOneOnOneDetailsSchema = z.object({
     }),
   ),
   results: z.string(),
-  focus: z.object({ topic: z.string(), question: z.string(), agree: z.array(z.string()) }).nullable(),
+  focus: z
+    .object({
+      topic: z.string(),
+      question: z.string(),
+      agree: z.array(z.string()),
+      source: z.enum(["behaviour", "results", "override"]),
+      setBy: z.string().nullable(),
+      note: z.string().nullable(),
+      automaticTopic: z.string().nullable(),
+    })
+    .nullable(),
   focusMessage: z.string().nullable(),
 });
+
+export const coachingTopicSourceSchema = z.object({
+  source: z.enum(["behaviour", "results", "override"]),
+  setBy: z.string().nullable(),
+  note: z.string().nullable(),
+  automaticTopic: z.string().nullable(),
+});
+
+export const topicOverrideBodySchema = z.object({
+  weekStart: z.iso.date(),
+  topic: z.string().trim().min(1).max(120).nullable(),
+  note: z.string().trim().max(280),
+});
+export type TopicOverrideBody = z.infer<typeof topicOverrideBodySchema>;
 
 export const coachingOverviewResponseSchema = z.object({
   configured: z.boolean(),
@@ -211,9 +238,12 @@ export const coachingBrokerResponseSchema = z.object({
     }),
   ),
   topic: z.string().nullable(),
+  topicSource: coachingTopicSourceSchema.nullable(),
   context: z.record(z.string(), z.number().nullable()),
   pulse: coachingPulseSchema.nullable(),
-  history: z.array(z.object({ weekStart: z.string(), isoWeek: z.string(), topic: z.string().nullable(), pulse: coachingPulseSchema.nullable() })),
+  history: z.array(
+    z.object({ weekStart: z.string(), isoWeek: z.string(), topic: z.string().nullable(), topicSource: coachingTopicSourceSchema.nullable(), pulse: coachingPulseSchema.nullable() }),
+  ),
 });
 export type CoachingBrokerResponse = z.infer<typeof coachingBrokerResponseSchema>;
 

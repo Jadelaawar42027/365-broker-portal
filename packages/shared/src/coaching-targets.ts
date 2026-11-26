@@ -20,6 +20,7 @@ export type TargetUnit = "minutes" | "percent" | "points" | "count" | "dollars";
 const UNITS: Record<CoachingMetricId, TargetUnit> = {
   responsiveness: "minutes",
   on_time_touches: "percent",
+  follow_consistency: "percent",
   promises_kept: "percent",
   next_step_coverage: "percent",
   showing_conversion: "percent",
@@ -45,6 +46,7 @@ export const TARGET_WINDOWS: Partial<Record<CoachingMetricId, string>> = {
   closed_value: "per 12 months",
   showings_completed: "per 90 days",
   showing_conversion: "over 90 days",
+  follow_consistency: "of leads with no 7-day gap",
   responsiveness: "in working hours",
 };
 

@@ -2,13 +2,14 @@
  * File: apps/api/test/helpers/coach-fake.ts
  * Purpose: An in-memory stand-in for the coach service's store, so Coaching routes and views can be tested without the
  * coach database. Snapshots, excuses, pulses, the playbook, lead names and targets are plain seed values the test fills in;
- * decisions, pulses and target changes are recorded.
+ * decisions, pulses, target changes and topic overrides are recorded.
  *
  * Functions:
  * - snapshot(brokerId, weekStart, overrides): a weekly snapshot row with sensible defaults.
+ * - latest(rows): the newest override per broker and week, like the real store's DISTINCT ON.
  * - createFakeCoachStore(seed): returns a store with the same methods as the real one, backed by the seed arrays.
  */
-import type { CoachStore, ExcuseRow, PulseRow, SnapshotRow } from "../../src/services/coaching/store";
+import type { CoachStore, ExcuseRow, PulseRow, SnapshotRow, TopicOverrideRow } from "../../src/services/coaching/store";
 
 export function snapshot(brokerId: string, weekStart: string, overrides: Partial<SnapshotRow> = {}): SnapshotRow {
   return {
@@ -36,6 +37,15 @@ export function snapshot(brokerId: string, weekStart: string, overrides: Partial
   };
 }
 
+function latest(rows: TopicOverrideRow[]): TopicOverrideRow[] {
+  const byKey = new Map<string, TopicOverrideRow>();
+  for (const r of rows) {
+    const k = `${r.brokerId}|${r.weekStart}`;
+    if (!byKey.has(k) || byKey.get(k)!.setAt <= r.setAt) byKey.set(k, r);
+  }
+  return [...byKey.values()];
+}
+
 export function createFakeCoachStore(
   seed: {
     snapshots?: SnapshotRow[];
@@ -44,8 +54,10 @@ export function createFakeCoachStore(
     playbook?: Record<string, unknown>;
     leadNames?: Record<string, string>;
     targets?: Record<string, number>;
+    overrides?: TopicOverrideRow[];
   } = {},
 ) {
+  const overrides = seed.overrides ?? [];
   const targets = new Map(Object.entries(seed.targets ?? {}).map(([metric, target]) => [metric, { metric, target, updatedByName: "Initial targets", updatedAt: "2026-11-26T12:00:00.000Z" }]));
   const targetChanges: Array<{ metric: string; oldTarget: number | null; newTarget: number; changedByName: string; changedAt: string }> = [];
   const snapshots = seed.snapshots ?? [];
@@ -82,6 +94,11 @@ export function createFakeCoachStore(
       targetChanges.unshift({ metric: input.metric, oldTarget: row.target, newTarget: input.target, changedByName: input.userName, changedAt });
       return { oldTarget: row.target };
     },
+    topicOverrides: async (weekStarts, brokerId) =>
+      latest(overrides.filter((o) => weekStarts.includes(o.weekStart) && (!brokerId || o.brokerId === brokerId))),
+    brokerTopicOverrides: async (brokerId) => latest(overrides.filter((o) => o.brokerId === brokerId)),
+    setTopicOverride: async (input) =>
+      void overrides.push({ brokerId: input.brokerId, weekStart: input.weekStart, topic: input.topic, note: input.note, setByName: input.userName, setAt: new Date(Date.now() + overrides.length).toISOString() }),
   } satisfies CoachStore;
-  return { store, decisions, pulses, targetChanges };
+  return { store, decisions, pulses, targetChanges, overrides };
 }

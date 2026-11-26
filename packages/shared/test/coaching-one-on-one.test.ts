@@ -1,8 +1,9 @@
 /**
  * File: packages/shared/test/coaching-one-on-one.test.ts
  * Purpose: Unit tests for the "Needs a 1:1 this week" details: what's slipping (behaviour only, largest gap first),
- * this week's focus (never a results metric, never next step, an empty case), "+N more", the plain sentences and
- * example leads, the results line, and last week's focus with the "same focus for 3 weeks" flag.
+ * this week's focus (never a results metric, never next step, an empty case; an admin's override; the results review),
+ * "+N more", the plain sentences and example leads (with follow-up consistency gaps), the results line, and last week's
+ * focus with the "same focus for 3 weeks" flag.
  *
  * Functions:
  * - cell(o): a metric cell with defaults (green, no value).
@@ -17,9 +18,11 @@ import {
   NO_BEHAVIOUR_GAPS,
   ONLY_NEXT_STEP_GAP,
   resultsLine,
+  resultsReview,
   slippingMetrics,
   slippingSentence,
   splitShown,
+  weeklyFocus,
   workTime,
   type OneOnOneCell,
 } from "../src/coaching-one-on-one";
@@ -86,14 +89,61 @@ describe("this week's focus", () => {
       current: { next_step_coverage: red(0, 0.8, 0, 8), on_time_touches: amber(0.444, 0.571, 44.4, 10) },
       previous: null, twoBack: null, playbook, leadName: () => null, ghlUrl: () => null,
     });
-    expect(d.focus).toEqual({ topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning", "A date on every lead"] });
+    expect(d.focus).toEqual({
+      topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning", "A date on every lead"],
+      source: "behaviour", setBy: null, note: null, automaticTopic: null,
+    });
+  });
+
+  it("shows an admin's override instead, with who set it, the note and the automatic topic", () => {
+    const d = buildOneOnOneDetails({
+      current: { on_time_touches: amber(0.444, 0.571, 44.4, 10) },
+      previous: null, twoBack: null, playbook, leadName: () => null, ghlUrl: () => null,
+      override: { topic: "Hand-offs from setters", note: "Two setter leads waited a day", setBy: "Shelly" },
+    });
+    expect(d.focus).toEqual({
+      topic: "Hand-offs from setters", question: "", agree: [], source: "override", setBy: "Shelly", note: "Two setter leads waited a day", automaticTopic: "Consistent follow-ups",
+    });
+  });
+
+  it("a cleared override (no topic) falls back to the automatic topic", () => {
+    const f = weeklyFocus({ on_time_touches: amber(0.444, 0.571, 44.4, 10) }, playbook, { topic: null, note: "", setBy: "Aj" });
+    expect(f).toMatchObject({ source: "behaviour", topic: "Consistent follow-ups" });
+  });
+
+  it("last week's override is named in last week's focus", () => {
+    const d = buildOneOnOneDetails({
+      current: { on_time_touches: amber(0.5, 0.571, 50, 10) },
+      previous: { on_time_touches: amber(0.444, 0.571, 44.4, 10) }, twoBack: null, playbook, leadName: () => null, ghlUrl: () => null,
+      previousOverride: { topic: "Hand-offs from setters", note: "", setBy: "Aj" },
+    });
+    expect(d.lastWeek).toEqual({ text: "Last week: Hand-offs from setters (set by Aj)", direction: null, stuck: false });
+  });
+});
+
+describe("results review", () => {
+  const nearAll = {
+    speed_to_follow: amber(68, 75, 68, 10), promises_kept: amber(0.72, 0.8, 72, 7), call_quality: amber(64, 65, 64, 8),
+    on_time_touches: cell({ status: "green", value: 0.82, target: 0.8, points: 82, weight: 5 }), next_step_coverage: cell({ status: "unknown" }),
+  };
+  it("is the topic when every known behaviour metric is within 10% of target and a result is below target", () => {
+    const cells = { ...nearAll, closes: red(0, 1, 0, 9), showings_completed: red(2, 6, 33, 12) };
+    expect(resultsReview(cells)).toBe(true);
+    expect(weeklyFocus(cells, playbook)).toMatchObject({ source: "results", topic: "Pipeline review: which deals can move to a showing or offer this month" });
+  });
+  it("is not the topic when a behaviour metric is further off, or results are on target", () => {
+    expect(resultsReview({ ...nearAll, speed_to_follow: amber(67, 75, 67, 10), closes: red(0, 1, 0, 9) })).toBe(false);
+    expect(resultsReview({ ...nearAll, closes: cell({ status: "green", value: 1, target: 1, points: 100, weight: 9 }) })).toBe(false);
+    expect(resultsReview({ responsiveness: red(70, 60, 50, 7), closes: red(0, 1, 0, 9) })).toBe(false);
+    expect(resultsReview({ responsiveness: amber(65, 60, 60, 7), closes: red(0, 1, 0, 9) })).toBe(true);
   });
 });
 
 describe("plain sentences", () => {
   it("say the actual number and the target in words", () => {
     expect(slippingSentence("responsiveness", red(923, 60, 28, 7))).toBe("Replies to clients take about 15 working hours (target: within 1 hour)");
-    expect(slippingSentence("on_time_touches", amber(0.541, 0.571, 54.1, 10))).toBe("54% of follow-ups that were due happened on time (target: 57% or more)");
+    expect(slippingSentence("on_time_touches", amber(0.541, 0.571, 54.1, 10))).toBe("54% of deadlines were met on time (new leads, after consultations and no-shows, agreed dates) (target: 57% or more)");
+    expect(slippingSentence("follow_consistency", red(0.333, 0.7, 33.3, 5))).toBe("33% of Active and Buy Now leads were contacted at least every 7 days over the last 30 days (target: 70% or more)");
     expect(slippingSentence("next_step_coverage", red(0.167, 0.8, 16.7, 8))).toBe("17% of Active and Buy Now leads have a next step booked (target: 80% or more)");
     expect(slippingSentence("promises_kept", amber(0.6, 0.643, 60, 7))).toBe("60% of promises to clients were kept on time (target: 64% or more)");
     expect(slippingSentence("call_quality", amber(57.3, 57.9, 57.3, 8))).toBe("Calls rate 57 out of 100 on the call checklist (target: 58 or more)");
@@ -109,6 +159,8 @@ describe("plain sentences", () => {
 
   it("explain each example lead in plain words", () => {
     expect(exampleText("on_time_touches", { reason: "idle", dueAt: "2026-11-17T15:00:00Z", daysWithoutTouch: 12 })).toBe("went 12 days without broker contact");
+    expect(exampleText("follow_consistency", { gapDays: 19.8, gapFrom: "2026-10-27T15:00:00Z", gapTo: "2026-11-16T15:00:00Z", neverTouched: false })).toBe("20 days without contact (Oct 27 to Nov 16)");
+    expect(exampleText("follow_consistency", { gapDays: 30, gapFrom: "2026-10-24T15:00:00Z", gapTo: "2026-11-23T11:00:00Z", neverTouched: true })).toBe("never contacted");
     expect(exampleText("on_time_touches", { reason: "agreed_followup", dueAt: "2026-11-18T15:00:00Z", daysWithoutTouch: 3 })).toBe("the follow-up the client agreed for Nov 18 was missed");
     expect(exampleText("responsiveness", { messageAt: "2026-11-18T15:00:00Z", minutes: 900, replied: true })).toBe("waited about 15 working hours for a reply on Nov 18");
     expect(exampleText("responsiveness", { messageAt: "2026-11-18T15:00:00Z", minutes: 400, replied: false })).toBe("message on Nov 18 still unanswered after about 7 working hours");

@@ -7,7 +7,11 @@
  *
  * Functions:
  * - slippingMetrics(cells): behaviour metrics below target (red or amber), largest weighted point gap first.
- * - focusMetric(slipping): the metric this week's focus comes from: the first slipping one that is not next step, or null.
+ * - focusMetric(slipping): the behaviour metric a focus comes from: the first slipping one that is not next step, or null.
+ * - resultsReview(cells): true when every known behaviour metric is within 10% of its target and a results metric is below
+ *   target: the week's topic is then a pipeline review instead of a minor behaviour gap.
+ * - weeklyFocus(cells, playbook, override): the week's 1:1 topic with its question and things to agree: an admin's override
+ *   when set (keeping the automatic topic for reference), else the results review, else the first slipping behaviour metric.
  * - splitShown(items, limit): the first `limit` items to show and the rest behind "+N more".
  * - workTime(minutes): working minutes in words ("about 15 working hours", "40 minutes").
  * - targetTime(minutes): a reply-time target in words ("within 1 hour", "within 35 minutes").
@@ -22,13 +26,15 @@
  * - movement(metric, before, after): whether a metric improved, stayed about the same or got worse between two weeks.
  * - phrase(metric, value): a metric's value in words for "went from ... to ..." ("about 6 working hours", "54%", "59 out of 100").
  * - lastWeekText(metric, topic, before, after): "Last week: Same-day replies. Reply time went from ... to ..., improving".
- * - buildOneOnOneDetails(input): the details for one broker from this week's and the two previous weeks' cells (one example per lead, up to three).
+ * - buildOneOnOneDetails(input): the details for one broker from this week's and the two previous weeks' cells and topic overrides
+ *   (one example per lead, up to three; up to five leads with their gaps for follow-up consistency).
  */
 import { formatCoachingValue, type CoachingMetricId, type CoachingStatus } from "./api-coaching";
 
 export const BEHAVIOUR_METRICS: readonly CoachingMetricId[] = [
   "speed_to_follow",
   "on_time_touches",
+  "follow_consistency",
   "next_step_coverage",
   "call_quality",
   "responsiveness",
@@ -53,17 +59,41 @@ export type OneOnOneCell = {
 
 export type CoachingEntry = { topic: string; measures?: string; question: string; agree: string[]; action?: string };
 
+export type TopicOverride = { topic: string | null; note: string; setBy: string };
+
+export type WeeklyFocus = {
+  topic: string;
+  question: string;
+  agree: string[];
+  source: "behaviour" | "results" | "override";
+  metric: CoachingMetricId | null;
+  setBy: string | null;
+  note: string | null;
+  automaticTopic: string | null;
+};
+
 export type OneOnOneDetails = {
-  lastWeek: { text: string; direction: "improving" | "about the same" | "getting worse"; stuck: boolean } | null;
+  lastWeek: { text: string; direction: "improving" | "about the same" | "getting worse" | null; stuck: boolean } | null;
   slipping: Array<{ metric: CoachingMetricId; sentence: string; examples: Array<{ name: string; text: string; ghlUrl: string | null }> }>;
   results: string;
-  focus: { topic: string; question: string; agree: string[] } | null;
+  focus: Omit<WeeklyFocus, "metric"> | null;
   focusMessage: string | null;
 };
+
+export const RESULTS_REVIEW: CoachingEntry = {
+  topic: "Pipeline review: which deals can move to a showing or offer this month",
+  question: "Which of your live deals could move to a showing or an offer this month, and what is in the way?",
+  agree: ["Pick the three deals most likely to move this month", "Book a showing or a firm next step on each this week", "Go through the hot list together next week"],
+};
+
+const RESULTS_METRICS: readonly CoachingMetricId[] = ["showings_completed", "hot_pipeline", "closes", "closed_value"];
+const NEAR_TARGET = 0.1;
+const EPSILON = 1e-9;
 
 const MINUTES_PER_HOUR = 60;
 const STEADY_POINTS = 2;
 const EXAMPLES = 3;
+const CONSISTENCY_EXAMPLES = 5;
 const DATE = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
 
@@ -79,6 +109,48 @@ export function slippingMetrics(cells: Partial<Record<CoachingMetricId, OneOnOne
 
 export function focusMetric(slipping: CoachingMetricId[]): CoachingMetricId | null {
   return slipping.find((m) => BEHAVIOUR_METRICS.includes(m) && !SKIPPED_FOR_FOCUS.has(m)) ?? null;
+}
+
+export function resultsReview(cells: Partial<Record<CoachingMetricId, OneOnOneCell>>): boolean {
+  const known = BEHAVIOUR_METRICS.flatMap((m) => {
+    const c = cells[m];
+    return c && c.status !== "unknown" && c.value !== null && c.target !== null ? [{ m, value: c.value, target: c.target }] : [];
+  });
+  const near = known.every(({ m, value, target }) =>
+    m === "responsiveness" ? value <= target * (1 + NEAR_TARGET) + EPSILON : value >= target * (1 - NEAR_TARGET) - EPSILON,
+  );
+  const resultsBelow = RESULTS_METRICS.some((m) => cells[m]?.status === "red" || cells[m]?.status === "amber");
+  return known.length > 0 && near && resultsBelow;
+}
+
+export function weeklyFocus(
+  cells: Partial<Record<CoachingMetricId, OneOnOneCell>>,
+  playbook: Partial<Record<CoachingMetricId, CoachingEntry>>,
+  override: TopicOverride | null = null,
+): WeeklyFocus | null {
+  let automatic: WeeklyFocus | null = null;
+  if (resultsReview(cells)) {
+    automatic = { ...RESULTS_REVIEW, agree: [...RESULTS_REVIEW.agree], source: "results", metric: null, setBy: null, note: null, automaticTopic: null };
+  } else {
+    const metric = focusMetric(slippingMetrics(cells));
+    if (metric) {
+      const entry = playbook[metric];
+      automatic = {
+        topic: entry?.topic ?? WHAT[metric] ?? metric,
+        question: entry?.question ?? "",
+        agree: (entry?.agree ?? []).slice(0, 3),
+        source: "behaviour",
+        metric,
+        setBy: null,
+        note: null,
+        automaticTopic: null,
+      };
+    }
+  }
+  if (override?.topic) {
+    return { topic: override.topic, question: "", agree: [], source: "override", metric: null, setBy: override.setBy, note: override.note || null, automaticTopic: automatic?.topic ?? null };
+  }
+  return automatic;
 }
 
 export function splitShown<T>(items: T[], limit = 3): { shown: T[]; more: T[] } {
@@ -131,7 +203,11 @@ export function slippingSentence(metric: CoachingMetricId, cell: OneOnOneCell): 
       return `Replies to clients take ${workTime(value)}${target === null ? "" : ` (target: ${targetTime(target)})`}`;
     case "on_time_touches": {
       const [v, t] = percent(value, target);
-      return `${v} of follow-ups that were due happened on time${t ? ` (target: ${t} or more)` : ""}`;
+      return `${v} of deadlines were met on time (new leads, after consultations and no-shows, agreed dates)${t ? ` (target: ${t} or more)` : ""}`;
+    }
+    case "follow_consistency": {
+      const [v, t] = percent(value, target);
+      return `${v} of Active and Buy Now leads were contacted at least every 7 days over the last 30 days${t ? ` (target: ${t} or more)` : ""}`;
     }
     case "next_step_coverage": {
       const [v, t] = percent(value, target);
@@ -198,6 +274,13 @@ export function exampleText(metric: CoachingMetricId, facts: Record<string, stri
     }
     case "next_step_coverage":
       return `${typeof facts.priority === "string" ? facts.priority : "Active"} lead with no next step booked`;
+    case "follow_consistency": {
+      if (facts.neverTouched === true) return "never contacted";
+      const days = typeof facts.gapDays === "number" ? Math.round(facts.gapDays) : null;
+      const from = date("gapFrom");
+      const to = date("gapTo");
+      return days === null ? null : `${days} days without contact${from && to ? ` (${from} to ${to})` : ""}`;
+    }
     case "call_quality":
       return typeof facts.score === "number" ? `call on ${date("callAt")} rated ${facts.score} out of 100` : null;
     case "promises_kept":
@@ -250,7 +333,8 @@ function phrase(metric: CoachingMetricId, value: number | null): string {
 
 const WHAT: Partial<Record<CoachingMetricId, string>> = {
   responsiveness: "Reply time",
-  on_time_touches: "Follow-ups done on time",
+  on_time_touches: "Deadlines met on time",
+  follow_consistency: "Leads contacted at least weekly",
   next_step_coverage: "Leads with a next step booked",
   speed_to_follow: "Follow-up after calls",
   call_quality: "The call checklist rating",
@@ -268,20 +352,25 @@ export function buildOneOnOneDetails(input: {
   playbook: Partial<Record<CoachingMetricId, CoachingEntry>>;
   leadName: (leadId: string) => string | null;
   ghlUrl: (leadId: string) => string | null;
+  override?: TopicOverride | null;
+  previousOverride?: TopicOverride | null;
+  twoBackOverride?: TopicOverride | null;
 }): OneOnOneDetails {
   const slippingNow = slippingMetrics(input.current);
-  const focusNow = focusMetric(slippingNow);
-  const topicOf = (m: CoachingMetricId) => input.playbook[m]?.topic ?? WHAT[m] ?? m;
+  const focusNow = weeklyFocus(input.current, input.playbook, input.override ?? null);
+  const automaticNow = weeklyFocus(input.current, input.playbook);
 
   let lastWeek: OneOnOneDetails["lastWeek"] = null;
-  const focusBefore = input.previous ? focusMetric(slippingMetrics(input.previous)) : null;
-  if (input.previous && focusBefore && input.previous[focusBefore] && input.current[focusBefore]) {
-    const before = input.previous[focusBefore]!;
-    const after = input.current[focusBefore]!;
-    const focusTwoBack = input.twoBack ? focusMetric(slippingMetrics(input.twoBack)) : null;
-    const start = input.twoBack?.[focusBefore];
-    const stuck = focusNow === focusBefore && focusTwoBack === focusBefore && !!start && movement(focusBefore, start, after) !== "improving";
-    lastWeek = { text: lastWeekText(focusBefore, topicOf(focusBefore), before, after), direction: movement(focusBefore, before, after), stuck };
+  const before = input.previous ? weeklyFocus(input.previous, input.playbook, input.previousOverride ?? null) : null;
+  if (before && before.source !== "behaviour") {
+    lastWeek = { text: `Last week: ${before.topic}${before.setBy ? ` (set by ${before.setBy})` : ""}`, direction: null, stuck: false };
+  } else if (before?.metric && input.previous?.[before.metric] && input.current[before.metric]) {
+    const m = before.metric;
+    const after = input.current[m]!;
+    const twoBackFocus = input.twoBack ? weeklyFocus(input.twoBack, input.playbook, input.twoBackOverride ?? null) : null;
+    const start = input.twoBack?.[m];
+    const stuck = automaticNow?.metric === m && twoBackFocus?.metric === m && !!start && movement(m, start, after) !== "improving";
+    lastWeek = { text: lastWeekText(m, before.topic, input.previous[m]!, after), direction: movement(m, input.previous[m]!, after), stuck };
   }
 
   const slipping = slippingNow.map((metric) => ({
@@ -293,11 +382,10 @@ export function buildOneOnOneDetails(input: {
         const text = exampleText(metric, e.facts);
         return text ? [{ name: input.leadName(e.leadId) ?? "A lead", text, ghlUrl: input.ghlUrl(e.leadId) }] : [];
       })
-      .slice(0, EXAMPLES),
+      .slice(0, metric === "follow_consistency" ? CONSISTENCY_EXAMPLES : EXAMPLES),
   }));
 
-  const entry = focusNow ? input.playbook[focusNow] : undefined;
-  const focus = focusNow ? { topic: topicOf(focusNow), question: entry?.question ?? "", agree: (entry?.agree ?? []).slice(0, 3) } : null;
+  const focus = focusNow ? { topic: focusNow.topic, question: focusNow.question, agree: focusNow.agree, source: focusNow.source, setBy: focusNow.setBy, note: focusNow.note, automaticTopic: focusNow.automaticTopic } : null;
   const focusMessage = focusNow ? null : slippingNow.length ? ONLY_NEXT_STEP_GAP : NO_BEHAVIOUR_GAPS;
   return { lastWeek, slipping, results: resultsLine(input.current), focus, focusMessage };
 }

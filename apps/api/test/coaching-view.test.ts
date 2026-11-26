@@ -2,7 +2,7 @@
  * File: apps/api/test/coaching-view.test.ts
  * Purpose: Unit tests for the Coaching view builders: full scores highest first, then provisional, then no score A-Z;
  * who needs a 1:1 (full scores only, highest first, every metric below target, the topic one of them); team totals (calls reviewed summed from the
- * snapshots), who needs a 1:1, all twelve metric cells with each metric's own points (v4 snapshots), the 90-day window flag, GHL evidence links, the 8-week metric history with speed to
+ * snapshots), who needs a 1:1, all thirteen metric cells with each metric's own points (v4 snapshots), the 90-day window flag, GHL evidence links, the 8-week metric history with speed to
  * follow's detail, and the 1:1 history with Shelly's pulse.
  *
  * Functions:
@@ -33,9 +33,9 @@ describe("buildOverview", () => {
     excusesToConfirm: 2,
   });
 
-  it("lists portal brokers only, highest score first, with all twelve metric cells", () => {
+  it("lists portal brokers only, highest score first, with all thirteen metric cells", () => {
     expect(overview.brokers.map((b) => b.name)).toEqual(["Ana", "Ben"]);
-    expect(Object.keys(overview.brokers[0]!.metrics)).toHaveLength(12);
+    expect(Object.keys(overview.brokers[0]!.metrics)).toHaveLength(13);
     expect(overview.brokers[1]!.metrics.call_quality).toEqual({ value: null, points: null, weight: null, target: null, targetPlaceholder: false, status: "unknown", sample: 0, windowDays: null });
     expect(overview.brokers[1]!.metrics.speed_to_follow).toEqual({ value: 55, points: null, weight: null, target: 60, targetPlaceholder: false, status: "amber", sample: 4, windowDays: 90 });
   });
@@ -105,7 +105,9 @@ describe("buildOverview", () => {
       const charlie = o.needsOneOnOne[0]!;
       expect(charlie.reason).toBe("Off target: on-time touches 54% (≥ 57%)");
       expect(charlie.topic).toBe("Consistent follow-ups");
-      expect(charlie.details.focus).toEqual({ topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning"] });
+      expect(charlie.details.focus).toEqual({
+        topic: "Consistent follow-ups", question: "Which leads slipped through?", agree: ["Task list every morning"], source: "behaviour", setBy: null, note: null, automaticTopic: null,
+      });
       const james = o.needsOneOnOne[1]!;
       expect(james.topic).toBe("Same-day replies");
       expect(james.details.slipping.map((l) => l.metric)).toEqual(["responsiveness"]);
@@ -164,7 +166,9 @@ describe("buildBrokerPage", () => {
 
   it("builds the 1:1 history with Shelly's pulse per week", () => {
     expect(page.history.map((h) => [h.isoWeek, h.pulse?.supportNeeded ?? null])).toEqual([["2026-W47", null], ["2026-W46", "More listings"]]);
-    expect(page.topic).toBe("On-time touches: Go through the pipeline together");
+    expect(page.topic).toBe("Follow-up after calls");
+    expect(page.topicSource).toEqual({ source: "behaviour", setBy: null, note: null, automaticTopic: null });
+    expect(page.history.map((h) => h.topic)).toEqual(["Follow-up after calls", "Deadlines met on time"]);
   });
 
   it("reads week numbers from ISO week labels", () => {
