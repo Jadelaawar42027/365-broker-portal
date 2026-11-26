@@ -1,14 +1,15 @@
 /**
  * File: apps/web/src/components/admin/coaching/one-on-one-list.tsx
  * Purpose: "Needs a 1:1 this week" as collapsed bars, one per broker (name, score with its status and the trend). A bar
- * opens that broker's details below it: last week's focus, what's slipping with example leads, results and this week's
- * focus (with who set it when an admin chose the topic, and a form to set or remove one). Several can be open at once;
+ * opens that broker's details below it: this week's focus first, in a highlighted box (topic, the question to ask, what to
+ * agree on; an admin's topic shows first with who set it and the automatic topic under it, plus a form to set or remove
+ * one), then last week's focus, what's slipping with example leads, and results. Several can be open at once;
  * "Expand all" opens every bar. Each bar is a button with aria-expanded; the trend is against the 4-week average.
  *
  * Functions:
  * - OneOnOneList({ items, week }): the bars, the Expand all / Collapse all toggle and the open details.
  * - OneOnOneBar({ item, open, onToggle }): one broker's bar.
- * - OneOnOneDetails({ item, week }): the expanded details for one broker.
+ * - OneOnOneDetails({ item, week }): the expanded details for one broker, this week's focus first.
  * - SlippingList({ slipping, brokerId }): the first three slipping lines, with "+N more" to show the rest.
  * - SlippingLine({ line }): one slipping sentence and its example leads.
  */
@@ -98,38 +99,8 @@ function OneOnOneDetails({ item, week }: { item: Item; week: string | null }) {
       aria-labelledby={`one-on-one-${item.brokerId}`}
       className="flex flex-col gap-5 border-t border-line px-5 py-5"
     >
-      <section>
-        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">Last week&apos;s focus</h4>
-        {d.lastWeek ? (
-          <>
-            <p className="mt-1 text-[17px]">{d.lastWeek.text}</p>
-            {d.lastWeek.stuck ? (
-              <p className="mt-2">
-                <Pill tone="warning">Same focus for 3 weeks, no change</Pill>
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="mt-1 text-[17px] text-muted">No behaviour focus was set last week.</p>
-        )}
-      </section>
-
-      <section>
-        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">What&apos;s slipping</h4>
-        {d.slipping.length ? (
-          <SlippingList slipping={d.slipping} brokerId={item.brokerId} />
-        ) : (
-          <p className="mt-1 text-[17px] text-muted">Nothing in day-to-day work is below target.</p>
-        )}
-      </section>
-
-      <section>
-        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">Results</h4>
-        <p className="mt-1 text-[17px]">{d.results}</p>
-      </section>
-
-      <section className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-4">
-        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">This week&apos;s focus</h4>
+      <section className="rounded-xl border border-brand/30 border-l-4 border-l-brand bg-brand-soft px-4 py-4">
+        <h4 className="text-[15px] font-bold tracking-wide text-brand uppercase">This week&apos;s focus</h4>
         {d.focus ? (
           <>
             <p className="mt-1 text-lg font-bold">{d.focus.topic}</p>
@@ -169,6 +140,36 @@ function OneOnOneDetails({ item, week }: { item: Item; week: string | null }) {
             current={d.focus?.source === "override" ? { topic: d.focus.topic, note: d.focus.note } : null}
           />
         ) : null}
+      </section>
+
+      <section>
+        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">Last week&apos;s focus</h4>
+        {d.lastWeek ? (
+          <>
+            <p className="mt-1 text-[17px]">{d.lastWeek.text}</p>
+            {d.lastWeek.stuck ? (
+              <p className="mt-2">
+                <Pill tone="warning">Same focus for 3 weeks, no change</Pill>
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-1 text-[17px] text-muted">No behaviour focus was set last week.</p>
+        )}
+      </section>
+
+      <section>
+        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">What&apos;s slipping</h4>
+        {d.slipping.length ? (
+          <SlippingList slipping={d.slipping} brokerId={item.brokerId} />
+        ) : (
+          <p className="mt-1 text-[17px] text-muted">Nothing in day-to-day work is below target.</p>
+        )}
+      </section>
+
+      <section>
+        <h4 className="text-[15px] font-bold tracking-wide text-muted uppercase">Results</h4>
+        <p className="mt-1 text-[17px]">{d.results}</p>
       </section>
 
       <Link
