@@ -1,10 +1,11 @@
 /**
  * File: apps/api/test/coaching-coach-portal.int.test.ts
  * Purpose: Integration test for the Coaching section against coach-api's real tables and the coach_portal role's real
- * grants (copied from coach-api migrations 1764072000000_events, 1764110000000_engine, 1764120000000_ai-layer and
- * 1764130000000_portal-access), with COACH_DATABASE_URL logging in as coach_portal. It checks that the app opens one
+ * grants (copied from coach-api migrations 1764072000000_events, 1764110000000_engine, 1764120000000_ai-layer,
+ * 1764130000000_portal-access and 1764190000000_config-v8-playbook: SELECT on config, SELECT (id, name) on leads), with
+ * COACH_DATABASE_URL logging in as coach_portal. It checks that the app opens one
  * coach_portal connection even with HEALTH_SOURCE=none, that the Coaching store and the lead-matching health adapter
- * both use that same connection, and that every Coaching route (overview, broker page, pulse insert and update, excuse
+ * both use that same connection, that it reads lead names and the playbook but no other lead column, and that every Coaching route (overview, broker page, pulse insert and update, excuse
  * confirm then reject, the broker's own page) works within coach_portal's grants.
  *
  * Functions:
@@ -31,6 +32,12 @@ CREATE TABLE coach.call_reviews (
   promises jsonb NOT NULL DEFAULT '[]'::jsonb, next_step jsonb, coaching_note text, model text NOT NULL,
   prompt_version text NOT NULL, reviewed_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE coach.config (
+  rules_version text PRIMARY KEY, weights jsonb NOT NULL, targets jsonb NOT NULL, windows jsonb NOT NULL,
+  min_samples jsonb NOT NULL, playbook jsonb NOT NULL, points jsonb, active_from timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE coach.leads (id text PRIMARY KEY, broker_id uuid, priority text, name text, setter_outcome text);
 CREATE TABLE coach.weekly_snapshot (
   broker_id uuid NOT NULL, week_start date NOT NULL, iso_week text NOT NULL, score numeric, coverage numeric NOT NULL,
   provisional boolean NOT NULL, metrics jsonb NOT NULL, focus_areas jsonb NOT NULL, trend jsonb NOT NULL,
@@ -65,7 +72,8 @@ BEGIN
 END
 $$;
 GRANT USAGE ON SCHEMA coach TO coach_portal;
-GRANT SELECT ON coach.weekly_snapshot, coach.excuse_checks, coach.call_reviews TO coach_portal;
+GRANT SELECT ON coach.weekly_snapshot, coach.excuse_checks, coach.call_reviews, coach.config TO coach_portal;
+GRANT SELECT (id, name) ON coach.leads TO coach_portal;
 GRANT SELECT, INSERT, UPDATE ON coach.manager_pulse TO coach_portal;
 GRANT SELECT, INSERT ON coach.excuse_decisions TO coach_portal;
 GRANT USAGE ON SEQUENCE coach.excuse_decisions_id_seq TO coach_portal;
@@ -125,6 +133,17 @@ describe("one coach_portal connection for Coaching and lead matching", () => {
     await expect(coachDb!.$client`SELECT count(*) FROM public.brokers`).rejects.toThrow(/permission denied/);
   });
 
+  it("reads lead names and the playbook, but no other lead field", async () => {
+    await ctx.sql`INSERT INTO coach.leads (id, broker_id, priority, name, setter_outcome) VALUES (${"L-named"}, ${brokerA.brokerId}, ${"Active"}, ${"John Smith"}, ${"Booked"})`;
+    await ctx.sql`INSERT INTO coach.config (rules_version, weights, targets, windows, min_samples, playbook) VALUES (${"v8"}, ${"{}"}::jsonb, ${"{}"}::jsonb, ${"{}"}::jsonb, ${"{}"}::jsonb, ${JSON.stringify({ responsiveness: { topic: "Same-day replies", question: "Q", agree: ["A"] } })}::jsonb)`;
+    const coach = ctx.app.deps.coach!;
+    expect(await coach.leadNames(["L-named", "missing"])).toEqual(new Map([["L-named", "John Smith"]]));
+    expect(await coach.playbook()).toMatchObject({ responsiveness: { topic: "Same-day replies" } });
+    const coachDb = ctx.app.deps.coachDb!;
+    await expect(coachDb.$client`SELECT priority FROM coach.leads`).rejects.toThrow(/permission denied/);
+    await expect(coachDb.$client`SELECT setter_outcome FROM coach.leads`).rejects.toThrow(/permission denied/);
+  });
+
   it("serves lead-matching health over the same connection", async () => {
     const health = await getBrokerHealth({ db: ctx.db, coachDb: ctx.app.deps.coachDb, healthSource: "coach" }, [brokerA.brokerId, brokerB.brokerId]);
     expect(health.get(brokerA.brokerId)).toEqual({ score: 88, followUpScore: 75 });
@@ -137,6 +156,7 @@ describe("Coaching routes within coach_portal's grants", () => {
     const res = await ctx.call("GET", "/v1/admin/coaching/overview", { cookie: owner });
     expect(res.statusCode).toBe(200);
     expect(res.json().brokers.map((b: { name: string }) => b.name)).toEqual(["Coached A", "Coached B"]);
+    expect(Array.isArray(res.json().needsOneOnOne)).toBe(true);
     expect(res.json().totals.callsReviewed).toBe(5);
     expect(res.json().brokers[0].metrics.speed_to_follow).toMatchObject({ value: 62, windowDays: 90 });
   });

@@ -1,7 +1,8 @@
 /**
  * File: apps/api/test/helpers/coach-fake.ts
  * Purpose: An in-memory stand-in for the coach service's store, so Coaching routes and views can be tested without the
- * coach database. Snapshots, excuses and pulses are plain arrays the test fills in; decisions and pulses are recorded.
+ * coach database. Snapshots, excuses, pulses, the playbook and lead names are plain seed values the test fills in;
+ * decisions and pulses are recorded.
  *
  * Functions:
  * - snapshot(brokerId, weekStart, overrides): a weekly snapshot row with sensible defaults.
@@ -35,7 +36,9 @@ export function snapshot(brokerId: string, weekStart: string, overrides: Partial
   };
 }
 
-export function createFakeCoachStore(seed: { snapshots?: SnapshotRow[]; excuses?: ExcuseRow[]; pulses?: PulseRow[] } = {}) {
+export function createFakeCoachStore(
+  seed: { snapshots?: SnapshotRow[]; excuses?: ExcuseRow[]; pulses?: PulseRow[]; playbook?: Record<string, unknown>; leadNames?: Record<string, string> } = {},
+) {
   const snapshots = seed.snapshots ?? [];
   const excuses = seed.excuses ?? [];
   const pulses = seed.pulses ?? [];
@@ -46,6 +49,8 @@ export function createFakeCoachStore(seed: { snapshots?: SnapshotRow[]; excuses?
     snapshots: async (weekStart) => snapshots.filter((s) => s.weekStart === weekStart),
     brokerHistory: async (brokerId, upTo, count) =>
       snapshots.filter((s) => s.brokerId === brokerId && s.weekStart <= upTo).sort((a, b) => b.weekStart.localeCompare(a.weekStart)).slice(0, count),
+    playbook: async () => seed.playbook ?? {},
+    leadNames: async (ids) => new Map(ids.flatMap((id) => (seed.leadNames?.[id] ? [[id, seed.leadNames[id]!] as [string, string]] : []))),
     excusesToConfirm: async () => excuses.filter((e) => e.needsConfirmation && !e.decision).length,
     excuses: async (brokerId) => excuses.filter((e) => e.brokerId === brokerId),
     excuseBroker: async (momentKey) => excuses.find((e) => e.momentKey === momentKey)?.brokerId ?? null,

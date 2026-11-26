@@ -26,7 +26,7 @@ import { HttpError, notFound } from "../../errors";
 import { currentActor } from "../../plugins/auth-guard";
 import { writeAudit } from "../../services/audit";
 import type { CoachStore } from "../../services/coaching/store";
-import { buildBrokerPage, buildOverview, type PortalBroker } from "../../services/coaching/view";
+import { buildBrokerPage, buildOverview, evidenceLeadIds, type PortalBroker } from "../../services/coaching/view";
 
 const DAY = 864e5;
 const weekQuery = z.object({ week: z.iso.date().optional() });
@@ -59,12 +59,21 @@ export function registerAdminCoachingRoutes(app: FastifyInstance): void {
       const coach = requireCoach(app);
       const weeks = await coach.weeks();
       const week = pickWeek(weeks, request.query.week);
-      const [snapshots, portalBrokers, excusesToConfirm] = await Promise.all([
+      const at = week ? weeks.indexOf(week) : -1;
+      const earlier = (n: number) => (at >= 0 && weeks[at + n] ? coach.snapshots(weeks[at + n]!.weekStart) : Promise.resolve([]));
+      const [snapshots, previousSnapshots, twoBackSnapshots, portalBrokers, excusesToConfirm, playbook] = await Promise.all([
         week ? coach.snapshots(week.weekStart) : Promise.resolve([]),
+        earlier(1),
+        earlier(2),
         loadPortalBrokers(app.deps.db),
         coach.excusesToConfirm(),
+        coach.playbook(),
       ]);
-      return buildOverview({ weeks, week, snapshots, brokers: portalBrokers, excusesToConfirm });
+      const leadNames = await coach.leadNames(evidenceLeadIds(snapshots));
+      return buildOverview({
+        weeks, week, snapshots, brokers: portalBrokers, excusesToConfirm,
+        previousSnapshots, twoBackSnapshots, playbook, leadNames, ghlLocationId: app.deps.env.GHL_LOCATION_ID,
+      });
     },
   );
 
