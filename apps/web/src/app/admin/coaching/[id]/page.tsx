@@ -1,7 +1,7 @@
 /**
  * File: apps/web/src/app/admin/coaching/[id]/page.tsx
  * Purpose: One broker's coaching page for leadership: score, band, trend and data coverage; the two focus areas with
- * the leads behind them (linking to the GHL contact) and the playbook action; every metric with its own 0-100 points
+ * the leads behind them (linking to the GHL contact) and the playbook action; every metric, grouped into behaviour and results, with its own 0-100 points
  * (the score is their weighted average; the target only sets the colour), its target, an 8-week line and sample size
  * (marked "90-day data" when measured over 90 days; speed to follow also shows the first-call score and median time
  * to the next touch; reply time shows how many client messages needed no reply; showing conversion shows booked vs
@@ -16,6 +16,9 @@
  * - money(value): "$480K" style amounts (Intl compact USD).
  * - followDetail(detail): speed to follow's context line ("First calls 72 (5) · next touch 1.2 h median"), or null.
  * - replyDetail(detail): reply time's context line ("4 messages needed no reply"), or null when none were left out.
+ * - hotDetail(detail): hot pipeline's context line ("4 tagged and touched in 14 days · 3 with a showing or later stage"), or null.
+ * - valueDetail(detail): closed value's context line ("1 close without a value in GHL"), or null.
+ * - targetText(metric, target, placeholder): the target, plus " (placeholder)" when it is still to be set.
  * - showingDetail(detail): showing conversion's context line ("2 completed · 1 booked · first showing 3 days median · 2 leads pending"), or null.
  * - metricDetail(metric, detail): the context line shown under a metric's name, or null.
  */
@@ -27,11 +30,13 @@ import {
   formatWorkMinutes,
   windowLabel,
   scoreBand,
+  coachingMetricGroup,
   type CoachingBrokerResponse,
   type CoachingMetricId,
 } from "@bp/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { ExcuseActions } from "@/components/admin/coaching/excuse-actions";
 import { MetricCell } from "@/components/admin/coaching/metric-cell";
@@ -84,10 +89,33 @@ function showingDetail(detail: Record<string, number | null> | null): string | n
   return parts.length ? parts.join(" · ") : null;
 }
 
+function hotDetail(detail: Record<string, number | null> | null): string | null {
+  if (!detail) return null;
+  const parts: string[] = [];
+  const tagged = detail.tagged_and_touched;
+  const showing = detail.showing_or_later_stage;
+  if (typeof tagged === "number" && tagged > 0) parts.push(`${tagged} tagged and touched in 14 days`);
+  if (typeof showing === "number" && showing > 0) parts.push(`${showing} with a showing or later stage`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function valueDetail(detail: Record<string, number | null> | null): string | null {
+  const missing = detail?.closes_without_value;
+  if (typeof missing !== "number" || missing <= 0) return null;
+  return `${missing} ${missing === 1 ? "close" : "closes"} without a value in GHL`;
+}
+
+function targetText(metric: CoachingMetricId, target: number | null, placeholder: boolean): string {
+  const text = formatCoachingTarget(metric, target);
+  return placeholder && target !== null ? `${text} (placeholder)` : text;
+}
+
 function metricDetail(metric: CoachingMetricId, detail: Record<string, number | null> | null): string | null {
   if (metric === "speed_to_follow") return followDetail(detail);
   if (metric === "responsiveness") return replyDetail(detail);
   if (metric === "showing_conversion") return showingDetail(detail);
+  if (metric === "hot_pipeline") return hotDetail(detail);
+  if (metric === "closed_value") return valueDetail(detail);
   return null;
 }
 
@@ -196,7 +224,7 @@ export default async function BrokerCoachingPage({
                                 <strong className="font-bold text-ink tabular-nums">{formatPoints(focus.points)}</strong> points ·{" "}
                               </>
                             )}
-                            target {formatCoachingTarget(focus.metric, focus.target)}
+                            target {targetText(focus.metric, focus.target, focus.targetPlaceholder)}
                           </span>
                         </div>
                         {focus.evidence.length ? (
@@ -226,7 +254,7 @@ export default async function BrokerCoachingPage({
 
                 <Card as="section" className="px-6 py-5">
                   <h2 className="text-xl font-bold">All metrics</h2>
-                  <p className="mt-1 mb-3 text-[15px] text-muted">Each metric scores 0–100 points on its own; the score is their weighted average. The target only sets the colour.</p>
+                  <p className="mt-1 mb-3 text-[15px] text-muted">Each metric scores 0–100 points on its own; the score is their weighted average, half behaviour and half results. Results counts score against their target; other targets only set the colour. Targets marked placeholder are still to be set.</p>
                   <div className="relative overflow-x-auto">
                     <table className="w-full min-w-[640px] border-collapse text-left">
                       <thead>
@@ -240,8 +268,16 @@ export default async function BrokerCoachingPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {data.metrics.map((m) => (
-                          <tr key={m.metric} className="border-b border-line last:border-0">
+                        {data.metrics.map((m, i) => (
+                          <Fragment key={m.metric}>
+                          {i === 0 || coachingMetricGroup(data.metrics[i - 1]!.metric) !== coachingMetricGroup(m.metric) ? (
+                            <tr className="border-b border-line bg-page">
+                              <th scope="colgroup" colSpan={6} className="px-3 py-2 text-[14px] font-bold tracking-wide text-muted uppercase">
+                                {coachingMetricGroup(m.metric) === "behaviour" ? "Behaviour" : "Results"}
+                              </th>
+                            </tr>
+                          ) : null}
+                          <tr className="border-b border-line last:border-0">
                             <th scope="row" className="px-3 py-3 font-semibold">
                               {COACHING_METRIC_LABELS[m.metric]}
                               {metricDetail(m.metric, m.detail) ? (
@@ -252,15 +288,19 @@ export default async function BrokerCoachingPage({
                             <td className="px-3 py-3">
                               <MetricCell metric={m.metric} value={m.value} status={m.status} />
                             </td>
-                            <td className="px-3 py-3 whitespace-nowrap tabular-nums text-muted">{formatCoachingTarget(m.metric, m.target)}</td>
+                            <td className="px-3 py-3 whitespace-nowrap tabular-nums text-muted">
+                              {formatCoachingTarget(m.metric, m.target)}
+                              {m.targetPlaceholder && m.target !== null ? <span className="block text-[13px]">placeholder</span> : null}
+                            </td>
                             <td className="px-3 py-3">
                               <Sparkline values={m.history} label={`${COACHING_METRIC_LABELS[m.metric]}, last ${m.history.length} weeks, now ${formatCoachingValue(m.metric, m.value)}`} />
                             </td>
                             <td className="px-3 py-3 tabular-nums text-muted">
                               {m.sample}
-                              {windowLabel(m.windowDays) ? <span className="block text-[14px]">{windowLabel(m.windowDays)}</span> : null}
+                              {windowLabel(m.windowDays) ? <span className="block text-[14px] whitespace-nowrap">{windowLabel(m.windowDays)}</span> : null}
                             </td>
                           </tr>
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>

@@ -1,8 +1,9 @@
 /**
  * File: apps/web/src/app/admin/coaching/page.tsx
  * Purpose: The Coaching team overview for leadership: team totals, who needs a 1:1 this week (with the reason and a
- * suggested topic), and every broker's row (score, trend, data coverage, the eight metric cells against their
- * targets, with "90-day data" under a cell measured over 90 days, focus areas under the name; the name column stays put
+ * suggested topic), and every broker's row (score, trend, data coverage, the twelve metric cells grouped into behaviour
+ * and results against their targets, placeholder targets marked, with "90-day data" or "12-month data" under a cell
+ * measured over a longer window, focus areas under the name; the name column stays put
  * while the table scrolls on a phone), worst score first, with the colour legend. Numbers come from the coach
  * service's frozen Monday snapshot for the chosen week.
  *
@@ -13,6 +14,7 @@
 import {
   COACHING_METRIC_LABELS,
   COACHING_METRICS,
+  coachingMetricGroup,
   formatCoachingTarget,
   formatWorkMinutes,
   scoreBand,
@@ -28,6 +30,9 @@ import { StatCard } from "@/components/admin/stat-card";
 import { Card } from "@/components/ui/misc";
 import { Pill } from "@/components/ui/pill";
 import { serverGet } from "@/lib/server-api";
+
+const BEHAVIOUR_COUNT = COACHING_METRICS.filter((metric) => coachingMetricGroup(metric) === "behaviour").length;
+const FIRST_RESULT = COACHING_METRICS.find((metric) => coachingMetricGroup(metric) === "results");
 
 export const metadata: Metadata = { title: "Coaching · 365 Yachts admin" };
 
@@ -109,8 +114,17 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
               <CoachingLegend />
             </div>
             <div className="relative overflow-x-auto">
-              <table className="w-full min-w-[960px] border-collapse text-left">
+              <table className="w-full min-w-[1360px] border-collapse text-left">
                 <thead>
+                  <tr className="text-[14px] font-bold tracking-wide text-muted uppercase">
+                    <td colSpan={4} className="sticky left-0 z-10 bg-white" />
+                    <th scope="colgroup" colSpan={BEHAVIOUR_COUNT} className="border-b border-line px-1.5 pt-2 pb-1">
+                      Behaviour
+                    </th>
+                    <th scope="colgroup" colSpan={COACHING_METRICS.length - BEHAVIOUR_COUNT} className="border-b border-l border-line px-1.5 pt-2 pb-1">
+                      Results
+                    </th>
+                  </tr>
                   <tr className="border-b border-line text-[15px] text-muted">
                     <th scope="col" className="sticky left-0 z-10 bg-white px-3 py-2.5 font-semibold">Broker</th>
                     <th scope="col" className="px-3 py-2.5 font-semibold">Score</th>
@@ -118,10 +132,12 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
                     <th scope="col" className="px-3 py-2.5 font-semibold">Data</th>
                     {COACHING_METRICS.map((metric) => {
                       const target = data.brokers[0]?.metrics[metric]?.target ?? null;
+                      const placeholder = target !== null && data.brokers[0]?.metrics[metric]?.targetPlaceholder === true;
                       return (
-                        <th key={metric} scope="col" className="px-1.5 py-2.5 align-bottom font-semibold">
+                        <th key={metric} scope="col" className={`px-1.5 py-2.5 align-bottom font-semibold ${metric === FIRST_RESULT ? "border-l border-line" : ""}`}>
                           {COACHING_METRIC_LABELS[metric]}
                           <span className="block font-normal tabular-nums">{formatCoachingTarget(metric, target)}</span>
+                          {placeholder ? <span className="block text-[13px] font-normal">placeholder</span> : null}
                         </th>
                       );
                     })}
@@ -151,7 +167,7 @@ export default async function CoachingOverviewPage({ searchParams }: { searchPar
                         {COACHING_METRICS.map((metric) => {
                           const longer = windowLabel(row.metrics[metric]?.windowDays ?? null);
                           return (
-                            <td key={metric} className="px-1.5 py-3 text-center">
+                            <td key={metric} className={`px-1.5 py-3 text-center ${metric === FIRST_RESULT ? "border-l border-line" : ""}`}>
                               <MetricCell metric={metric} value={row.metrics[metric]?.value ?? null} status={row.metrics[metric]?.status ?? "unknown"} />
                               {longer ? <span className="mt-1 block text-[13px] leading-tight text-muted">{longer}</span> : null}
                             </td>
